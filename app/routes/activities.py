@@ -44,6 +44,7 @@ def week_view():
                 "calories": a.get("calories", "–"),
             }
             for a in raw
+            if a.get("duration", 0) >= 1800
         ]
     except Exception as exc:
         error = str(exc)
