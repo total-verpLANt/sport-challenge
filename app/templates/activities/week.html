@@ -5,12 +5,29 @@
   <h2>Woche vom {{ monday.strftime('%d.%m.%Y') }} – {{ sunday.strftime('%d.%m.%Y') }}</h2>
 </div>
 
-<div class="d-flex gap-2 mb-4">
-  <a href="?offset={{ offset - 1 }}" class="btn btn-outline-secondary">← Vorherige Woche</a>
-  <a href="?offset=0" class="btn btn-outline-primary">Aktuelle Woche</a>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+  <a href="?offset={{ offset - 1 }}&filter_short={{ filter_short }}" class="btn btn-outline-secondary">← Vorherige Woche</a>
+  <a href="?offset=0&filter_short={{ filter_short }}" class="btn btn-outline-primary">Aktuelle Woche</a>
   {% if offset < 0 %}
-  <a href="?offset={{ offset + 1 }}" class="btn btn-outline-secondary">Nächste Woche →</a>
+  <a href="?offset={{ offset + 1 }}&filter_short={{ filter_short }}" class="btn btn-outline-secondary">Nächste Woche →</a>
   {% endif %}
+
+  <form method="get" class="ms-auto d-flex align-items-center">
+    <input type="hidden" name="offset" value="{{ offset }}">
+    <div class="form-check mb-0">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        name="filter_short"
+        value="1"
+        id="filterShort"
+        onchange="this.form.submit()"
+        {{ 'checked' if filter_short == '1' else '' }}>
+      <label class="form-check-label text-muted small" for="filterShort">
+        Unter 30 Min. ausblenden
+      </label>
+    </div>
+  </form>
 </div>
 
 {% if error %}

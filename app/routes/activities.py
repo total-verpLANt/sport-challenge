@@ -20,6 +20,7 @@ def _get_week_bounds(ref: date) -> tuple[date, date]:
 @login_required
 def week_view():
     offset = request.args.get("offset", 0, type=int)
+    filter_short = request.args.get("filter_short", "1")
     ref = date.today() + timedelta(weeks=offset)
     monday, sunday = _get_week_bounds(ref)
 
@@ -44,7 +45,7 @@ def week_view():
                 "calories": a.get("calories", "–"),
             }
             for a in raw
-            if a.get("duration", 0) >= 1800
+            if filter_short != "1" or a.get("duration", 0) >= 1800
         ]
     except Exception as exc:
         error = str(exc)
@@ -55,5 +56,6 @@ def week_view():
         monday=monday,
         sunday=sunday,
         offset=offset,
+        filter_short=filter_short,
         error=error,
     )
