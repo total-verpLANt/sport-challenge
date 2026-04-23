@@ -23,6 +23,7 @@
         id="filterShort"
         onchange="this.form.submit()"
         {{ 'checked' if filter_short == '1' else '' }}>
+      <input type="hidden" name="filter_short" value="0">
       <label class="form-check-label text-muted small" for="filterShort">
         Unter 30 Min. ausblenden
       </label>
