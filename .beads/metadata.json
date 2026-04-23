@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "sport_challenge",
+  "project_id": "b45968c4-f63f-4538-8d8f-27f70f858657"
+}
