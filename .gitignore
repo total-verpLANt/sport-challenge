@@ -3,3 +3,16 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# Projekt
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+garmin_tokens.json
+instance/
+.DS_Store
+.venv/
