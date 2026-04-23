@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from flask import Blueprint, current_app, render_template, request
+from flask import Blueprint, current_app, render_template, request, session
 
 from app.garmin.client import GarminClient
+from app.routes.auth import login_required
 
 activities_bp = Blueprint("activities", __name__, template_folder="../templates")
 
@@ -15,15 +16,8 @@ def _get_week_bounds(ref: date) -> tuple[date, date]:
     return monday, sunday
 
 
-def _get_garmin_client() -> GarminClient:
-    return GarminClient(
-        email=current_app.config["GARMIN_EMAIL"],
-        password=current_app.config["GARMIN_PASSWORD"],
-        token_dir=current_app.config["GARMIN_TOKEN_DIR"],
-    )
-
-
 @activities_bp.route("/week")
+@login_required
 def week_view():
     offset = request.args.get("offset", 0, type=int)
     ref = date.today() + timedelta(weeks=offset)
@@ -32,7 +26,8 @@ def week_view():
     error = None
     activities = []
     try:
-        client = _get_garmin_client()
+        client = GarminClient(current_app.config["GARMIN_TOKEN_DIR"])
+        client.reconnect(session["garmin_email"])
         raw = client.get_week_activities(monday, sunday)
         activities = [
             {
