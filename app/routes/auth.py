@@ -1,5 +1,6 @@
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
+from sqlalchemy import func
 
 from app.extensions import db, limiter
 from app.models.user import User
@@ -24,9 +25,13 @@ def login():
                 db.select(User).filter_by(email=email)
             ).scalar_one_or_none()
             if user and user.check_password(password):
-                login_user(user)
-                return redirect(url_for("activities.week_view"))
-            error = "Ungültige Anmeldedaten."
+                if not user.is_approved:
+                    error = "Konto wartet auf Admin-Freigabe."
+                else:
+                    login_user(user)
+                    return redirect(url_for("activities.week_view"))
+            else:
+                error = "Ungültige Anmeldedaten."
 
     return render_template("auth/login.html", error=error)
 
@@ -52,10 +57,19 @@ def register():
             else:
                 user = User(email=email)
                 user.set_password(password)
+                is_first_user = db.session.execute(
+                    db.select(func.count()).select_from(User)
+                ).scalar() == 0
+                if is_first_user:
+                    user.role = "admin"
+                    user.is_approved = True
                 db.session.add(user)
                 db.session.commit()
-                login_user(user)
-                return redirect(url_for("activities.week_view"))
+                if is_first_user:
+                    login_user(user)
+                    return redirect(url_for("activities.week_view"))
+                flash("Registrierung erfolgreich – warte auf Admin-Freigabe.")
+                return redirect(url_for("auth.login"))
 
     return render_template("auth/register.html", error=error)
 

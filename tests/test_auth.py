@@ -88,8 +88,8 @@ def test_register_creates_user(client, db):
 # ---------------------------------------------------------------------------
 
 def test_login_with_valid_credentials(client, db):
-    # Vorbereitung: User anlegen
-    user = User(email="valid@example.com")
+    # Vorbereitung: freigeschalteter User
+    user = User(email="valid@example.com", is_approved=True)
     user.set_password("richtiges_passwort")
     db.session.add(user)
     db.session.commit()
