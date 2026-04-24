@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2>Benutzerverwaltung</h2>
+  {% if pending_count > 0 %}
+  <span class="badge bg-warning text-dark fs-6">{{ pending_count }} ausstehend</span>
+  {% endif %}
+</div>
+
+{% if users %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead class="table-dark">
+      <tr>
+        <th>E-Mail</th>
+        <th>Rolle</th>
+        <th>Status</th>
+        <th>Registriert</th>
+        <th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr class="{{ 'table-warning' if not user.is_approved else '' }}">
+        <td>{{ user.email }}</td>
+        <td>
+          {% if user.is_admin %}
+          <span class="badge bg-danger">Admin</span>
+          {% else %}
+          <span class="badge bg-secondary">User</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if user.is_approved %}
+          <span class="badge bg-success">Aktiv</span>
+          {% else %}
+          <span class="badge bg-warning text-dark">Ausstehend</span>
+          {% endif %}
+        </td>
+        <td class="text-muted small">{{ user.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        <td>
+          {% if not user.is_approved %}
+          <form method="post" action="{{ url_for('admin.approve_user', user_id=user.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-success btn-sm">Freischalten</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.reject_user', user_id=user.id) }}" class="d-inline ms-1"
+                onsubmit="return confirm('{{ user.email }} wirklich ablehnen und löschen?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger btn-sm">Ablehnen</button>
+          </form>
+          {% elif not user.is_admin %}
+          <span class="text-muted small">–</span>
+          {% else %}
+          <span class="text-muted small">Admin</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-muted">Keine Benutzer vorhanden.</p>
+{% endif %}
+{% endblock %}

@@ -30,6 +30,9 @@ def create_app(config_class=Config):
     from app.routes.connectors import connectors_bp
     app.register_blueprint(connectors_bp, url_prefix="/connectors")
 
+    from app.routes.admin import admin_bp
+    app.register_blueprint(admin_bp, url_prefix="/admin")
+
     @app.route("/")
     def index():
         return redirect(url_for("auth.login"))
