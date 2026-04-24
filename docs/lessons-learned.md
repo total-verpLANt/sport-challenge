@@ -84,12 +84,24 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 
 ## Architektur-Entscheidungen
 
-### 2026-04-24: FernetField als SQLAlchemy-TypeDecorator (kein Column-Event)
+### 2026-04-24: Stumme Sicherheitslücke – TypeDecorator definiert aber nicht gebunden
 
-**Erkenntnis:** Die Fernet-Verschlüsselung für `ConnectorCredential.credentials` läuft als `TypeDecorator` (transparente Ver-/Entschlüsselung beim DB-Zugriff), nicht als SQLAlchemy-Event-Listener oder Property.
+**Erkenntnis:** `_fernet_field()` war in `connector.py` definiert und korrekt implementiert, aber `credentials` nutzte `String(2048)` – der Decorator wurde nie an die Column gebunden. Credentials wurden unverschlüsselt gespeichert, ohne Fehler, ohne Test-Failure. Erst ein Code-Review beim Schreiben der Connector-Tests deckte das auf.
 
-**Warum relevant:** Der `TypeDecorator`-Ansatz erfordert den `SECRET_KEY` zur Instanzierungszeit des Feldtyps, was im App-Context passieren muss. Wer das Modell außerhalb eines App-Contexts importiert, bekommt keinen Fehler beim Import – aber einen beim ersten DB-Zugriff.
+**Warum relevant:** TypeDecorator-Verschlüsselung ist keine Magie – sie muss explizit in `mapped_column(...)` eingetragen sein. Fehlt sie, speichert SQLAlchemy still Klartext. Tests prüfen typischerweise das Verhalten, nicht ob eine Column den richtigen Typ hat.
 
-**Wo sichtbar:** `app/utils/crypto.py` → `FernetField`, `app/models/connector.py` → `_JsonFernetField`
+**Wie vermeiden:** Bei Security-relevanten Feldern immer prüfen: steht der TypeDecorator tatsächlich in `mapped_column(...)`? `grep -n "mapped_column" app/models/` reicht als Schnellcheck.
 
-**Quelle:** Commit `99fe575`, `16ac948`
+**Quelle:** Wachwechsel #3, 2026-04-24. Fix in Commit `899d5db`.
+
+---
+
+### 2026-04-24: FernetField Lazy-Init – kein App-Context bei Model-Definition
+
+**Erkenntnis:** `FernetField.__init__` mit direktem `Fernet(derive_fernet_key(secret_key))`-Aufruf funktioniert nicht ohne App-Context. SQLAlchemy-Models werden beim Import initialisiert, `current_app` ist dort nicht verfügbar. Lösung: `secret_key` optional machen, `_get_fernet()` lazy aus `current_app.config` lesen.
+
+**Warum relevant:** Der `TypeDecorator`-Ansatz ist korrekt – aber der `secret_key` darf erst beim ersten echten DB-Zugriff (innerhalb eines Request-Contexts) gelesen werden.
+
+**Wo sichtbar:** `app/utils/crypto.py` → `FernetField._get_fernet()`, `app/models/connector.py` → `_JsonFernetField()`
+
+**Quelle:** Commit `899d5db`, Wachwechsel #3 2026-04-24.
