@@ -19,3 +19,11 @@ instance/
 
 # Serena MCP – lokale Metadaten, nicht teilbar
 .serena/
+
+# Playwright – Screenshots und MCP-Artefakte
+.playwright-mcp/
+playwright-report/
+test-results/
+*.png
+*.jpeg
+*.webm
