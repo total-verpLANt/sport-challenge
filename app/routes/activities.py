@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from flask import Blueprint, current_app, render_template, request, session
+from flask import Blueprint, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 
-from app.garmin.client import GarminClient
-from app.routes.auth import login_required
+from app.connectors import PROVIDER_REGISTRY
+from app.models.connector import ConnectorCredential
 
 activities_bp = Blueprint("activities", __name__, template_folder="../templates")
 
@@ -24,22 +25,28 @@ def week_view():
     ref = date.today() + timedelta(weeks=offset)
     monday, sunday = _get_week_bounds(ref)
 
+    cred = ConnectorCredential.query.filter_by(
+        user_id=current_user.id, provider_type="garmin"
+    ).first()
+    if cred is None:
+        return redirect(url_for("connectors.index"))
+
+    connector_cls = PROVIDER_REGISTRY["garmin"]
+    connector = connector_cls(user_id=current_user.id)
+
     error = None
     activities = []
     try:
-        client = GarminClient(current_app.config["GARMIN_TOKEN_DIR"])
-        client.reconnect(session["garmin_email"])
-        raw = client.get_week_activities(monday, sunday)
+        connector.connect(cred.credentials)
+        raw = connector.get_activities(monday, sunday)
         activities = [
             {
                 "date": a.get("startTimeLocal", "")[:10],
                 "name": a.get("activityName", "–"),
                 "type": a.get("activityType", {}).get("typeKey", "–"),
-                "duration": GarminClient.format_duration(a.get("duration", 0)),
+                "duration": _format_duration(a.get("duration", 0)),
                 "distance": (
-                    GarminClient.format_distance(a["distance"])
-                    if a.get("distance")
-                    else "–"
+                    _format_distance(a["distance"]) if a.get("distance") else "–"
                 ),
                 "avg_hr": a.get("averageHR", "–"),
                 "calories": a.get("calories", "–"),
@@ -59,3 +66,14 @@ def week_view():
         filter_short=filter_short,
         error=error,
     )
+
+
+def _format_duration(seconds: float) -> str:
+    seconds = int(seconds)
+    h, remainder = divmod(seconds, 3600)
+    m, s = divmod(remainder, 60)
+    return f"{h}:{m:02d}:{s:02d}"
+
+
+def _format_distance(meters: float) -> str:
+    return f"{meters / 1000:.2f} km"
