@@ -4,7 +4,7 @@ Abdeckung:
   1. test_register_creates_user         – POST /auth/register legt User in DB an
   2. test_login_with_valid_credentials  – POST /auth/login mit korrekten Daten → 302
   3. test_login_with_invalid_credentials– POST /auth/login mit falschen Daten → 200 + Fehlertext
-  4. test_login_rate_limited            – 6 Login-Versuche → 429 beim 6. Versuch
+  4. test_login_lockout_after_10_failures – 10 Fehlversuche → Konto gesperrt
   5. test_logout_get_returns_405        – GET /auth/logout → 405
   6. test_csrf_missing_returns_400      – POST /auth/login ohne CSRF-Token → 400
 """
@@ -121,15 +121,27 @@ def test_login_with_invalid_credentials(client, db):
 
 
 # ---------------------------------------------------------------------------
-# Test 4 – Login Rate-Limiting (429 beim 6. Versuch)
+# Test 4 – Lockout nach 10 Fehlversuchen
 # ---------------------------------------------------------------------------
 
-def test_login_rate_limited(rate_limit_client):
-    payload = {"email": "spam@example.com", "password": "falsch"}
-    last_response = None
-    for _ in range(6):
-        last_response = rate_limit_client.post("/auth/login", data=payload)
-    assert last_response.status_code == 429
+def test_login_lockout_after_10_failures(client, db):
+    user = User(email="lockme@example.com", is_approved=True)
+    user.set_password("richtiges_passwort")
+    db.session.add(user)
+    db.session.commit()
+
+    payload = {"email": "lockme@example.com", "password": "falsch"}
+    for _ in range(10):
+        client.post("/auth/login", data=payload)
+
+    # 11. Versuch – auch mit richtigem Passwort gesperrt
+    resp = client.post(
+        "/auth/login",
+        data={"email": "lockme@example.com", "password": "richtiges_passwort"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 200
+    assert "gesperrt" in resp.get_data(as_text=True)
 
 
 # ---------------------------------------------------------------------------
