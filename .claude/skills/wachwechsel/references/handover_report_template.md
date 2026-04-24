@@ -21,6 +21,9 @@ Der Abschluss-Bericht, den der Wachwechsel-Skill an den Kapitän ausgibt. Pirate
 | `.env.example` | ✅ synchron mit Code / ⚠️ ergänzt um X, Y |
 | bd-Memory | ✅ Key: `<key-prefix>` |
 | `.gitignore` | ✅ (oder: ergänzt um X, Y) |
+| `docs/lessons-learned.md` | ✅ <N> neue Einträge / – unverändert / neu erstellt |
+| Ghost-Message | ✅ hinterlegt / – übersprungen |
+| `scripts/verify-handover.sh` | ✅ vorhanden und ausführbar |
 
 ### Einstiegsweg für die neue Session
 
@@ -33,8 +36,9 @@ Drei redundante Pfade – falls einer nicht greift, führen die anderen zum Ziel
 ### Erster Befehl für die neue Session
 
 ```bash
-bd update <erstes-ready-issue> --claim   # Nächstes Issue klammern
-bd show <erstes-ready-issue>              # Details
+./scripts/verify-handover.sh              # Sanity-Check vor dem Einsteigen
+bd update <erstes-ready-issue> --claim    # Nächstes Issue klammern
+bd show <erstes-ready-issue>               # Details
 # Dann atomarer Fix nach Pflicht-Reihenfolge aus CLAUDE.md
 ```
 

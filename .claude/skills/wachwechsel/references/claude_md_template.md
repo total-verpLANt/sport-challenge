@@ -30,6 +30,23 @@ bd show <erstes-ready-issue>          # Details zum ersten Ticket
 
 **Plan-ID → bd-ID Quick-Map:**
 `I-01→<id> · I-02→<id> · I-03→<id> · ...`
+
+### Nachricht vom scheidenden Wachoffizier (YYYY-MM-DD)
+
+> <2–6 Sätze, siehe references/ghost_message_guide.md. Wenn keine
+> Nachricht hinterlassen wurde: Abschnitt komplett weglassen.>
+
+### Bekannte Stolpersteine
+
+- Aktuelle Top-Risiken: siehe `docs/lessons-learned.md` (falls vorhanden)
+- Point-of-no-return-Issues aus Plan: <konkrete IDs auflisten>
+- Fragile externe Abhängigkeiten: <z.B. "Garmin-API ändert sich regelmäßig">
+
+### Start-Verifikation
+
+```bash
+./scripts/verify-handover.sh    # prüft, ob die Übergabe konsistent ist
+```
 ```
 
 ## Regeln für den Inhalt

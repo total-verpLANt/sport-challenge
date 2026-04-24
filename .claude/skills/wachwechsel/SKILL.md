@@ -81,6 +81,31 @@ Prüfe, was an Projekt-Dokumentation existiert und was davon durch die aktuelle 
 
 **Wenn der `doc-sync-check`-Skill verfügbar ist**, ruf ihn intern auf statt manuell zu prüfen – er ist genau für diesen Zweck gebaut. Fallback ist die manuelle Checkliste.
 
+### Schritt 2.6: Stolpersteine-Kurator
+
+Das teuerste Wissen in einem Projekt ist **nicht** im Code und **nicht** im Plan – es sind die Dinge, die schiefgegangen sind und aus denen man gelernt hat. Ohne explizites Festhalten verschwindet dieses Wissen mit jedem Agentenwechsel.
+
+Prüfe: Gibt es `docs/lessons-learned.md`?
+
+- **Falls nein:** Biete dem Kapitän an, das Dokument neu anzulegen mit den bisher gesammelten Erkenntnissen. Struktur siehe [references/lessons_learned_template.md](references/lessons_learned_template.md).
+- **Falls ja:** Scanne seit dem letzten Wachwechsel-Commit (`git log <letzter-wachwechsel>..HEAD`) nach neuen Research-Dokumenten, gelösten Bugs, Version-Bumps mit Breaking-Change-Grund. Schlage dem Kapitän konkrete Einträge zur Aufnahme vor.
+
+**Typische Kandidaten für Lessons:**
+
+- Version-Bumps mit Grund (z.B. "garminconnect 0.3.2 → 0.3.3 wegen Breaking Change am 17.03.2026")
+- Verworfene Optionen mit Begründung (z.B. "Samsung Health kein Connector – hat kein Web-API")
+- Nicht-offensichtliche Defaults (z.B. "Werkzeug-scrypt ist unter OWASP")
+- Community-Gerüchte, die sich als richtig/falsch erwiesen (z.B. "Strava localhost offiziell whitelisted")
+- Deprecated/Tot-Pakete mit Nachfolger (z.B. "pysqlcipher3 deprecated, Nachfolger sqlcipher3")
+
+**Keine Kandidaten:**
+
+- Einfache Bugfixes ("Typo korrigiert") – die sind im Commit-Log sichtbar genug
+- Subjektive Vorlieben ("Ich mag Tailwind nicht") – gehören in CLAUDE.md-Conventions
+- Flüchtiges Status-Wissen ("Wave 3 läuft") – gehört in bd-Memory
+
+Der Abschnitt ist eine kuratierte Wissensbasis, kein Änderungsprotokoll.
+
 ### Schritt 3: Plan-ID → bd-ID-Mapping
 
 Wenn ein Plan existiert und Issue-IDs im Format `I-NN` enthält:
@@ -105,6 +130,24 @@ Dieses Mapping geht später in CLAUDE.md, damit der nächste Agent ohne Suche di
 
 **Warte auf explizite Freigabe.** Der Kapitän kann das Vorgehen ablehnen, Teile rausnehmen oder umformulieren. Er kann Doku-Änderungen auch auf einen separaten Commit verlagern, wenn sie umfangreich sind.
 
+### Schritt 4.5: Ghost-Message-Gate
+
+Nach der Freigabe, **bevor** die CLAUDE.md geschrieben wird, frage den Kapitän:
+
+> *"Möchtest du dem nächsten Agenten eine kurze Nachricht hinterlassen? 2–3 Sätze, was dich heute am meisten beschäftigt hat, welche Entscheidungen du bewusst so getroffen hast, oder wo er besonders vorsichtig sein soll. Das ist kontextreicher als jede Tabelle."*
+
+Die Antwort landet **wörtlich** als Block-Zitat im "Aktueller Stand"-Abschnitt von CLAUDE.md, unter einem Abschnitt `### Nachricht vom scheidenden Wachoffizier (YYYY-MM-DD)`.
+
+Wenn der Kapitän "nichts" oder "pass" antwortet: Abschnitt weglassen oder den alten stehen lassen (nicht stillschweigend löschen – die alte Nachricht hatte ihren Grund).
+
+Gute Ghost-Messages erfüllen eins dieser Kriterien:
+
+- Erklären **warum** eine Entscheidung so gefallen ist (nicht **was** entschieden wurde – das steht im Plan)
+- Warnen vor Stellen, an denen der scheidende Agent selbst fast gestolpert wäre
+- Benennen Unsicherheiten, die in Tabellen zu formal wirken würden
+
+Beispiel siehe [references/ghost_message_guide.md](references/ghost_message_guide.md).
+
 ### Schritt 5: Umsetzung (nach Freigabe)
 
 Reihenfolge ist wichtig – erst Dateien, dann Git, dann Memory, damit bei Abbruch immer ein konsistenter Zwischenzustand existiert:
@@ -116,7 +159,8 @@ Reihenfolge ist wichtig – erst Dateien, dann Git, dann Memory, damit bei Abbru
    `git tag -a pre-rebuild-2026-04-24 -m "Sicherheitsanker vor Multi-User Rebuild (Epic sport-challenge-79s). Plan: .schrammns_workflow/plans/..."`
    Tag **vor** dem Commit setzen, damit er auf den letzten sauberen Zustand vor dem Wachwechsel zeigt (nicht auf den Wachwechsel-Commit selbst – sonst bringt Rollback nichts).
 5. **`bd remember`:** Kompakter Pointer. Struktur siehe [references/bd_memory_template.md](references/bd_memory_template.md).
-6. **Commit:** Spezifische Pfade stagen (niemals `git add .`). Commit-Message referenziert den Epic und listet die Doku-Änderungen explizit (Transparenz für den nächsten Kollegen).
+6. **Start-Verifikations-Script:** Wenn `scripts/verify-handover.sh` noch nicht existiert, aus [references/verify_handover_template.sh](references/verify_handover_template.sh) anlegen und projektspezifisch anpassen (Python-Version, DB-Datei-Pfad, etc.). Chmod ausführbar machen. Falls existiert: aktualisieren, wenn neue Prüfungen dazukommen (z.B. neue env-Variablen).
+7. **Commit:** Spezifische Pfade stagen (niemals `git add .`). Commit-Message referenziert den Epic und listet die Doku-Änderungen explizit (Transparenz für den nächsten Kollegen).
 
 ### Schritt 6: Verifikation
 
