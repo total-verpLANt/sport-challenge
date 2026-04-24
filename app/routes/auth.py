@@ -1,34 +1,15 @@
-from __future__ import annotations
+from flask import Blueprint, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
 
-from functools import wraps
-
-from flask import (
-    Blueprint,
-    current_app,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-)
-
-from app.garmin.client import GarminClient
+from app.extensions import db
+from app.models.user import User
 
 auth_bp = Blueprint("auth", __name__, template_folder="../templates")
 
 
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if "garmin_email" not in session:
-            return redirect(url_for("auth.login"))
-        return f(*args, **kwargs)
-    return decorated
-
-
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-    if "garmin_email" in session:
+    if current_user.is_authenticated:
         return redirect(url_for("activities.week_view"))
 
     error = None
@@ -38,18 +19,47 @@ def login():
         if not email or not password:
             error = "E-Mail und Passwort sind erforderlich."
         else:
-            try:
-                client = GarminClient(current_app.config["GARMIN_TOKEN_DIR"])
-                client.login(email, password)
-                session["garmin_email"] = email
+            user = db.session.execute(
+                db.select(User).filter_by(email=email)
+            ).scalar_one_or_none()
+            if user and user.check_password(password):
+                login_user(user)
                 return redirect(url_for("activities.week_view"))
-            except Exception as exc:
-                error = f"Garmin-Login fehlgeschlagen: {exc}"
+            error = "Ungültige Anmeldedaten."
 
     return render_template("auth/login.html", error=error)
 
 
-@auth_bp.route("/logout")
+@auth_bp.route("/register", methods=["GET", "POST"])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for("activities.week_view"))
+
+    error = None
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        if not email or not password:
+            error = "E-Mail und Passwort sind erforderlich."
+        else:
+            existing = db.session.execute(
+                db.select(User).filter_by(email=email)
+            ).scalar_one_or_none()
+            if existing:
+                error = "Diese E-Mail ist bereits registriert."
+            else:
+                user = User(email=email)
+                user.set_password(password)
+                db.session.add(user)
+                db.session.commit()
+                login_user(user)
+                return redirect(url_for("activities.week_view"))
+
+    return render_template("auth/register.html", error=error)
+
+
+@auth_bp.route("/logout", methods=["POST"])
+@login_required
 def logout():
-    session.clear()
+    logout_user()
     return redirect(url_for("auth.login"))
