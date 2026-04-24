@@ -64,6 +64,24 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 
 ---
 
+## Tooling: Python venv
+
+### 2026-04-24: venv nach Projektumzug mit gebrochenen Shebangs
+
+**Erkenntnis:** Ein `python3 -m venv .venv` (oder `uv venv`) speichert den absoluten Pfad des Projekts in die Shebangs aller Scripts unter `.venv/bin/`. Nach einem Projektumzug (Ordner umbenennen oder verschieben) sind diese Shebangs ungültig – alle `.venv/bin/*`-Binaries werfen sofort `bad interpreter: no such file or directory`.
+
+**Warum relevant:** Das `.venv` erscheint vorhanden (`ls .venv/` zeigt Dateien), ist aber komplett unbrauchbar. Die Fehlermeldung ist irreführend – man sucht zunächst nach falschen Paketen statt nach dem Pfad.
+
+**Wie lösen:** `uv venv .venv --clear --python 3.14 && uv pip install -r requirements.txt`. Mit `uv` gebaute venvs nutzen symlink-basierte Interpreter – nach dem nächsten Umzug kein erneutes `--clear` nötig, solange Python unter demselben Homebrew-Pfad liegt.
+
+**Wie vermeiden:** Projekt-Verzeichnis nicht umbenennen/verschieben. Falls doch: venv immer neu aufbauen, nie kopieren.
+
+**Wo sichtbar:** `.venv/bin/` – Shebang-Zeile der Scripts (`head -1 .venv/bin/flask`)
+
+**Quelle:** Session 2026-04-24, Wachwechsel #2
+
+---
+
 ## Architektur-Entscheidungen
 
 ### 2026-04-24: FernetField als SQLAlchemy-TypeDecorator (kein Column-Event)

@@ -50,16 +50,16 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-04-24, Wachwechsel)
+## Aktueller Stand (2026-04-24, Wachwechsel #2)
 
-**Aktive Arbeit:** Multi-User Rebuild – Wave 0–3 abgeschlossen, Wave 4/5 als nächstes
+**Aktive Arbeit:** Multi-User Rebuild – Wave 4/5 abgeschlossen, Wave 6/7 als nächstes
 
 - **Epic:** `sport-challenge-79s` – Rebuild vom Single-User-Prototyp zur Multi-User-Flask-App
-- **Fortschritt:** 21 von 25 Plan-Issues erledigt (+ 6 Altissues), 4 Issues ready
+- **Fortschritt:** 26 von 32 Issues geschlossen, 5 ready
 - **Plan:** `.schrammns_workflow/plans/2026-04-23-sport-challenge-multi-user-rebuild.md` (25 Issues, 8 Waves)
 - **Research:** `.schrammns_workflow/research/2026-04-23-architektur-best-practices-rebuild-sport-challenge-flask.md`
 - **Git-Anker:** Tag `pre-rebuild-2026-04-24` (Rollback via `git reset --hard pre-rebuild-2026-04-24`)
-- **Lessons Learned:** `docs/lessons-learned.md` (Alembic-Fallstrick, Sub-Agent-Permissions, scrypt-Defaults)
+- **Lessons Learned:** `docs/lessons-learned.md`
 
 ### Einstieg für neue Sessions
 
@@ -71,30 +71,38 @@ bd ready                              # nächste Issues
 ```
 
 **Nächste Issues (ready):**
-- `i7k` – I-16: Migration connector_credentials-Tabelle ← **hier einsteigen**
-- `q7a` – I-17: GarminConnector-Implementation mit Per-User-Token-Isolation
-- `nmu` – I-21: Flask-Limiter am Login-Endpoint aktivieren
-- `6n2` – I-23: pytest + Flask-Fixtures Setup
-- `gvl` – OWASP-konforme scrypt-Parameter
+- `0jp` – I-25: Connector-Tests (Base + Garmin) ← **hier einsteigen**
+- `k7x` – I-24: Auth-Flow-Tests
+- `4p5` – I-19: Connector-UI für Verbinden + Status
+- `gdc` – Retry-Decorator mit exponential backoff (429)
+- `58h` – I-20: Activities-Route auf Connector-Abstraction
 
 **Plan-ID → bd-ID Quick-Map:**
 `I-01→gxc · I-02→om6 · I-03→0fd · I-04→25e · I-05→cjx · I-06→99s · I-07→4qi · I-08→bmu · I-09→l6s · I-10→p67 · I-11→xta · I-12→uwg · I-13=t65 · I-14→tya · I-15→tjp · I-16→i7k · I-17→q7a · I-18=gdc · I-19→4p5 · I-20→58h · I-21→nmu · I-22=gvl · I-23→6n2 · I-24→k7x · I-25→0jp`
 
+### Nachricht vom scheidenden Wachoffizier (2026-04-24)
+
+> Wir sind beim letzten Mal über absolute Pfade gestolpert, weil das Projektverzeichnis verschoben wurde. Das `.venv` hatte gebrochene Shebangs und musste mit `uv venv --clear` neu gebaut werden. Achte darauf, dass Pfade im Code, in Konfigurationsdateien und in Settings immer relativ zum Projektverzeichnis sind – keine Abhängigkeit zum Entwicklergerät.
+
 ## Build & Test
 
 ```bash
-# Virtualenv aktivieren
-source .venv/bin/activate
+# venv neu aufbauen (bei Pfadproblemen nach Projektumzug)
+uv venv .venv --python 3.14 --clear
+uv pip install -r requirements.txt
 
-# Abhängigkeiten installieren
-pip install -r requirements.txt
+# Dev-Server starten
+SECRET_KEY=<dein-key> FLASK_DEBUG=1 .venv/bin/python run.py
 
-# Dev-Server starten (Debug nur wenn FLASK_DEBUG=1 nach I-01)
-FLASK_DEBUG=1 python run.py
+# Migrationen anwenden
+FLASK_APP=run.py .venv/bin/flask db upgrade
 
-# Tests (ab I-23 verfügbar)
-# pytest
+# Tests ausführen
+.venv/bin/pytest -v
 ```
+
+**Hinweis Pfade:** Alle Pfade im Projekt müssen relativ sein. `.venv/bin/` statt absolutem Pfad.
+Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `uv venv .venv --clear` ausführen.
 
 ## Architecture Overview
 
@@ -102,17 +110,19 @@ FLASK_DEBUG=1 python run.py
 - `app/garmin/client.py` – Wrapper um `garminconnect`-Lib (Token-Reuse in `~/.garminconnect/`)
 - `app/routes/activities.py` – `/activities/week` mit Wochennavigation und 30-Min-Filter
 
-**Phase 2 (in Arbeit, Wave 0–3 done):** Multi-User mit Connector-Architektur.
+**Phase 2 (in Arbeit, Wave 4/5 done):** Multi-User mit Connector-Architektur.
 - `app/__init__.py` – App Factory mit Extensions-Init + user_loader
 - `app/extensions.py` – db, migrate, login_manager, csrf, limiter (Instanzen, kein init_app hier)
-- `app/models/user.py` – User + UserMixin, scrypt-Hashing, is_admin-Property
+- `app/models/user.py` – User + UserMixin, scrypt N=2^17 (OWASP), is_admin-Property
 - `app/models/connector.py` – ConnectorCredential mit JSON-FernetField, UniqueConstraint(user_id, provider_type)
 - `app/connectors/base.py` – BaseConnector ABC; `app/connectors/__init__.py` – PROVIDER_REGISTRY + @register
+- `app/connectors/garmin.py` – GarminConnector, Token-Dir pro User isoliert (`GARMIN_TOKEN_DIR/<user_id>/`)
 - `app/utils/crypto.py` – HKDF-Key-Derivation + FernetField TypeDecorator
 - `app/utils/decorators.py` – admin_required (verkettet login_required intern)
-- `app/routes/auth.py` – Login/Register/Logout mit Flask-Login; Logout POST-only
-- `migrations/` – Alembic initialisiert, users-Tabelle migriert
-- **Noch offen:** GarminConnector-Impl (I-17), connector_credentials-Migration (I-16), Activities-Route auf Connector-Abstraction (I-20), Auth-Flow-Tests (I-24)
+- `app/routes/auth.py` – Login/Register/Logout mit Flask-Login + Rate-Limit (5/min, 3/min)
+- `migrations/` – users + connector_credentials (Alembic)
+- `tests/` – pytest, conftest.py mit app/client/db-Fixture (In-Memory-SQLite)
+- **Noch offen:** Connector-UI (I-19), Activities-Route auf Connector-Abstraction (I-20), Auth-Tests (I-24), Connector-Tests (I-25)
 
 ## Conventions & Patterns
 

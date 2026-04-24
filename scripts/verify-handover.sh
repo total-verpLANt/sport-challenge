@@ -46,7 +46,7 @@ section "Projekt-Setup"
 if [ -d ".venv" ]; then
     pass "Python venv vorhanden (.venv/)"
 else
-    fail "Python venv fehlt – 'python -m venv .venv && pip install -r requirements.txt'"
+    fail "Python venv fehlt – 'uv venv .venv --python 3.14 && uv pip install -r requirements.txt'"
 fi
 
 if [ -f "instance/sport-challenge.db" ]; then

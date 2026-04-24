@@ -22,5 +22,21 @@
         "matcher": ""
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/pytest *)",
+      "Bash(.venv/bin/pytest)",
+      "Bash(.venv/bin/python -m pytest *)",
+      "Bash(.venv/bin/flask db *)",
+      "Bash(FLASK_APP=run.py .venv/bin/flask db *)",
+      "Bash(bd ready *)",
+      "Bash(bd ready)",
+      "Bash(bd show *)",
+      "Bash(bd list *)",
+      "Bash(bd stats *)",
+      "Bash(bd stats)",
+      "Bash(lsof -ti:*)"
+    ]
   }
 }
