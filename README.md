@@ -27,7 +27,7 @@ uv pip install -r requirements.txt
 FLASK_APP=run.py SECRET_KEY=dev .venv/bin/flask db upgrade
 
 # 3. Dev-Server starten
-SECRET_KEY=dev FLASK_DEBUG=1 GARMIN_TOKEN_DIR=./garmin_tokens .venv/bin/python run.py
+SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 ```
 
 **Pflicht-Umgebungsvariablen:**
@@ -35,7 +35,6 @@ SECRET_KEY=dev FLASK_DEBUG=1 GARMIN_TOKEN_DIR=./garmin_tokens .venv/bin/python r
 | Variable | Beschreibung |
 |---|---|
 | `SECRET_KEY` | Flask Secret Key (beliebiger langer String) |
-| `GARMIN_TOKEN_DIR` | Verzeichnis für Garmin-Token-Dateien (pro User isoliert) |
 | `FLASK_DEBUG` | Optional: `1` für Debug-Modus |
 
 > **Hinweis:** Nach Projektumzug (Ordner umbenennen/verschieben) ist das `.venv` durch gebrochene Shebangs unbrauchbar.  
@@ -67,7 +66,7 @@ app/
 ├── connectors/
 │   ├── base.py          # BaseConnector ABC
 │   ├── __init__.py      # PROVIDER_REGISTRY + @register
-│   └── garmin.py        # GarminConnector (Token-Dir pro User)
+│   └── garmin.py        # GarminConnector (Tokens Fernet-verschlüsselt in DB)
 ├── routes/
 │   ├── auth.py          # Login/Register/Logout, Rate-Limit
 │   ├── activities.py    # /activities/week – Wochenansicht
@@ -88,7 +87,7 @@ tests/                   # pytest, In-Memory-SQLite
 1. User ruft `/activities/week` auf
 2. Route lädt `ConnectorCredential` für `current_user` (Fernet-entschlüsselt)
 3. `GarminConnector` wird aus `PROVIDER_REGISTRY` instanziiert
-4. `connector.connect(credentials)` → Garmin-Login mit Token-Isolation pro User
+4. `connector.connect(credentials)` → Token-basierter Reconnect (oder Erstlogin mit Credentials); ggf. refreshte Tokens werden verschlüsselt in DB gespeichert
 5. `connector.get_activities(start, end)` → gefilterte Aktivitätsliste
 
 ## Weiterführend
