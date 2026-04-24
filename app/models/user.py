@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from flask_login import UserMixin
-from sqlalchemy import DateTime, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -20,12 +20,19 @@ class User(UserMixin, db.Model):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+    is_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password, method="scrypt:131072:8:1")
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def is_active(self) -> bool:
+        return self.is_approved
 
     @property
     def is_admin(self) -> bool:
