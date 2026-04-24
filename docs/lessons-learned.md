@@ -105,3 +105,29 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wo sichtbar:** `app/utils/crypto.py` → `FernetField._get_fernet()`, `app/models/connector.py` → `_JsonFernetField()`
 
 **Quelle:** Commit `899d5db`, Wachwechsel #3 2026-04-24.
+
+---
+
+## Konfiguration & Infrastruktur
+
+### 2026-04-24: Env-Var-Name stumm ignoriert – Fallback greift immer
+
+**Erkenntnis:** `config.py` las `GARMINTOKENS`, alle anderen Stellen (README, CLAUDE.md, Tests) nutzten `GARMIN_TOKEN_DIR`. Wer den dokumentierten Namen setzte, hatte ihn stillschweigend ignoriert – der Fallback `~/.garminconnect` griff immer, ohne Fehler oder Warnung.
+
+**Warum relevant:** Falsche Env-Var-Namen sind schwer zu debuggen: Tests bleiben grün (Fallback funktioniert), Deployment-Probleme treten erst in Produktion auf wenn der Fallback-Pfad nicht existiert.
+
+**Wie vermeiden:** `/doc-sync-check` nach Config-Änderungen ausführen. Env-Var-Namen in `config.py`, README, `.env.example` und Tests müssen identisch sein.
+
+**Quelle:** Wachwechsel #4, 2026-04-24. Fix in Commit `9811fae`.
+
+---
+
+### 2026-04-24: SRI-Hash-Mismatch blockt gesamtes Frontend-JavaScript
+
+**Erkenntnis:** Ein Zeichen Unterschied im Bootstrap SRI-Hash (`Xc4s9b` statt `Xc5s9f`) in `base.html` ließ den Browser das gesamte JS-Bundle blockieren. Unit-Tests blieben vollständig grün. Erst der Playwright-Smoke-Test deckte den Console-Error auf.
+
+**Warum relevant:** SRI-Hashes können bei CDN-Versionsänderungen oder Tippfehlern bei manueller Einbindung stillschweigend falsch sein. Der Fehler ist nicht im Code sichtbar – nur im Browser.
+
+**Wie vermeiden:** Bootstrap-CDN-Links immer von `getbootstrap.com/docs/x.y/getting-started/introduction/` kopieren, nie manuell tippen. Hash per `curl ... | openssl dgst -sha384 -binary | openssl base64 -A` verifizieren. Playwright-Smoke-Test auf Console-Errors prüfen.
+
+**Quelle:** Wachwechsel #4, 2026-04-24. Fix in Commit `92eab14`.

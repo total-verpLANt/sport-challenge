@@ -50,16 +50,19 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-04-24, Wachwechsel #3)
+## Aktueller Stand (2026-04-24, Wachwechsel #4)
 
-**Aktive Arbeit:** Multi-User Rebuild – **ABGESCHLOSSEN**
+**Aktive Arbeit:** Quality-Fixes nach Multi-User Rebuild – keine offenen Issues
 
 - **Epic:** `sport-challenge-79s` – GESCHLOSSEN. 33/33 Issues done.
 - **Meilenstein-Tag:** `milestone-multi-user-rebuild-2026-04-24`
-- **Plan:** `.schrammns_workflow/plans/2026-04-23-sport-challenge-multi-user-rebuild.md`
-- **Research:** `.schrammns_workflow/research/2026-04-23-architektur-best-practices-rebuild-sport-challenge-flask.md`
 - **Lessons Learned:** `docs/lessons-learned.md`
 - **Nächste Phase:** Kein aktiver Epic – neue Aufgaben via `bd create` anlegen
+
+**Fixes seit Wachwechsel #3:**
+- `9811fae` – Env-Var `GARMINTOKENS` → `GARMIN_TOKEN_DIR` (config.py / .env.example)
+- `92eab14` – Bootstrap JS SRI-Hash korrigiert (base.html, JS war geblockt)
+- `082afaf` – Playwright-Artefakte in .gitignore + Bootstrap-Research committet
 
 ### Einstieg für neue Sessions
 
