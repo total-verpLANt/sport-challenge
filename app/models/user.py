@@ -22,7 +22,7 @@ class User(UserMixin, db.Model):
     )
 
     def set_password(self, password: str) -> None:
-        self.password_hash = generate_password_hash(password, method="scrypt")
+        self.password_hash = generate_password_hash(password, method="scrypt:131072:8:1")
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
