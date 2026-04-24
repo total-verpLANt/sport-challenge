@@ -23,11 +23,6 @@ class _JsonFernetField(FernetField):
         return json.loads(raw)
 
 
-def _fernet_field():
-    from flask import current_app
-    return _JsonFernetField(current_app.config["SECRET_KEY"])
-
-
 class ConnectorCredential(db.Model):
     __tablename__ = "connector_credentials"
     __table_args__ = (UniqueConstraint("user_id", "provider_type"),)
@@ -35,7 +30,7 @@ class ConnectorCredential(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     provider_type: Mapped[str] = mapped_column(String(64), nullable=False)
-    credentials: Mapped[str] = mapped_column(String(2048), nullable=False)
+    credentials: Mapped[dict] = mapped_column(_JsonFernetField(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

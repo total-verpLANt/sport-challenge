@@ -21,16 +21,24 @@ class FernetField(TypeDecorator):
     impl = String
     cache_ok = True
 
-    def __init__(self, secret_key: str, *args, **kwargs):
+    def __init__(self, secret_key: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._fernet = Fernet(derive_fernet_key(secret_key))
+        self._fernet: Fernet | None = (
+            Fernet(derive_fernet_key(secret_key)) if secret_key else None
+        )
+
+    def _get_fernet(self) -> Fernet:
+        if self._fernet is None:
+            from flask import current_app
+            self._fernet = Fernet(derive_fernet_key(current_app.config["SECRET_KEY"]))
+        return self._fernet
 
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
-        return self._fernet.encrypt(value.encode()).decode()
+        return self._get_fernet().encrypt(value.encode()).decode()
 
     def process_result_value(self, value, dialect):
         if value is None:
             return None
-        return self._fernet.decrypt(value.encode()).decode()
+        return self._get_fernet().decrypt(value.encode()).decode()
