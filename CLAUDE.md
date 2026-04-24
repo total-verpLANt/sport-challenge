@@ -50,24 +50,32 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-04-24)
+## Aktueller Stand (2026-04-24, Wachwechsel)
 
-**Aktive Arbeit:** Multi-User Rebuild mit Connector-Architektur
+**Aktive Arbeit:** Multi-User Rebuild – Wave 0–3 abgeschlossen, Wave 4/5 als nächstes
 
 - **Epic:** `sport-challenge-79s` – Rebuild vom Single-User-Prototyp zur Multi-User-Flask-App
+- **Fortschritt:** 21 von 25 Plan-Issues erledigt (+ 6 Altissues), 4 Issues ready
 - **Plan:** `.schrammns_workflow/plans/2026-04-23-sport-challenge-multi-user-rebuild.md` (25 Issues, 8 Waves)
 - **Research:** `.schrammns_workflow/research/2026-04-23-architektur-best-practices-rebuild-sport-challenge-flask.md`
-- **Quellen-Nachweis:** `.schrammns_workflow/research/2026-04-23-websearch-ergebnisse.md`
-- **Git-Anker:** Tag `pre-rebuild-2026-04-24` (vor Wave 0 gesetzt, Rollback via `git reset --hard <tag>`)
+- **Git-Anker:** Tag `pre-rebuild-2026-04-24` (Rollback via `git reset --hard pre-rebuild-2026-04-24`)
+- **Lessons Learned:** `docs/lessons-learned.md` (Alembic-Fallstrick, Sub-Agent-Permissions, scrypt-Defaults)
 
 ### Einstieg für neue Sessions
 
 ```bash
+./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
 bd memories multi-user                # gespeicherter Pointer mit allen IDs
-bd ready                              # aktuelle Wave (Start: I-01, I-02, I-03)
-bd show sport-challenge-gxc           # erstes Wave-0-Issue im Detail
+bd ready                              # nächste Issues
 ```
+
+**Nächste Issues (ready):**
+- `i7k` – I-16: Migration connector_credentials-Tabelle ← **hier einsteigen**
+- `q7a` – I-17: GarminConnector-Implementation mit Per-User-Token-Isolation
+- `nmu` – I-21: Flask-Limiter am Login-Endpoint aktivieren
+- `6n2` – I-23: pytest + Flask-Fixtures Setup
+- `gvl` – OWASP-konforme scrypt-Parameter
 
 **Plan-ID → bd-ID Quick-Map:**
 `I-01→gxc · I-02→om6 · I-03→0fd · I-04→25e · I-05→cjx · I-06→99s · I-07→4qi · I-08→bmu · I-09→l6s · I-10→p67 · I-11→xta · I-12→uwg · I-13=t65 · I-14→tya · I-15→tjp · I-16→i7k · I-17→q7a · I-18=gdc · I-19→4p5 · I-20→58h · I-21→nmu · I-22=gvl · I-23→6n2 · I-24→k7x · I-25→0jp`
@@ -90,17 +98,21 @@ FLASK_DEBUG=1 python run.py
 
 ## Architecture Overview
 
-**Phase 1 (Ist-Zustand):** Single-User Flask-App mit Wochenansicht für Garmin-Aktivitäten.
-- `app/__init__.py` – App Factory mit 2 Blueprints (auth, activities)
+**Phase 1 (erledigt):** Single-User Flask-App mit Wochenansicht für Garmin-Aktivitäten.
 - `app/garmin/client.py` – Wrapper um `garminconnect`-Lib (Token-Reuse in `~/.garminconnect/`)
-- `app/routes/auth.py` – Session-basierter Login mit custom `login_required` (wird in Wave 3 durch Flask-Login ersetzt)
 - `app/routes/activities.py` – `/activities/week` mit Wochennavigation und 30-Min-Filter
 
-**Phase 2 (Ziel, in Arbeit):** Multi-User mit Connector-Architektur.
-- `app/extensions.py` – Flask-SQLAlchemy, Flask-Migrate, Flask-Login, Flask-WTF, Flask-Limiter (ab I-05)
-- `app/models/` – User + ConnectorCredential mit Fernet-Feldverschlüsselung
-- `app/connectors/` – BaseConnector ABC + Provider-Registry, GarminConnector wrapt den bestehenden Client
-- `app/utils/crypto.py` – HKDF-Key-Derivation aus SECRET_KEY
+**Phase 2 (in Arbeit, Wave 0–3 done):** Multi-User mit Connector-Architektur.
+- `app/__init__.py` – App Factory mit Extensions-Init + user_loader
+- `app/extensions.py` – db, migrate, login_manager, csrf, limiter (Instanzen, kein init_app hier)
+- `app/models/user.py` – User + UserMixin, scrypt-Hashing, is_admin-Property
+- `app/models/connector.py` – ConnectorCredential mit JSON-FernetField, UniqueConstraint(user_id, provider_type)
+- `app/connectors/base.py` – BaseConnector ABC; `app/connectors/__init__.py` – PROVIDER_REGISTRY + @register
+- `app/utils/crypto.py` – HKDF-Key-Derivation + FernetField TypeDecorator
+- `app/utils/decorators.py` – admin_required (verkettet login_required intern)
+- `app/routes/auth.py` – Login/Register/Logout mit Flask-Login; Logout POST-only
+- `migrations/` – Alembic initialisiert, users-Tabelle migriert
+- **Noch offen:** GarminConnector-Impl (I-17), connector_credentials-Migration (I-16), Activities-Route auf Connector-Abstraction (I-20), Auth-Flow-Tests (I-24)
 
 ## Conventions & Patterns
 
