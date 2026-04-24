@@ -5,7 +5,7 @@ Routen
 GET  /connectors/                      – Liste aller Provider mit Status
 GET  /connectors/<provider>/connect    – Formular für Credentials
 POST /connectors/<provider>/connect    – Credentials speichern (upsert)
-POST /connectors/<provider>/disconnect – Credential + Token-Dir löschen
+POST /connectors/<provider>/disconnect – Credential löschen
 """
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.connectors import PROVIDER_REGISTRY
-from app.connectors.garmin import GarminConnector
 from app.extensions import db
 from app.models.connector import ConnectorCredential
 
@@ -82,7 +81,7 @@ def connect_form(provider: str):
 @connectors_bp.route("/<provider>/connect", methods=["POST"])
 @login_required
 def connect_save(provider: str):
-    """Credentials speichern (verschlüsselt via _JsonFernetField, Upsert)."""
+    """Credentials speichern: Test-Login, Token in DB ablegen (Fernet-verschlüsselt)."""
     cls = _get_provider_cls(provider)
 
     # Nur bekannte Felder aus dem Formular übernehmen – niemals beliebige Input-Keys
@@ -95,6 +94,19 @@ def connect_save(provider: str):
     if any(v == "" for v in credentials.values()):
         flash("Bitte alle Felder ausfüllen.", "danger")
         return redirect(url_for("connectors.connect_form", provider=provider))
+
+    # Test-Login: Verbindung herstellen und Tokens holen
+    connector = cls(user_id=current_user.id)
+    try:
+        connector.connect(credentials)
+    except Exception as exc:
+        flash(f"Verbindung fehlgeschlagen: {exc}", "danger")
+        return redirect(url_for("connectors.connect_form", provider=provider))
+
+    # Token-String in Credentials einbetten (wird Fernet-verschlüsselt gespeichert)
+    token_json = connector.get_fresh_token_json()
+    if token_json:
+        credentials["_garmin_tokens"] = token_json
 
     existing = _get_credential(current_user.id, provider)
     if existing is None:
@@ -123,11 +135,6 @@ def disconnect(provider: str):
     if cred is None:
         flash(f"{cls.display_name} war nicht verbunden.", "warning")
         return redirect(url_for("connectors.index"))
-
-    # Provider-spezifisches Cleanup (z.B. Token-Dir löschen)
-    if provider == GarminConnector.provider_type:
-        connector = GarminConnector(user_id=current_user.id)
-        connector.disconnect()
 
     db.session.delete(cred)
     db.session.commit()

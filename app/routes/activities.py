@@ -6,6 +6,7 @@ from flask import Blueprint, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.connectors import PROVIDER_REGISTRY
+from app.extensions import db
 from app.models.connector import ConnectorCredential
 
 activities_bp = Blueprint("activities", __name__, template_folder="../templates")
@@ -38,6 +39,14 @@ def week_view():
     activities = []
     try:
         connector.connect(cred.credentials)
+        # Refresh-Persistenz: ggf. aktualisierte Tokens zurück in DB schreiben
+        fresh_token = connector.get_fresh_token_json()
+        stored_token = cred.credentials.get("_garmin_tokens")
+        if fresh_token and fresh_token != stored_token:
+            updated = dict(cred.credentials)
+            updated["_garmin_tokens"] = fresh_token
+            cred.credentials = updated
+            db.session.commit()
         raw = connector.get_activities(monday, sunday)
         activities = [
             {
