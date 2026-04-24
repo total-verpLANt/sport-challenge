@@ -14,6 +14,7 @@ def create_app(config_class=Config):
     csrf.init_app(app)
     limiter.init_app(app)
 
+    from app.models.connector import ConnectorCredential  # noqa: F401 – Alembic autogenerate
     from app.models.user import User
 
     @login_manager.user_loader
