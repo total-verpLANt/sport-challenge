@@ -50,19 +50,22 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-04-24, Wachwechsel #4)
+## Aktueller Stand (2026-04-24, Wachwechsel #5)
 
-**Aktive Arbeit:** Quality-Fixes nach Multi-User Rebuild – keine offenen Issues
+**Aktive Arbeit:** Garmin-Token-DB-Umbau abgeschlossen – keine offenen Issues
 
-- **Epic:** `sport-challenge-79s` – GESCHLOSSEN. 33/33 Issues done.
+- **Epic:** `sport-challenge-79s` – GESCHLOSSEN. 40/40 Issues done.
 - **Meilenstein-Tag:** `milestone-multi-user-rebuild-2026-04-24`
 - **Lessons Learned:** `docs/lessons-learned.md`
 - **Nächste Phase:** Kein aktiver Epic – neue Aufgaben via `bd create` anlegen
 
-**Fixes seit Wachwechsel #3:**
-- `9811fae` – Env-Var `GARMINTOKENS` → `GARMIN_TOKEN_DIR` (config.py / .env.example)
-- `92eab14` – Bootstrap JS SRI-Hash korrigiert (base.html, JS war geblockt)
-- `082afaf` – Playwright-Artefakte in .gitignore + Bootstrap-Research committet
+**Umbau seit Wachwechsel #4 (Garmin-Tokens von Disk in DB):**
+- `12cc765` – GarminClient: token_dir entfernt, In-Memory login/reconnect (I-01)
+- `8acfaf4` – GarminConnector: _token_dir() weg, zwei-Pfad connect() (I-02)
+- `518e3da` – Token-Speicherung in connect_save(), Refresh-Persistenz in week_view() (I-03/I-04)
+- `d7d5006` – GARMIN_TOKEN_DIR aus config.py, .env.example, README entfernt (I-05)
+- `e5016b2` – Tests: Token-Pfad-Test ersetzt, 6 neue GarminClient/Connector-Tests (I-06)
+- `09c9dc0` – load_dotenv() vor App-Import (CSRF-Fix)
 
 ### Einstieg für neue Sessions
 

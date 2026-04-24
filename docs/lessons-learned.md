@@ -131,3 +131,33 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wie vermeiden:** Bootstrap-CDN-Links immer von `getbootstrap.com/docs/x.y/getting-started/introduction/` kopieren, nie manuell tippen. Hash per `curl ... | openssl dgst -sha384 -binary | openssl base64 -A` verifizieren. Playwright-Smoke-Test auf Console-Errors prüfen.
 
 **Quelle:** Wachwechsel #4, 2026-04-24. Fix in Commit `92eab14`.
+
+---
+
+## Konfiguration & Infrastruktur (Fortsetzung)
+
+### 2026-04-24: python-dotenv Import-Order – load_dotenv() vor App-Import
+
+**Erkenntnis:** `load_dotenv()` muss in `run.py` **vor** `from app import create_app` stehen. `Config.SECRET_KEY = os.environ.get("SECRET_KEY")` wird beim Klassen-Import ausgewertet – nicht erst bei `create_app()`. Steht `load_dotenv()` danach, erhält CSRF-Middleware `None` als Key und wirft `RuntimeError: The session is unavailable because no secret key was set` beim ersten Request, obwohl `.env` korrekt befüllt ist.
+
+**Warum relevant:** Der Fehler tritt erst zur Laufzeit auf, nicht beim Start des Servers. Tests laufen durch (Fixture setzt den Key direkt). Nur im Browser sichtbar.
+
+**Wie vermeiden:** Reihenfolge in `run.py` ist fest: `load_dotenv()` → dann alle App-Imports.
+
+**Wo sichtbar:** `run.py` Zeile 5 (`load_dotenv()`) muss vor Zeile 7 (`from app import create_app`) stehen.
+
+**Quelle:** Wachwechsel #5, 2026-04-24. Fix in Commit `09c9dc0`.
+
+---
+
+## Externe APIs: Garmin Connect (Fortsetzung)
+
+### 2026-04-24: garminconnect In-Memory-Token-API – kein Disk-Pfad für Reconnect
+
+**Erkenntnis:** `garminconnect` speichert Tokens in Memory als JSON-String (`client.dumps()`). Für den Reconnect reicht `Garmin().login(tokenstore=token_json)` – Strings >512 Zeichen werden von der Library automatisch als Inline-Token-Daten erkannt (kein Pfad nötig). Nur der **Erstlogin** braucht ein Verzeichnis für die OAuth-Session-Dateien; dieses wird via `tempfile.mkdtemp()` angelegt und im `finally`-Block bereinigt.
+
+**Warum relevant:** Tokens mussten bisher als Dateien auf Disk liegen (Sicherheitsrisiko bei Multi-User). Mit der In-Memory-API können sie Fernet-verschlüsselt in der Datenbank gespeichert werden – keine Disk-Isolation pro User nötig.
+
+**Wo sichtbar:** `app/garmin/client.py` – `login()` nutzt `tempfile.mkdtemp()` + `finally: shutil.rmtree()`, `reconnect()` nutzt `Garmin().login(tokenstore=token_json)`. `app/connectors/garmin.py` – `credentials["_garmin_tokens"]` enthält den Token-String.
+
+**Quelle:** Wachwechsel #5, 2026-04-24. Umgesetzt in I-01 bis I-06 (Commits `12cc765`–`e5016b2`).

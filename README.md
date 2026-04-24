@@ -46,7 +46,7 @@ SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 .venv/bin/pytest -v
 ```
 
-17 Tests (Auth, Connector, Retry, Smoke) – kein externer Service nötig.
+22 Tests (Auth, Connector, Retry, Smoke) – kein externer Service nötig.
 
 ### Schnell-Check für neue Sessions
 
