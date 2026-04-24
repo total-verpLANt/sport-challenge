@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12 col-md-8 col-lg-6 mx-auto">
+    <h2 class="mb-4">Verbundene Dienste</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if providers %}
+    <div class="list-group">
+      {% for provider in providers %}
+      <div class="list-group-item d-flex justify-content-between align-items-center py-3">
+        <div>
+          <strong>{{ provider.display_name }}</strong>
+          {% if provider.connected %}
+          <span class="badge bg-success ms-2">Verbunden</span>
+          {% else %}
+          <span class="badge bg-secondary ms-2">Nicht verbunden</span>
+          {% endif %}
+        </div>
+        <div>
+          {% if provider.connected %}
+          <form method="post"
+                action="{{ url_for('connectors.disconnect', provider=provider.provider_type) }}"
+                class="d-inline"
+                onsubmit="return confirm('{{ provider.display_name }} wirklich trennen?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm">Trennen</button>
+          </form>
+          {% else %}
+          <a href="{{ url_for('connectors.connect_form', provider=provider.provider_type) }}"
+             class="btn btn-outline-primary btn-sm">Verbinden</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">Keine Provider registriert.</p>
+    {% endif %}
+
+    <div class="mt-4">
+      <a href="{{ url_for('activities.week_view') }}" class="btn btn-secondary btn-sm">
+        &larr; Zurück zu den Aktivitäten
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-sm-8 col-md-5 col-lg-4">
+    <div class="card shadow-sm mt-5">
+      <div class="card-body p-4">
+        <h4 class="card-title mb-4 text-center">{{ display_name }} verbinden</h4>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+          {% endfor %}
+        {% endwith %}
+
+        <form method="post"
+              action="{{ url_for('connectors.connect_save', provider=provider_type) }}"
+              novalidate
+              autocomplete="off">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          {% for field in credential_fields %}
+          <div class="mb-3">
+            <label for="{{ field }}" class="form-label text-capitalize">
+              {{ field | replace("_", " ") | title }}
+            </label>
+            <input
+              type="{{ 'password' if field == 'password' else 'text' }}"
+              class="form-control"
+              id="{{ field }}"
+              name="{{ field }}"
+              autocomplete="{{ 'current-password' if field == 'password' else 'off' }}"
+              required>
+          </div>
+          {% endfor %}
+
+          <div class="d-grid mt-4">
+            <button type="submit" class="btn btn-primary">Verbinden</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <p class="text-center text-muted mt-3 small">
+      <a href="{{ url_for('connectors.index') }}">&larr; Zurück zur Übersicht</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

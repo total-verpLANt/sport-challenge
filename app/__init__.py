@@ -27,6 +27,9 @@ def create_app(config_class=Config):
     from app.routes.activities import activities_bp
     app.register_blueprint(activities_bp, url_prefix="/activities")
 
+    from app.routes.connectors import connectors_bp
+    app.register_blueprint(connectors_bp, url_prefix="/connectors")
+
     @app.route("/")
     def index():
         return redirect(url_for("auth.login"))
