@@ -99,7 +99,7 @@ Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `
 ## Architecture Overview
 
 **Phase 1 (erledigt):** Single-User Flask-App mit Wochenansicht für Garmin-Aktivitäten.
-- `app/garmin/client.py` – Wrapper um `garminconnect`-Lib (Token-Reuse in `~/.garminconnect/`)
+- `app/garmin/client.py` – Wrapper um `garminconnect`-Lib; `login()` gibt Token-JSON zurück, `reconnect(token_json)` ohne Disk
 - `app/routes/activities.py` – `/activities/week` mit Wochennavigation und 30-Min-Filter
 
 **Phase 2 (abgeschlossen):** Multi-User mit Connector-Architektur.
@@ -108,7 +108,7 @@ Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `
 - `app/models/user.py` – User + UserMixin, scrypt N=2^17 (OWASP), is_admin-Property
 - `app/models/connector.py` – ConnectorCredential mit `_JsonFernetField()` (Lazy-Init), UniqueConstraint(user_id, provider_type)
 - `app/connectors/base.py` – BaseConnector ABC; `app/connectors/__init__.py` – PROVIDER_REGISTRY + @register
-- `app/connectors/garmin.py` – GarminConnector, Token-Dir pro User isoliert (`GARMIN_TOKEN_DIR/<user_id>/`), `@retry_on_rate_limit` auf connect + get_activities
+- `app/connectors/garmin.py` – GarminConnector, Tokens Fernet-verschlüsselt in `credentials["_garmin_tokens"]` (DB), `@retry_on_rate_limit` auf connect + get_activities
 - `app/utils/crypto.py` – HKDF-Key-Derivation + FernetField TypeDecorator (Lazy-Init via `_get_fernet()`)
 - `app/utils/retry.py` – `@retry_on_rate_limit(max_retries=2, base_delay=60)`, nur `GarminConnectTooManyRequestsError`
 - `app/utils/decorators.py` – admin_required (verkettet login_required intern)
@@ -116,7 +116,7 @@ Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `
 - `app/routes/connectors.py` – /connectors/ Index + Connect + Disconnect (login_required, CSRF)
 - `app/routes/activities.py` – /activities/week via Connector-Abstraction, Redirect bei fehlendem Credential
 - `migrations/` – users + connector_credentials (Alembic)
-- `tests/` – 17 Tests: pytest, conftest.py mit app/client/db-Fixture (In-Memory-SQLite)
+- `tests/` – 22 Tests: pytest, conftest.py mit app/client/db-Fixture (In-Memory-SQLite)
 
 ## Conventions & Patterns
 
@@ -126,4 +126,4 @@ Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `
 - **Credentials:** nie hardcoden, nie loggen, Fernet-Field-Encryption für Connector-Daten
 - **Migrationen:** `irreversible / requires-approval` – vor Wave 2 und Wave 4 SQLite-Backup
 - **Tests:** Playwright-Aufgaben immer via Haiku-Sub-Agent (siehe user-global CLAUDE.md)
-- **Kein Git-Remote konfiguriert:** `git push` entfällt, Issues sind lokal
+- **Git-Remote:** `github.com/total-verpLANt/sport-challenge` – `git push` nach jedem Commit
