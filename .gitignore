@@ -16,3 +16,6 @@ garmin_tokens.json
 instance/
 .DS_Store
 .venv/
+
+# Serena MCP – lokale Metadaten, nicht teilbar
+.serena/
