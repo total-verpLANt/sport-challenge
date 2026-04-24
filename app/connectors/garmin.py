@@ -9,6 +9,7 @@ from flask import current_app
 from app.connectors import register
 from app.connectors.base import BaseConnector
 from app.garmin.client import GarminClient
+from app.utils.retry import retry_on_rate_limit
 
 
 @register
@@ -41,6 +42,7 @@ class GarminConnector(BaseConnector):
     # BaseConnector interface
     # ------------------------------------------------------------------
 
+    @retry_on_rate_limit()
     def connect(self, credentials: dict) -> None:
         """Frisch einloggen und Tokens in das user-spezifische Dir speichern."""
         token_dir = self._token_dir()
@@ -50,6 +52,7 @@ class GarminConnector(BaseConnector):
             password=credentials["password"],
         )
 
+    @retry_on_rate_limit()
     def get_activities(self, start: datetime, end: datetime) -> list:
         """Aktivitäten abrufen; bei vorhandenen Tokens kein Passwort nötig."""
         if self._client is None:
