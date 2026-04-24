@@ -1,26 +1,31 @@
 from __future__ import annotations
 
-import os
+import shutil
+import tempfile
 from datetime import date
 
 from garminconnect import Garmin
 
 
 class GarminClient:
-    def __init__(self, token_dir: str) -> None:
-        self._token_dir = token_dir
+    def __init__(self) -> None:
         self._api: Garmin | None = None
 
-    def login(self, email: str, password: str) -> None:
-        """Frisch mit Credentials einloggen; Tokens auf Disk speichern."""
-        os.makedirs(self._token_dir, exist_ok=True)
-        self._api = Garmin(email=email, password=password)
-        self._api.login(self._token_dir)
+    def login(self, email: str, password: str) -> str:
+        """Erstlogin mit Credentials; gibt serialisierten Token-JSON-String zurück."""
+        tmp = tempfile.mkdtemp(prefix="garmin_login_")
+        try:
+            self._api = Garmin(email=email, password=password)
+            self._api.login(tmp)
+            return self._api.client.dumps()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
-    def reconnect(self, email: str) -> None:
-        """Gespeicherte Tokens laden – kein Passwort nötig, solange Tokens gültig."""
-        self._api = Garmin(email=email, password="")
-        self._api.login(self._token_dir)
+    def reconnect(self, token_json: str) -> str:
+        """Token-basierter Reconnect ohne Passwort; gibt ggf. refreshten Token-String zurück."""
+        self._api = Garmin()
+        self._api.login(tokenstore=token_json)
+        return self._api.client.dumps()
 
     def get_week_activities(self, start: date, end: date) -> list[dict]:
         if self._api is None:
