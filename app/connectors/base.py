@@ -17,6 +17,12 @@ class BaseConnector(ABC):
     @abstractmethod
     def disconnect(self) -> None: ...
 
+    @classmethod
+    def is_configured(cls) -> bool:
+        """Gibt True zurück wenn der Provider einsatzbereit ist.
+        OAuth-Provider können diese Methode überschreiben um Config-Checks durchzuführen."""
+        return True
+
     def get_token_updates(self) -> dict:
         """Gibt Token-Keys zurück, die nach connect() in credentials gespeichert werden.
         Default: leeres Dict (kein Token-Update nötig, z.B. Garmin nach Reconnect ohne Refresh)."""

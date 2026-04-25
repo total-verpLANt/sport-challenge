@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "epic_id": "sport-challenge-u83",
+  "wave_count": 1,
+  "fix_cycles": 0,
+  "issues_completed": 1,
+  "issues_total": 6,
+  "last_wave_summary": "Wave 1 complete: S-01 (bw0) geschlossen. stravalib in requirements.txt; BaseConnector um oauth_flow=False und get_token_updates()->dict erweitert. 31/31 Tests grün.",
+  "wave_1_summary_length": 170,
+  "files_read_early": ["requirements.txt", "app/connectors/base.py"],
+  "plan_file": ".schrammns_workflow/plans/2026-04-25-strava-connector-integration.md",
+  "decisions_made": [],
+  "last_updated": "2026-04-25T00:00:00Z"
+}

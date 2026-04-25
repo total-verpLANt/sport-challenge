@@ -22,6 +22,17 @@ class StravaConnector(BaseConnector):
     credential_fields = []  # kein Passwort-Formular – OAuth2 Flow
     oauth_flow = True
 
+    @classmethod
+    def is_configured(cls) -> bool:
+        try:
+            from flask import current_app
+            return bool(
+                current_app.config.get("STRAVA_CLIENT_ID")
+                and current_app.config.get("STRAVA_CLIENT_SECRET")
+            )
+        except RuntimeError:
+            return False
+
     def __init__(self, user_id: int) -> None:
         self._user_id = user_id
         self._client: Client | None = None
