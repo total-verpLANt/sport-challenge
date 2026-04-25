@@ -87,7 +87,7 @@ uv venv .venv --python 3.14 --clear
 uv pip install -r requirements.txt
 
 # Dev-Server starten
-SECRET_KEY=<dein-key> FLASK_DEBUG=1 .venv/bin/python run.py
+SECRET_KEY=<dein-key> FLASK_DEBUG=1 .venv/bin/python run.py  # PFLICHT: ohne SECRET_KEY RuntimeError
 
 # Migrationen anwenden
 FLASK_APP=run.py .venv/bin/flask db upgrade

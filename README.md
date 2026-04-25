@@ -34,7 +34,7 @@ SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 
 | Variable | Beschreibung |
 |---|---|
-| `SECRET_KEY` | Flask Secret Key (beliebiger langer String) |
+| `SECRET_KEY` | Flask Secret Key – **Pflichtfeld**, App startet nicht ohne diesen Key |
 | `FLASK_DEBUG` | Optional: `1` für Debug-Modus |
 
 > **Hinweis:** Nach Projektumzug (Ordner umbenennen/verschieben) ist das `.venv` durch gebrochene Shebangs unbrauchbar.  
