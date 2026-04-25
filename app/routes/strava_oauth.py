@@ -8,6 +8,7 @@ GET /connectors/strava/oauth/callback – Code-Exchange, Token in DB speichern
 from __future__ import annotations
 
 import secrets
+import time
 
 from flask import Blueprint, current_app, flash, redirect, request, session, url_for
 from flask_login import current_user, login_required
@@ -24,7 +25,7 @@ strava_oauth_bp = Blueprint("strava_oauth", __name__)
 def oauth_start():
     """Leitet den User zur Strava-Autorisierungsseite weiter."""
     state = secrets.token_urlsafe(16)
-    session["strava_oauth_state"] = state
+    session["strava_oauth_state"] = {"state": state, "ts": time.time()}
 
     client = Client()
     redirect_uri = url_for("strava_oauth.oauth_callback", _external=True)
@@ -47,23 +48,35 @@ def oauth_callback():
         return redirect(url_for("connectors.index"))
 
     state = request.args.get("state", "")
-    expected = session.pop("strava_oauth_state", None)
-    if not expected or state != expected:
+    stored = session.pop("strava_oauth_state", None)
+    if not stored or state != stored.get("state"):
         flash("Ungültiger OAuth-State. Bitte erneut versuchen.", "danger")
+        return redirect(url_for("connectors.index"))
+    if time.time() - stored.get("ts", 0) > 600:
+        flash("OAuth-Sitzung abgelaufen. Bitte erneut versuchen.", "danger")
         return redirect(url_for("connectors.index"))
 
     code = request.args.get("code", "")
-    tmp = Client()
-    token_response = tmp.exchange_code_for_token(
-        client_id=current_app.config["STRAVA_CLIENT_ID"],
-        client_secret=current_app.config["STRAVA_CLIENT_SECRET"],
-        code=code,
-    )
-    credentials = {
-        "access_token": token_response["access_token"],
-        "refresh_token": token_response["refresh_token"],
-        "expires_at": int(token_response["expires_at"]),
-    }
+    if not code:
+        flash("Kein Autorisierungscode erhalten. Bitte erneut versuchen.", "danger")
+        return redirect(url_for("connectors.index"))
+
+    try:
+        tmp = Client()
+        token_response = tmp.exchange_code_for_token(
+            client_id=current_app.config["STRAVA_CLIENT_ID"],
+            client_secret=current_app.config["STRAVA_CLIENT_SECRET"],
+            code=code,
+        )
+        credentials = {
+            "access_token": token_response["access_token"],
+            "refresh_token": token_response["refresh_token"],
+            "expires_at": int(token_response["expires_at"]),
+        }
+    except Exception:
+        current_app.logger.exception("Strava token exchange fehlgeschlagen")
+        flash("Strava-Verbindung fehlgeschlagen. Bitte erneut versuchen.", "danger")
+        return redirect(url_for("connectors.index"))
 
     existing = db.session.execute(
         db.select(ConnectorCredential).where(

@@ -217,7 +217,7 @@ def test_oauth_callback_rejects_invalid_state(client, db):
     user = _login_user(client, db)
 
     with client.session_transaction() as sess:
-        sess["strava_oauth_state"] = "correct_state"
+        sess["strava_oauth_state"] = {"state": "correct_state", "ts": time.time()}
 
     response = client.get(
         "/connectors/strava/oauth/callback?code=abc&state=WRONG_STATE",
@@ -242,7 +242,7 @@ def test_oauth_callback_stores_credential_on_success(app, client, db):
 
     correct_state = "test_state_12345"
     with client.session_transaction() as sess:
-        sess["strava_oauth_state"] = correct_state
+        sess["strava_oauth_state"] = {"state": correct_state, "ts": time.time()}
 
     mock_token_response = {
         "access_token": "new_access",
