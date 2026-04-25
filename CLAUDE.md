@@ -50,22 +50,23 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-04-24, Wachwechsel #5)
+## Aktueller Stand (2026-04-26, Wachwechsel #6)
 
-**Aktive Arbeit:** Garmin-Token-DB-Umbau abgeschlossen – keine offenen Issues
+**Aktive Arbeit:** UX-Polishing + Security-Fixes abgeschlossen – keine offenen Issues
 
-- **Epic:** `sport-challenge-79s` – GESCHLOSSEN. 40/40 Issues done.
-- **Meilenstein-Tag:** `milestone-multi-user-rebuild-2026-04-24`
+- **Epic:** kein aktiver Epic – nächste Aufgaben via `bd create` anlegen
 - **Lessons Learned:** `docs/lessons-learned.md`
-- **Nächste Phase:** Kein aktiver Epic – neue Aufgaben via `bd create` anlegen
 
-**Umbau seit Wachwechsel #4 (Garmin-Tokens von Disk in DB):**
-- `12cc765` – GarminClient: token_dir entfernt, In-Memory login/reconnect (I-01)
-- `8acfaf4` – GarminConnector: _token_dir() weg, zwei-Pfad connect() (I-02)
-- `518e3da` – Token-Speicherung in connect_save(), Refresh-Persistenz in week_view() (I-03/I-04)
-- `d7d5006` – GARMIN_TOKEN_DIR aus config.py, .env.example, README entfernt (I-05)
-- `e5016b2` – Tests: Token-Pfad-Test ersetzt, 6 neue GarminClient/Connector-Tests (I-06)
-- `09c9dc0` – load_dotenv() vor App-Import (CSRF-Fix)
+**Änderungen seit Wachwechsel #5 (UX + Security):**
+- `e76ab16` – fix(SEC): Strava-Provider ausblenden wenn nicht konfiguriert
+- `7da8c4d` – fix(SEC): SECRET_KEY-Startup-Validierung (RuntimeError bei fehlendem Key)
+- `44a4527` – docs: SECRET_KEY als Pflichtfeld kennzeichnen
+- `71f7e25` – feat(UX): Bootstrap-Spinner + Button-Disable nach Garmin-Connect-Form-Submit
+- `5b04464` – feat(UX): ⚙-Settings-Dropdown in Navbar (Connectors + Admin), Logout separat
+
+**UI-Architektur-Ergänzungen:**
+- `app/templates/base.html` – `{% block scripts %}` Hook vor `</body>`; ⚙-Dropdown mit E-Mail als Trigger
+- `app/templates/connectors/connect.html` – Spinner + Button-Disable bei Submit (kein Doppelklick)
 
 ### Einstieg für neue Sessions
 
@@ -75,9 +76,6 @@ bd prime                              # Workflow-Kontext
 bd memories multi-user                # gespeicherter Pointer mit allen IDs
 bd ready                              # nächste Issues (aktuell: keine offen)
 ```
-
-**Plan-ID → bd-ID Quick-Map (vollständig, alle geschlossen):**
-`I-01→gxc · I-02→om6 · I-03→0fd · I-04→25e · I-05→cjx · I-06→99s · I-07→4qi · I-08→bmu · I-09→l6s · I-10→p67 · I-11→xta · I-12→uwg · I-13=t65 · I-14→tya · I-15→tjp · I-16→i7k · I-17→q7a · I-18=gdc · I-19→4p5 · I-20→58h · I-21→nmu · I-22=gvl · I-23→6n2 · I-24→k7x · I-25→0jp`
 
 ## Build & Test
 

@@ -150,6 +150,40 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 
 ---
 
+## Security: Fernet-Credentials
+
+### 2026-04-26: Fernet-Token-Mismatch bei SECRET_KEY-Wechsel
+
+**Erkenntnis:** Wechselt der `SECRET_KEY` (oder lief `load_dotenv()` beim Speichern zu spät), ist der abgeleitete Fernet-Key ein anderer als beim Lesen. Die DB-Zeile in `connector_credentials` ist dann nicht mehr entschlüsselbar → `cryptography.fernet.InvalidToken` beim ersten Request nach Login.
+
+**Warum relevant:** Der Fehler tritt erst nach dem Login auf (nicht beim Server-Start), ist ohne Kenntnis der HKDF-Ableitung schwer zu diagnostizieren, und sieht für den User wie ein App-Absturz aus.
+
+**Wie lösen:** `sqlite3 instance/sport-challenge.db "DELETE FROM connector_credentials;"` + Connector neu verbinden. Keine Daten gehen verloren (Aktivitäten werden live von Garmin abgerufen).
+
+**Wie vermeiden:** `SECRET_KEY` nie wechseln, wenn Credentials in der DB liegen. Vor Key-Rotation alle `connector_credentials`-Zeilen exportieren, neu verschlüsseln und re-importieren.
+
+**Wo sichtbar:** `app/utils/crypto.py` → `FernetField.process_result_value()`, `app/models/connector.py` → `_JsonFernetField`
+
+**Quelle:** Session 2026-04-26, Diagnose nach Fernet-Fehler nach Datenbankproblem.
+
+---
+
+## Tooling: Playwright-Test-Agents
+
+### 2026-04-26: Playwright-Agent legt echte User in Produktions-DB an
+
+**Erkenntnis:** Ein Haiku-Playwright-Agent zum UI-Test hat `testuser@localhost.test` in der laufenden SQLite-DB registriert und 4 Fehlversuche auf den Admin-Account hinterlassen. Der Agent war angewiesen, nur zu testen – aber der Registrierungsflow war für ihn erreichbar.
+
+**Warum relevant:** Testdaten in der Produktions-DB können den Login-Lockout-Zähler verfälschen und hinterlassen unapproved User, die den Admin-Überblick stören.
+
+**Wie vermeiden:** Playwright-Test-Agents explizit anweisen: „Lege KEINE neuen User an". Alternativ: Tests immer gegen einen separaten Testserver mit Wegwerf-DB (via `FLASK_TESTING=1` + In-Memory-SQLite). Cleanup nach jedem Playwright-Test via `DELETE FROM users WHERE email LIKE '%test%'`.
+
+**Wo sichtbar:** `app/routes/auth.py` → `register()` – kein Guard gegen Playwright-Agents.
+
+**Quelle:** Session 2026-04-26, Wachwechsel #6.
+
+---
+
 ## Externe APIs: Garmin Connect (Fortsetzung)
 
 ### 2026-04-24: garminconnect In-Memory-Token-API – kein Disk-Pfad für Reconnect
