@@ -54,6 +54,8 @@ def index():
     """Liste aller registrierten Provider mit Verbunden-Status."""
     providers = []
     for provider_type, cls in PROVIDER_REGISTRY.items():
+        if not cls.is_configured():
+            continue
         cred = _get_credential(current_user.id, provider_type)
         providers.append(
             {
@@ -85,6 +87,10 @@ def connect_save(provider: str):
     """Credentials speichern: Test-Login, Token in DB ablegen (Fernet-verschlüsselt)."""
     cls = _get_provider_cls(provider)
 
+    # OAuth-Provider haben kein Credentials-Formular – POST ist nicht erlaubt
+    if cls.oauth_flow:
+        abort(400)
+
     # Nur bekannte Felder aus dem Formular übernehmen – niemals beliebige Input-Keys
     credentials = {
         field: request.form.get(field, "")
@@ -100,8 +106,10 @@ def connect_save(provider: str):
     connector = cls(user_id=current_user.id)
     try:
         connector.connect(credentials)
-    except Exception as exc:
-        flash(f"Verbindung fehlgeschlagen: {exc}", "danger")
+    except Exception:
+        from flask import current_app
+        current_app.logger.exception("Connector connect() fehlgeschlagen für provider=%s user=%s", provider, current_user.id)
+        flash("Verbindung fehlgeschlagen. Bitte Zugangsdaten prüfen.", "danger")
         return redirect(url_for("connectors.connect_form", provider=provider))
 
     # Token-Updates vom Connector holen (generisch, Fernet-verschlüsselt gespeichert)

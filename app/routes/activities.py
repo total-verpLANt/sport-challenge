@@ -74,8 +74,10 @@ def week_view():
             for a in raw
             if filter_short != "1" or a.get("duration", 0) >= 1800
         ]
-    except Exception as exc:
-        error = str(exc)
+    except Exception:
+        from flask import current_app
+        current_app.logger.exception("Aktivitäten konnten nicht geladen werden für provider=%s user=%s", provider_type, current_user.id)
+        error = "Aktivitäten konnten nicht geladen werden. Bitte versuche es später erneut."
 
     return render_template(
         "activities/week.html",
