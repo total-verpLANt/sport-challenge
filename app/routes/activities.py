@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, abort, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.connectors import PROVIDER_REGISTRY
@@ -26,25 +26,36 @@ def week_view():
     ref = date.today() + timedelta(weeks=offset)
     monday, sunday = _get_week_bounds(ref)
 
-    cred = ConnectorCredential.query.filter_by(
-        user_id=current_user.id, provider_type="garmin"
-    ).first()
-    if cred is None:
-        return redirect(url_for("connectors.index"))
+    # Provider-Auswahl: ?provider=strava / ?provider=garmin, Fallback auf ersten verbundenen
+    provider_type = request.args.get("provider")
+    if provider_type:
+        cred = ConnectorCredential.query.filter_by(
+            user_id=current_user.id, provider_type=provider_type
+        ).first()
+        if cred is None:
+            return redirect(url_for("connectors.index"))
+    else:
+        cred = ConnectorCredential.query.filter_by(
+            user_id=current_user.id
+        ).first()
+        if cred is None:
+            return redirect(url_for("connectors.index"))
+        provider_type = cred.provider_type
 
-    connector_cls = PROVIDER_REGISTRY["garmin"]
+    connector_cls = PROVIDER_REGISTRY.get(provider_type)
+    if connector_cls is None:
+        abort(404)
     connector = connector_cls(user_id=current_user.id)
 
     error = None
     activities = []
     try:
         connector.connect(cred.credentials)
-        # Refresh-Persistenz: ggf. aktualisierte Tokens zurück in DB schreiben
-        fresh_token = connector.get_fresh_token_json()
-        stored_token = cred.credentials.get("_garmin_tokens")
-        if fresh_token and fresh_token != stored_token:
+        # Refresh-Persistenz: generisch via get_token_updates()
+        updates = connector.get_token_updates()
+        if updates:
             updated = dict(cred.credentials)
-            updated["_garmin_tokens"] = fresh_token
+            updated.update(updates)
             cred.credentials = updated
             db.session.commit()
         raw = connector.get_activities(monday, sunday)

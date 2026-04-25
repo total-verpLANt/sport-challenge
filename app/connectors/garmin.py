@@ -46,6 +46,12 @@ class GarminConnector(BaseConnector):
         """Gibt den (ggf. refreshten) Token-String zurück – für DB-Update."""
         return self._current_token_json
 
+    def get_token_updates(self) -> dict:
+        """Gibt Token-Updates als dict zurück – für generische connect_save-Route."""
+        if self._current_token_json:
+            return {"_garmin_tokens": self._current_token_json}
+        return {}
+
     @retry_on_rate_limit()
     def get_activities(self, start: datetime, end: datetime) -> list:
         if self._client is None:

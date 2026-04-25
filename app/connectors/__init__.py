@@ -8,3 +8,4 @@ def register(cls):
 
 # Connector-Module importieren, damit @register greift
 from app.connectors import garmin  # noqa: E402, F401
+from app.connectors import strava  # noqa: E402, F401
