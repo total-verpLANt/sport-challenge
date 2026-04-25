@@ -33,6 +33,9 @@ def create_app(config_class=Config):
     from app.routes.admin import admin_bp
     app.register_blueprint(admin_bp, url_prefix="/admin")
 
+    from app.routes.strava_oauth import strava_oauth_bp
+    app.register_blueprint(strava_oauth_bp)
+
     @app.route("/")
     def index():
         return redirect(url_for("auth.login"))

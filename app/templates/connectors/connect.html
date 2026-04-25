@@ -13,6 +13,14 @@
           {% endfor %}
         {% endwith %}
 
+        {% if oauth_flow %}
+        <div class="d-grid mt-4">
+          <a href="{{ url_for('strava_oauth.oauth_start') }}"
+             class="btn btn-primary">
+            Mit {{ display_name }} verbinden
+          </a>
+        </div>
+        {% else %}
         <form method="post"
               action="{{ url_for('connectors.connect_save', provider=provider_type) }}"
               novalidate
@@ -38,6 +46,7 @@
             <button type="submit" class="btn btn-primary">Verbinden</button>
           </div>
         </form>
+        {% endif %}
       </div>
     </div>
 

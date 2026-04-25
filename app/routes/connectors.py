@@ -75,6 +75,7 @@ def connect_form(provider: str):
         provider_type=provider,
         display_name=cls.display_name,
         credential_fields=cls.credential_fields,
+        oauth_flow=cls.oauth_flow,
     )
 
 
@@ -103,10 +104,8 @@ def connect_save(provider: str):
         flash(f"Verbindung fehlgeschlagen: {exc}", "danger")
         return redirect(url_for("connectors.connect_form", provider=provider))
 
-    # Token-String in Credentials einbetten (wird Fernet-verschlüsselt gespeichert)
-    token_json = connector.get_fresh_token_json()
-    if token_json:
-        credentials["_garmin_tokens"] = token_json
+    # Token-Updates vom Connector holen (generisch, Fernet-verschlüsselt gespeichert)
+    credentials.update(connector.get_token_updates())
 
     existing = _get_credential(current_user.id, provider)
     if existing is None:
