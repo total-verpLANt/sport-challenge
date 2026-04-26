@@ -12,7 +12,30 @@
 <body>
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container">
-      <a class="navbar-brand" href="{{ url_for('activities.week_view') }}">🏃 Sport Challenge</a>
+      <a class="navbar-brand" href="{{ url_for('dashboard.index') }}">🏃 Sport Challenge</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+              data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false"
+              aria-label="Navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        {% if current_user.is_authenticated %}
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('dashboard.index') }}">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('challenge_activities.my_week') }}">Meine Woche</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('challenge_activities.log_form') }}">Eintragen</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('bonus.index') }}">Bonus</a>
+          </li>
+        </ul>
+        {% endif %}
+      </div>
       <div class="ms-auto d-flex align-items-center gap-3">
         {% if current_user.is_authenticated %}
         <div class="dropdown">
@@ -22,9 +45,13 @@
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
             <li>
+              <a class="dropdown-item" href="{{ url_for('challenges.index') }}">Challenge</a>
+            </li>
+            <li>
               <a class="dropdown-item" href="{{ url_for('connectors.index') }}">Connectors</a>
             </li>
             {% if current_user.is_admin %}
+            <li><hr class="dropdown-divider"></li>
             <li>
               <a class="dropdown-item" href="{{ url_for('admin.users') }}">Admin</a>
             </li>

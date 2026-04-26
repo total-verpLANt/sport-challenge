@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Neue Challenge erstellen</h2>
+
+<form method="post" action="{{ url_for('challenges.create_post') }}" class="mt-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-3">
+    <div class="col-12">
+      <label for="name" class="form-label">Name der Challenge</label>
+      <input type="text" class="form-control" id="name" name="name"
+             value="{{ form_data.name if form_data else '' }}"
+             placeholder="z.B. Sport-Challenge Sommer 2026" required>
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label for="start_date" class="form-label">Startdatum</label>
+      <input type="date" class="form-control" id="start_date" name="start_date"
+             value="{{ form_data.start_date if form_data else '' }}" required>
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label for="end_date" class="form-label">Enddatum</label>
+      <input type="date" class="form-control" id="end_date" name="end_date"
+             value="{{ form_data.end_date if form_data else '' }}" required>
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label for="penalty_per_miss" class="form-label">Strafe pro Versäumnis (€)</label>
+      <input type="number" class="form-control" id="penalty_per_miss" name="penalty_per_miss"
+             value="{{ form_data.penalty_per_miss if form_data else '5' }}"
+             min="0" step="0.01" required>
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label for="bailout_fee" class="form-label">Bailout-Gebühr (€)</label>
+      <input type="number" class="form-control" id="bailout_fee" name="bailout_fee"
+             value="{{ form_data.bailout_fee if form_data else '25' }}"
+             min="0" step="0.01" required>
+    </div>
+
+    <div class="col-12 mt-3">
+      <button type="submit" class="btn btn-primary">Challenge erstellen</button>
+      <a href="{{ url_for('challenges.index') }}" class="btn btn-outline-secondary ms-2">Abbrechen</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

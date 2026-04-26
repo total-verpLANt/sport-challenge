@@ -1,0 +1,374 @@
+from datetime import date, timedelta
+
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+
+from app.connectors import PROVIDER_REGISTRY
+from app.extensions import db
+from app.models.activity import Activity
+from app.models.challenge import Challenge, ChallengeParticipation
+from app.models.connector import ConnectorCredential
+from app.utils.uploads import delete_upload, save_upload
+
+challenge_activities_bp = Blueprint(
+    "challenge_activities", __name__, template_folder="../templates"
+)
+
+
+def _get_week_bounds(offset: int = 0) -> tuple[date, date]:
+    """Return (monday, sunday) for the current week + offset weeks."""
+    today = date.today()
+    monday = today - timedelta(days=today.weekday()) + timedelta(weeks=offset)
+    sunday = monday + timedelta(days=6)
+    return monday, sunday
+
+
+def _active_participation():
+    """Return the current user's accepted ChallengeParticipation, or None."""
+    return (
+        db.session.execute(
+            db.select(ChallengeParticipation).where(
+                ChallengeParticipation.user_id == current_user.id,
+                ChallengeParticipation.status == "accepted",
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+
+@challenge_activities_bp.route("/log", methods=["GET"])
+@login_required
+def log_form():
+    participation = _active_participation()
+    if participation is None:
+        flash("Du nimmst aktuell an keiner Challenge teil.")
+        return redirect(url_for("challenges.index"))
+    today = date.today().isoformat()
+    return render_template("activities/log.html", today=today, participation=participation)
+
+
+@challenge_activities_bp.route("/log", methods=["POST"])
+@login_required
+def log_submit():
+    participation = _active_participation()
+    if participation is None:
+        flash("Du nimmst aktuell an keiner Challenge teil.")
+        return redirect(url_for("challenges.index"))
+
+    # Read form data
+    raw_date = request.form.get("activity_date", "").strip()
+    raw_duration = request.form.get("duration_minutes", "").strip()
+    sport_type = request.form.get("sport_type", "").strip()
+
+    # Validate date
+    try:
+        activity_date = date.fromisoformat(raw_date)
+    except ValueError:
+        flash("Ungültiges Datum.")
+        return redirect(url_for("challenge_activities.log_form"))
+
+    challenge = participation.challenge
+    if not (challenge.start_date <= activity_date <= challenge.end_date):
+        flash(
+            f"Datum muss innerhalb der Challenge-Periode liegen "
+            f"({challenge.start_date} – {challenge.end_date})."
+        )
+        return redirect(url_for("challenge_activities.log_form"))
+
+    # Validate duration
+    try:
+        duration_minutes = int(raw_duration)
+        if duration_minutes <= 0:
+            raise ValueError
+    except ValueError:
+        flash("Dauer muss eine positive Zahl sein.")
+        return redirect(url_for("challenge_activities.log_form"))
+
+    # Validate sport type
+    if not sport_type:
+        flash("Bitte Sportart angeben.")
+        return redirect(url_for("challenge_activities.log_form"))
+
+    # Optional screenshot upload
+    screenshot_path = None
+    screenshot_file = request.files.get("screenshot")
+    if screenshot_file and screenshot_file.filename:
+        screenshot_path = save_upload(screenshot_file)
+        if screenshot_path is None:
+            flash("Ungültiges Dateiformat für Screenshot (erlaubt: JPG, PNG, WebP, max. 5 MB).")
+            return redirect(url_for("challenge_activities.log_form"))
+
+    activity = Activity(
+        user_id=current_user.id,
+        challenge_id=participation.challenge_id,
+        activity_date=activity_date,
+        duration_minutes=duration_minutes,
+        sport_type=sport_type,
+        source="manual",
+        screenshot_path=screenshot_path,
+    )
+    db.session.add(activity)
+    db.session.commit()
+
+    flash("Aktivität wurde eingetragen.")
+    return redirect(url_for("challenge_activities.my_week"))
+
+
+@challenge_activities_bp.route("/my-week", methods=["GET"])
+@login_required
+def my_week():
+    participation = _active_participation()
+
+    offset = 0
+    try:
+        offset = int(request.args.get("offset", 0))
+    except (TypeError, ValueError):
+        offset = 0
+
+    monday, sunday = _get_week_bounds(offset)
+
+    # Fetch activities for this week (only from the user's active challenge if available)
+    query = db.select(Activity).where(
+        Activity.user_id == current_user.id,
+        Activity.activity_date >= monday,
+        Activity.activity_date <= sunday,
+    )
+    if participation:
+        query = query.where(Activity.challenge_id == participation.challenge_id)
+
+    activities = db.session.execute(query.order_by(Activity.activity_date)).scalars().all()
+
+    # Build per-day structure
+    days = []
+    for i in range(7):
+        day_date = monday + timedelta(days=i)
+        day_activities = [a for a in activities if a.activity_date == day_date]
+        total_minutes = sum(a.duration_minutes for a in day_activities)
+        days.append(
+            {
+                "date": day_date,
+                "activities": day_activities,
+                "total_minutes": total_minutes,
+                "short": total_minutes < 30 and total_minutes > 0,
+                "missing": total_minutes == 0,
+                "remaining": max(0, 30 - total_minutes),
+            }
+        )
+
+    # Fulfilled days: days with at least 30 minutes
+    fulfilled_days = sum(1 for d in days if d["total_minutes"] >= 30)
+    weekly_goal = participation.weekly_goal if participation else 3
+
+    return render_template(
+        "activities/my_week.html",
+        days=days,
+        monday=monday,
+        sunday=sunday,
+        offset=offset,
+        fulfilled_days=fulfilled_days,
+        weekly_goal=weekly_goal,
+        participation=participation,
+    )
+
+
+@challenge_activities_bp.route("/import", methods=["GET"])
+@login_required
+def import_form():
+    participation = _active_participation()
+    if participation is None:
+        flash("Du nimmst aktuell an keiner Challenge teil.")
+        return redirect(url_for("challenges.index"))
+
+    # Find user's connector credentials
+    credentials = ConnectorCredential.query.filter_by(user_id=current_user.id).all()
+    if not credentials:
+        flash("Verbinde zuerst einen Connector.", "info")
+        return redirect(url_for("connectors.index"))
+
+    offset = 0
+    try:
+        offset = int(request.args.get("offset", 0))
+    except (TypeError, ValueError):
+        offset = 0
+
+    monday, sunday = _get_week_bounds(offset)
+
+    # Use first available credential
+    cred = credentials[0]
+    provider_type = cred.provider_type
+
+    connector_cls = PROVIDER_REGISTRY.get(provider_type)
+    connector_activities = []
+    error = None
+
+    if connector_cls:
+        connector = connector_cls(user_id=current_user.id)
+        try:
+            connector.connect(cred.credentials)
+            updates = connector.get_token_updates()
+            if updates:
+                updated = dict(cred.credentials)
+                updated.update(updates)
+                cred.credentials = updated
+                db.session.commit()
+            raw = connector.get_activities(monday, sunday)
+
+            # Build set of already-imported external_ids
+            existing_ids = {
+                a.external_id
+                for a in db.session.execute(
+                    db.select(Activity).where(
+                        Activity.user_id == current_user.id,
+                        Activity.external_id.isnot(None),
+                    )
+                ).scalars()
+            }
+
+            for idx, act in enumerate(raw):
+                start_time = act.get("startTimeLocal", "")
+                ext_id = f"{provider_type}:{start_time}"
+                duration_sec = act.get("duration", 0)
+                duration_min = max(1, int(duration_sec) // 60)
+                distance_m = act.get("distance")
+                connector_activities.append(
+                    {
+                        "idx": idx,
+                        "external_id": ext_id,
+                        "date": start_time[:10] if start_time else "",
+                        "name": act.get("activityName", "–"),
+                        "type": act.get("activityType", {}).get("typeKey", "–"),
+                        "duration_min": duration_min,
+                        "distance": f"{distance_m / 1000:.2f} km" if distance_m else "–",
+                        "already_imported": ext_id in existing_ids,
+                    }
+                )
+        except Exception:
+            from flask import current_app
+            current_app.logger.exception(
+                "Import-Vorschau fehlgeschlagen provider=%s user=%s", provider_type, current_user.id
+            )
+            error = "Aktivitäten konnten nicht geladen werden. Bitte versuche es später erneut."
+
+    return render_template(
+        "activities/import.html",
+        activities=connector_activities,
+        provider_type=provider_type,
+        monday=monday,
+        sunday=sunday,
+        offset=offset,
+        participation=participation,
+        error=error,
+    )
+
+
+@challenge_activities_bp.route("/import", methods=["POST"])
+@login_required
+def import_submit():
+    participation = _active_participation()
+    if participation is None:
+        flash("Du nimmst aktuell an keiner Challenge teil.")
+        return redirect(url_for("challenges.index"))
+
+    credentials = ConnectorCredential.query.filter_by(user_id=current_user.id).all()
+    if not credentials:
+        flash("Verbinde zuerst einen Connector.", "info")
+        return redirect(url_for("connectors.index"))
+
+    offset = 0
+    try:
+        offset = int(request.form.get("offset", 0))
+    except (TypeError, ValueError):
+        offset = 0
+
+    monday, sunday = _get_week_bounds(offset)
+
+    cred = credentials[0]
+    provider_type = cred.provider_type
+
+    connector_cls = PROVIDER_REGISTRY.get(provider_type)
+    if not connector_cls:
+        flash("Unbekannter Connector.", "danger")
+        return redirect(url_for("challenge_activities.import_form"))
+
+    connector = connector_cls(user_id=current_user.id)
+    try:
+        connector.connect(cred.credentials)
+        updates = connector.get_token_updates()
+        if updates:
+            updated = dict(cred.credentials)
+            updated.update(updates)
+            cred.credentials = updated
+            db.session.commit()
+        raw = connector.get_activities(monday, sunday)
+    except Exception:
+        from flask import current_app
+        current_app.logger.exception(
+            "Import fehlgeschlagen provider=%s user=%s", provider_type, current_user.id
+        )
+        flash("Import fehlgeschlagen. Bitte versuche es später erneut.", "danger")
+        return redirect(url_for("challenge_activities.import_form", offset=offset))
+
+    selected_indices = request.form.getlist("selected")
+    imported_count = 0
+
+    for idx_str in selected_indices:
+        try:
+            idx = int(idx_str)
+            act = raw[idx]
+        except (ValueError, IndexError):
+            continue
+
+        start_time = act.get("startTimeLocal", "")
+        ext_id = f"{provider_type}:{start_time}"
+
+        # Deduplication check
+        existing = db.session.execute(
+            db.select(Activity).where(Activity.external_id == ext_id)
+        ).scalar_one_or_none()
+        if existing:
+            continue
+
+        activity_date_str = start_time[:10] if start_time else ""
+        try:
+            activity_date = date.fromisoformat(activity_date_str)
+        except ValueError:
+            activity_date = date.today()
+
+        duration_sec = act.get("duration", 0)
+        duration_min = max(1, int(duration_sec) // 60)
+        sport_type = act.get("activityType", {}).get("typeKey", "unknown")
+
+        activity = Activity(
+            user_id=current_user.id,
+            challenge_id=participation.challenge_id,
+            activity_date=activity_date,
+            duration_minutes=duration_min,
+            sport_type=sport_type,
+            source=provider_type,
+            external_id=ext_id,
+        )
+        db.session.add(activity)
+        imported_count += 1
+
+    db.session.commit()
+    flash(f"{imported_count} Aktivität(en) erfolgreich importiert.")
+    return redirect(url_for("challenge_activities.my_week"))
+
+
+@challenge_activities_bp.route("/<int:activity_id>/delete", methods=["POST"])
+@login_required
+def delete_activity(activity_id):
+    activity = db.session.get(Activity, activity_id)
+    if activity is None or activity.user_id != current_user.id:
+        flash("Aktivität nicht gefunden oder keine Berechtigung.")
+        return redirect(url_for("challenge_activities.my_week"))
+
+    if activity.screenshot_path:
+        delete_upload(activity.screenshot_path)
+
+    db.session.delete(activity)
+    db.session.commit()
+
+    flash("Aktivität wurde gelöscht.")
+    return redirect(url_for("challenge_activities.my_week"))

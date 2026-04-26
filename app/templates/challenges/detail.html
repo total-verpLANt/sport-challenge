@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h2>{{ challenge.name }}</h2>
+    <p class="text-muted mb-0">
+      {{ challenge.start_date.strftime('%d.%m.%Y') }} – {{ challenge.end_date.strftime('%d.%m.%Y') }}
+    </p>
+  </div>
+  <a href="{{ url_for('challenges.index') }}" class="btn btn-outline-secondary btn-sm">Zurück</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <h6 class="card-title text-muted">Strafe pro Versäumnis</h6>
+        <p class="card-text fs-4">{{ "%.2f"|format(challenge.penalty_per_miss) }} €</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <h6 class="card-title text-muted">Bailout-Gebühr</h6>
+        <p class="card-text fs-4">{{ "%.2f"|format(challenge.bailout_fee) }} €</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <h6 class="card-title text-muted">Teilnehmer</h6>
+        <p class="card-text fs-4">{{ participations|length }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# User actions section #}
+{% if my_participation %}
+  {% if my_participation.status == "invited" %}
+  <div class="card border-warning mb-4">
+    <div class="card-header bg-warning text-dark"><strong>Ausstehende Einladung</strong></div>
+    <div class="card-body">
+      <p>Du wurdest zu dieser Challenge eingeladen. Möchtest du teilnehmen?</p>
+      <div class="row g-2">
+        <div class="col-12 col-md-6">
+          <form method="post" action="{{ url_for('challenges.accept', challenge_id=challenge.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-2">
+              <label for="weekly_goal" class="form-label">Wochenziel</label>
+              <select name="weekly_goal" id="weekly_goal" class="form-select">
+                <option value="3" selected>3 Einheiten pro Woche</option>
+                <option value="2">2 Einheiten pro Woche</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-success w-100">Annehmen</button>
+          </form>
+        </div>
+        <div class="col-12 col-md-6 d-flex align-items-end">
+          <form method="post" action="{{ url_for('challenges.decline', challenge_id=challenge.id) }}" class="w-100">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-secondary w-100">Ablehnen</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% elif my_participation.status == "accepted" %}
+  <div class="card border-success mb-4">
+    <div class="card-header bg-success text-white"><strong>Deine Aktionen</strong></div>
+    <div class="card-body">
+      <p class="mb-2">
+        Du nimmst aktiv teil. Wochenziel: <strong>{{ my_participation.weekly_goal }} Einheiten</strong>
+      </p>
+      <div class="d-flex gap-2 flex-wrap">
+        <form method="post" action="{{ url_for('challenges.sick', challenge_id=challenge.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-warning">Krank melden (diese Woche)</button>
+        </form>
+        <form method="post" action="{{ url_for('challenges.bailout', challenge_id=challenge.id) }}"
+              onsubmit="return confirm('Wirklich aus der Challenge austreten? Bailout-Gebühr: {{ \"%.2f\"|format(challenge.bailout_fee) }} €')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-danger">Challenge verlassen (Bailout)</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% elif my_participation.status == "bailed_out" %}
+  <div class="alert alert-secondary mb-4">
+    Du hast diese Challenge am
+    {% if my_participation.bailed_out_at %}
+      {{ my_participation.bailed_out_at.strftime('%d.%m.%Y') }}
+    {% endif %}
+    verlassen (Bailout).
+  </div>
+  {% endif %}
+{% endif %}
+
+{# Admin: Invite form #}
+{% if current_user.is_admin and uninvited_users %}
+<div class="card mb-4">
+  <div class="card-header"><strong>Benutzer einladen</strong></div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('challenges.invite', challenge_id=challenge.id) }}" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-12 col-md-8">
+        <select name="user_id" class="form-select" required>
+          <option value="" disabled selected>Benutzer auswählen…</option>
+          {% for user in uninvited_users %}
+          <option value="{{ user.id }}">{{ user.email }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <button type="submit" class="btn btn-primary w-100">Einladen</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% elif current_user.is_admin and not uninvited_users %}
+<div class="alert alert-info mb-4">Alle freigeschalteten Benutzer sind bereits in dieser Challenge.</div>
+{% endif %}
+
+{# Participant table #}
+<h4>Teilnehmer</h4>
+{% if participations %}
+<div class="table-responsive">
+  <table class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>E-Mail</th>
+        <th>Ziel</th>
+        <th>Status</th>
+        <th>Beigetreten am</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in participations %}
+      <tr>
+        <td>{{ p.user.email }}</td>
+        <td>
+          {% if p.status == "invited" %}
+          <span class="text-muted">–</span>
+          {% else %}
+          {{ p.weekly_goal }}x/Woche
+          {% endif %}
+        </td>
+        <td>
+          {% if p.status == "invited" %}
+          <span class="badge bg-warning text-dark">Eingeladen</span>
+          {% elif p.status == "accepted" %}
+          <span class="badge bg-success">Aktiv</span>
+          {% elif p.status == "bailed_out" %}
+          <span class="badge bg-secondary">Ausgestiegen</span>
+          {% else %}
+          <span class="badge bg-light text-dark">{{ p.status }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if p.accepted_at %}
+          {{ p.accepted_at.strftime('%d.%m.%Y') }}
+          {% else %}
+          <span class="text-muted">–</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-muted">Noch keine Teilnehmer eingeladen.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2>Bonus-Challenges</h2>
+  {% if current_user.is_admin %}
+  <a href="{{ url_for('bonus.create') }}" class="btn btn-success">
+    + Neue Bonus-Challenge
+  </a>
+  {% endif %}
+</div>
+
+{% if not bonus_challenges %}
+  <div class="alert alert-info">
+    Noch keine Bonus-Challenges vorhanden.
+    {% if current_user.is_admin %}
+      <a href="{{ url_for('bonus.create') }}">Jetzt eine erstellen.</a>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="row g-4">
+    {% for bc in bonus_challenges %}
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <strong>{{ bc.description }}</strong>
+          <span class="text-muted small">{{ bc.scheduled_date.strftime('%d.%m.%Y') }}</span>
+        </div>
+        <div class="card-body">
+
+          {% set ranking = rankings[bc.id] %}
+          {% if ranking %}
+          <h6 class="mb-2">Rangliste</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-3">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col" style="width: 3rem;">Platz</th>
+                  <th scope="col">Name</th>
+                  <th scope="col" style="width: 8rem;">Zeit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for rank_entry in ranking %}
+                <tr {% if rank_entry.user_id == current_user.id %}class="table-primary"{% endif %}>
+                  <td>
+                    {% if loop.index == 1 %}🥇
+                    {% elif loop.index == 2 %}🥈
+                    {% elif loop.index == 3 %}🥉
+                    {% else %}{{ loop.index }}{% endif %}
+                  </td>
+                  <td>
+                    {{ rank_entry.email }}
+                    {% if rank_entry.user_id == current_user.id %}
+                      <span class="badge bg-primary ms-1">Du</span>
+                    {% endif %}
+                  </td>
+                  <td class="font-monospace">{{ rank_entry.time_formatted }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted small mb-3">Noch keine Zeiten eingetragen.</p>
+          {% endif %}
+
+          {% if is_participant and not user_entries[bc.id] %}
+          <form method="post" action="{{ url_for('bonus.add_entry', bonus_id=bc.id) }}"
+                class="row g-2 align-items-end">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="col-12 col-sm-auto">
+              <label for="time_{{ bc.id }}" class="form-label mb-1">Meine Zeit (M:SS)</label>
+              <input type="text" class="form-control form-control-sm"
+                     id="time_{{ bc.id }}" name="time"
+                     placeholder="z.B. 2:35"
+                     pattern="^\d+:\d{2}$|^\d+(\.\d+)?$"
+                     title="Format: M:SS (z.B. 2:35) oder Sekunden"
+                     style="max-width: 120px;"
+                     required>
+            </div>
+            <div class="col-auto">
+              <button type="submit" class="btn btn-primary btn-sm">Zeit eintragen</button>
+            </div>
+          </form>
+          {% elif user_entries[bc.id] %}
+          <p class="text-success small mb-0">
+            Deine Zeit wurde eingetragen: <strong class="font-monospace">
+              {% for rank_entry in rankings[bc.id] %}
+                {% if rank_entry.user_id == current_user.id %}{{ rank_entry.time_formatted }}{% endif %}
+              {% endfor %}
+            </strong>
+          </p>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

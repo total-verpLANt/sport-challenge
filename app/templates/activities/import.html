@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h2 class="mb-0">Aktivitäten importieren</h2>
+  <a href="{{ url_for('challenge_activities.my_week') }}" class="btn btn-outline-secondary btn-sm">
+    &larr; Meine Woche
+  </a>
+</div>
+
+{# Week navigation #}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <a href="{{ url_for('challenge_activities.import_form', offset=offset - 1) }}"
+     class="btn btn-outline-secondary btn-sm">&laquo; Vorwoche</a>
+  <span class="text-muted small">
+    {{ monday.strftime('%d.%m.%Y') }} – {{ sunday.strftime('%d.%m.%Y') }}
+  </span>
+  {% if offset < 0 %}
+  <a href="{{ url_for('challenge_activities.import_form', offset=offset + 1) }}"
+     class="btn btn-outline-secondary btn-sm">Nächste Woche &raquo;</a>
+  {% else %}
+  <span class="btn btn-outline-secondary btn-sm disabled">Nächste Woche &raquo;</span>
+  {% endif %}
+</div>
+
+{% if error %}
+<div class="alert alert-danger" role="alert">
+  {{ error }}
+</div>
+{% endif %}
+
+{% if not activities and not error %}
+<div class="alert alert-info" role="alert">
+  Keine Aktivitäten in dieser Woche gefunden.
+</div>
+{% endif %}
+
+{% if activities %}
+<form method="post" action="{{ url_for('challenge_activities.import_submit') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="offset" value="{{ offset }}">
+
+  <div class="table-responsive mb-3">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 2.5rem;">
+            <input type="checkbox" id="select-all" class="form-check-input" title="Alle auswählen">
+          </th>
+          <th>Datum</th>
+          <th>Name</th>
+          <th>Typ</th>
+          <th>Dauer</th>
+          <th>Distanz</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for act in activities %}
+        <tr class="{% if act.already_imported %}text-muted{% endif %}">
+          <td>
+            {% if act.already_imported %}
+            <input type="checkbox" class="form-check-input" disabled>
+            {% else %}
+            <input type="checkbox" class="form-check-input activity-checkbox"
+                   name="selected" value="{{ act.idx }}">
+            {% endif %}
+          </td>
+          <td>{{ act.date }}</td>
+          <td>{{ act.name }}</td>
+          <td>
+            <span class="badge bg-secondary text-capitalize">{{ act.type }}</span>
+          </td>
+          <td>{{ act.duration_min }} Min</td>
+          <td>{{ act.distance }}</td>
+          <td>
+            {% if act.already_imported %}
+            <span class="badge bg-light text-secondary border">Bereits importiert</span>
+            {% else %}
+            <span class="badge bg-primary">Verfügbar</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2">
+    <a href="{{ url_for('challenge_activities.my_week') }}" class="btn btn-outline-secondary">Abbrechen</a>
+    <button type="submit" class="btn btn-primary">Ausgewählte importieren</button>
+  </div>
+</form>
+
+{% block scripts %}
+<script>
+  document.getElementById('select-all').addEventListener('change', function () {
+    document.querySelectorAll('.activity-checkbox').forEach(function (cb) {
+      cb.checked = this.checked;
+    }, this);
+  });
+</script>
+{% endblock %}
+{% endif %}
+
+{% endblock %}

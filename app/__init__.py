@@ -14,7 +14,12 @@ def create_app(config_class=Config):
     csrf.init_app(app)
     limiter.init_app(app)
 
-    from app.models.connector import ConnectorCredential  # noqa: F401 – Alembic autogenerate
+    from app.models.activity import Activity  # noqa: F401 – Alembic autogenerate
+    from app.models.bonus import BonusChallenge, BonusChallengeEntry  # noqa: F401
+    from app.models.challenge import Challenge, ChallengeParticipation  # noqa: F401
+    from app.models.connector import ConnectorCredential  # noqa: F401
+    from app.models.penalty import PenaltyOverride  # noqa: F401
+    from app.models.sick_week import SickWeek  # noqa: F401
     from app.models.user import User
 
     @login_manager.user_loader
@@ -36,8 +41,23 @@ def create_app(config_class=Config):
     from app.routes.strava_oauth import strava_oauth_bp
     app.register_blueprint(strava_oauth_bp)
 
+    from app.routes.challenges import challenges_bp
+    app.register_blueprint(challenges_bp, url_prefix="/challenges")
+
+    from app.routes.challenge_activities import challenge_activities_bp
+    app.register_blueprint(challenge_activities_bp, url_prefix="/challenge-activities")
+
+    from app.routes.bonus import bonus_bp
+    app.register_blueprint(bonus_bp, url_prefix="/bonus")
+
+    from app.routes.dashboard import dashboard_bp
+    app.register_blueprint(dashboard_bp, url_prefix="/dashboard")
+
     @app.route("/")
     def index():
+        from flask_login import current_user
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard.index"))
         return redirect(url_for("auth.login"))
 
     return app

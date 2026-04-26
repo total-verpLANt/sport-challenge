@@ -1,0 +1,144 @@
+"""Integration tests for challenge activity logging routes."""
+from datetime import date, timedelta
+
+import pytest
+
+from app.models.activity import Activity
+from app.models.challenge import Challenge, ChallengeParticipation
+from app.models.user import User
+
+
+def _create_and_login(client, db, email="test@test.com", password="testpass123", is_admin=False):
+    user = User(email=email, is_approved=True)
+    if is_admin:
+        user.role = "admin"
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    client.post("/auth/login", data={"email": email, "password": password})
+    return user
+
+
+def _create_challenge_with_participation(db, user_id, status="accepted"):
+    today = date.today()
+    challenge = Challenge(
+        name="Log Test Challenge",
+        start_date=today - timedelta(days=7),
+        end_date=today + timedelta(days=30),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user_id,
+    )
+    db.session.add(challenge)
+    db.session.commit()
+
+    participation = ChallengeParticipation(
+        user_id=user_id,
+        challenge_id=challenge.id,
+        status=status,
+    )
+    db.session.add(participation)
+    db.session.commit()
+    return challenge, participation
+
+
+def test_log_manual_activity(client, db):
+    user = _create_and_login(client, db, email="logger@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    today = date.today()
+    activity_date = today  # within challenge period
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": activity_date.isoformat(),
+            "duration_minutes": "45",
+            "sport_type": "running",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(
+            Activity.user_id == user.id,
+            Activity.challenge_id == challenge.id,
+        )
+    ).scalar_one_or_none()
+    assert activity is not None
+    assert activity.duration_minutes == 45
+    assert activity.sport_type == "running"
+    assert activity.source == "manual"
+    assert activity.activity_date == activity_date
+
+
+def test_log_activity_requires_participation(client, db):
+    # Login without any accepted participation
+    _create_and_login(client, db, email="nopart@test.com")
+
+    resp = client.get("/challenge-activities/log", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "/challenges" in resp.headers["Location"]
+
+
+def test_delete_own_activity(client, db):
+    user = _create_and_login(client, db, email="deleter@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    activity = Activity(
+        user_id=user.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=30,
+        sport_type="cycling",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    activity_id = activity.id
+
+    resp = client.post(
+        f"/challenge-activities/{activity_id}/delete",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    gone = db.session.get(Activity, activity_id)
+    assert gone is None
+
+
+def test_cannot_delete_others_activity(client, db):
+    # User A creates activity
+    user_a = _create_and_login(client, db, email="usera@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user_a.id)
+
+    activity = Activity(
+        user_id=user_a.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=30,
+        sport_type="swimming",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    activity_id = activity.id
+
+    # Login as user B
+    client.post("/auth/logout")
+    user_b = User(email="userb@test.com", is_approved=True)
+    user_b.set_password("testpass123")
+    db.session.add(user_b)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "userb@test.com", "password": "testpass123"})
+
+    resp = client.post(
+        f"/challenge-activities/{activity_id}/delete",
+        follow_redirects=False,
+    )
+    # Should redirect (flash error + redirect), not delete the activity
+    assert resp.status_code == 302
+
+    still_there = db.session.get(Activity, activity_id)
+    assert still_there is not None

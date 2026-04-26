@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+    <h2>Aktivität eintragen</h2>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label for="activity_date" class="form-label">Datum</label>
+        <input type="date" class="form-control" id="activity_date" name="activity_date"
+               value="{{ today }}" required max="{{ today }}">
+      </div>
+      <div class="mb-3">
+        <label for="duration_minutes" class="form-label">Dauer (Minuten)</label>
+        <input type="number" class="form-control" id="duration_minutes" name="duration_minutes"
+               min="1" required placeholder="z.B. 30">
+      </div>
+      <div class="mb-3">
+        <label for="sport_type" class="form-label">Sportart</label>
+        <input type="text" class="form-control" id="sport_type" name="sport_type"
+               required placeholder="z.B. Laufen, Krafttraining, Schwimmen">
+      </div>
+      <div class="mb-3">
+        <label for="screenshot" class="form-label">Screenshot/Foto (optional)</label>
+        <input type="file" class="form-control" id="screenshot" name="screenshot"
+               accept="image/*">
+        <div class="form-text">Max. 5 MB, JPG/PNG/WebP</div>
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Eintragen</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

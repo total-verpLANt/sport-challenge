@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h2 class="mb-0">Meine Woche</h2>
+  <a href="{{ url_for('challenge_activities.log_form') }}" class="btn btn-primary btn-sm">
+    + Aktivität eintragen
+  </a>
+</div>
+
+{# Week navigation #}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <a href="{{ url_for('challenge_activities.my_week', offset=offset - 1) }}"
+     class="btn btn-outline-secondary btn-sm">&laquo; Vorwoche</a>
+  <span class="text-muted small">
+    {{ monday.strftime('%d.%m.%Y') }} – {{ sunday.strftime('%d.%m.%Y') }}
+  </span>
+  {% if offset < 0 %}
+  <a href="{{ url_for('challenge_activities.my_week', offset=offset + 1) }}"
+     class="btn btn-outline-secondary btn-sm">Nächste Woche &raquo;</a>
+  {% else %}
+  <span class="btn btn-outline-secondary btn-sm disabled">Nächste Woche &raquo;</span>
+  {% endif %}
+</div>
+
+{# Summary card #}
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title">Fortschritt diese Woche</h5>
+    <p class="card-text mb-2">
+      <strong>{{ fulfilled_days }} von {{ weekly_goal }} Tagen</strong> mit mindestens 30 Minuten
+    </p>
+    <div class="progress" style="height: 20px;" role="progressbar"
+         aria-valuenow="{{ fulfilled_days }}" aria-valuemin="0" aria-valuemax="{{ weekly_goal }}">
+      <div class="progress-bar {% if fulfilled_days >= weekly_goal %}bg-success{% elif fulfilled_days > 0 %}bg-warning{% else %}bg-danger{% endif %}"
+           style="width: {{ [[(fulfilled_days / weekly_goal * 100)|int, 0]|max, 100]|min }}%">
+        {{ fulfilled_days }}/{{ weekly_goal }}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Per-day breakdown #}
+{% for day in days %}
+<div class="card mb-3">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span>
+      <strong>{{ day.date.strftime('%A, %d.%m.%Y') }}</strong>
+    </span>
+    <span>
+      {% if day.total_minutes >= 30 %}
+        <span class="badge bg-success">{{ day.total_minutes }} Min ✓</span>
+      {% elif day.total_minutes > 0 %}
+        <span class="badge bg-warning text-dark">
+          {{ day.total_minutes }} Min – noch {{ day.remaining }} Min
+        </span>
+      {% else %}
+        <span class="badge bg-secondary">Keine Aktivität</span>
+      {% endif %}
+    </span>
+  </div>
+
+  {% if day.activities %}
+  <ul class="list-group list-group-flush">
+    {% for activity in day.activities %}
+    <li class="list-group-item">
+      <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+        <div class="flex-grow-1">
+          <strong>{{ activity.sport_type }}</strong>
+          <span class="text-muted ms-2">{{ activity.duration_minutes }} Min</span>
+          <span class="badge bg-secondary ms-1 text-capitalize">{{ activity.source }}</span>
+
+          {% if activity.screenshot_path %}
+          <div class="mt-2">
+            <a href="{{ url_for('static', filename=activity.screenshot_path) }}" target="_blank" rel="noopener">
+              <img src="{{ url_for('static', filename=activity.screenshot_path) }}"
+                   alt="Screenshot" class="img-thumbnail" style="max-height: 80px; max-width: 120px;">
+            </a>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if activity.source == "manual" %}
+        <form method="post"
+              action="{{ url_for('challenge_activities.delete_activity', activity_id=activity.id) }}"
+              onsubmit="return confirm('Aktivität wirklich löschen?');"
+              class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-danger btn-sm">Löschen</button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="card-body text-muted small">Keine Aktivitäten an diesem Tag.</div>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% endblock %}

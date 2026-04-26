@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Challenge-Übersicht</h2>
+
+{% if pending_invitation %}
+<div class="card border-warning mb-4">
+  <div class="card-header bg-warning text-dark">
+    <strong>Einladung ausstehend</strong>
+  </div>
+  <div class="card-body">
+    <p class="card-text">
+      Du wurdest zur Challenge <strong>{{ pending_invitation.challenge.name }}</strong>
+      ({{ pending_invitation.challenge.start_date.strftime('%d.%m.%Y') }} –
+      {{ pending_invitation.challenge.end_date.strftime('%d.%m.%Y') }}) eingeladen.
+    </p>
+    <p class="card-text">
+      Strafe pro Versäumnis: <strong>{{ "%.2f"|format(pending_invitation.challenge.penalty_per_miss) }} €</strong> &nbsp;|&nbsp;
+      Bailout-Gebühr: <strong>{{ "%.2f"|format(pending_invitation.challenge.bailout_fee) }} €</strong>
+    </p>
+
+    <div class="row g-2 mt-2">
+      <div class="col-12 col-md-6">
+        <form method="post" action="{{ url_for('challenges.accept', challenge_id=pending_invitation.challenge_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-2">
+            <label for="weekly_goal" class="form-label">Wochenziel (Trainingseinheiten)</label>
+            <select name="weekly_goal" id="weekly_goal" class="form-select">
+              <option value="3" selected>3 Einheiten pro Woche</option>
+              <option value="2">2 Einheiten pro Woche</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-success w-100">Einladung annehmen</button>
+        </form>
+      </div>
+      <div class="col-12 col-md-6 d-flex align-items-end">
+        <form method="post" action="{{ url_for('challenges.decline', challenge_id=pending_invitation.challenge_id) }}" class="w-100">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-secondary w-100">Einladung ablehnen</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if active_challenge and active_participation %}
+<div class="card mb-4">
+  <div class="card-header">
+    <strong>Aktive Challenge</strong>
+  </div>
+  <div class="card-body">
+    <h5 class="card-title">{{ active_challenge.name }}</h5>
+    <p class="card-text">
+      Zeitraum: {{ active_challenge.start_date.strftime('%d.%m.%Y') }} – {{ active_challenge.end_date.strftime('%d.%m.%Y') }}<br>
+      Dein Wochenziel: <strong>{{ active_participation.weekly_goal }} Einheiten</strong><br>
+      Strafe pro Versäumnis: <strong>{{ "%.2f"|format(active_challenge.penalty_per_miss) }} €</strong>
+    </p>
+    <a href="{{ url_for('challenges.detail', challenge_id=active_challenge.id) }}" class="btn btn-primary">Details anzeigen</a>
+  </div>
+</div>
+{% endif %}
+
+{% if current_user.is_admin and not any_active_challenge %}
+<div class="text-center py-4">
+  <p class="text-muted">Noch keine Challenge vorhanden.</p>
+  <a href="{{ url_for('challenges.create') }}" class="btn btn-primary">Neue Challenge erstellen</a>
+</div>
+{% elif current_user.is_admin and any_active_challenge %}
+<div class="mb-3">
+  <a href="{{ url_for('challenges.detail', challenge_id=any_active_challenge.id) }}" class="btn btn-outline-primary">Challenge verwalten</a>
+  <a href="{{ url_for('challenges.create') }}" class="btn btn-outline-secondary ms-2">Neue Challenge erstellen</a>
+</div>
+{% endif %}
+
+{% if not pending_invitation and not active_challenge and not current_user.is_admin %}
+<div class="alert alert-info">
+  Du hast aktuell keine aktive Challenge und keine ausstehenden Einladungen.
+</div>
+{% endif %}
+{% endblock %}
