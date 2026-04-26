@@ -164,3 +164,70 @@ def test_csrf_missing_returns_400(csrf_client):
         data={"email": "irgendwer@example.com", "password": "egal"},
     )
     assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Test 7 – Registrierung lehnt ungültige E-Mail-Adresse ab
+# ---------------------------------------------------------------------------
+
+def test_register_rejects_invalid_email(client, db):
+    resp = client.post("/auth/register", data={
+        "email": "notanemail",
+        "password": "TestPass123!",
+    })
+    assert resp.status_code == 200
+    assert "Ungültige E-Mail-Adresse" in resp.data.decode()
+    user = db.session.execute(
+        db.select(User).filter_by(email="notanemail")
+    ).scalar_one_or_none()
+    assert user is None
+
+
+# ---------------------------------------------------------------------------
+# Test 8 – Registrierung lehnt XSS-Payload in E-Mail ab
+# ---------------------------------------------------------------------------
+
+def test_register_rejects_xss_email(client, db):
+    resp = client.post("/auth/register", data={
+        "email": "x');alert(1);//@evil.com",
+        "password": "TestPass123!",
+    })
+    assert resp.status_code == 200
+    assert "Ungültige E-Mail-Adresse" in resp.data.decode()
+    count = db.session.execute(
+        db.select(User)
+    ).scalars().all()
+    assert len(count) == 0
+
+
+# ---------------------------------------------------------------------------
+# Test 9 – Registrierung normalisiert E-Mail auf Kleinschreibung
+# ---------------------------------------------------------------------------
+
+def test_register_normalizes_email(client, db):
+    # email_validator normalizes the domain to lowercase but preserves local part
+    # "Test@Example.COM" → "Test@example.com"
+    client.post("/auth/register", data={
+        "email": "Test@Example.COM",
+        "password": "TestPass123!",
+    }, follow_redirects=True)
+    user = db.session.execute(
+        db.select(User).filter_by(email="Test@example.com")
+    ).scalar_one_or_none()
+    assert user is not None
+
+
+# ---------------------------------------------------------------------------
+# Test 10 – Registrierung akzeptiert E-Mail mit Plus-Adressierung
+# ---------------------------------------------------------------------------
+
+def test_register_accepts_valid_email_with_plus(client, db):
+    client.post("/auth/register", data={
+        "email": "user+tag@example.com",
+        "password": "TestPass123!",
+    }, follow_redirects=True)
+    users = db.session.execute(
+        db.select(User)
+    ).scalars().all()
+    assert len(users) == 1
+    assert "user+tag@example.com" in users[0].email
