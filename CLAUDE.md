@@ -50,23 +50,22 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-04-26, Wachwechsel #6)
+## Aktueller Stand (2026-04-26, Wachwechsel #7)
 
-**Aktive Arbeit:** UX-Polishing + Security-Fixes abgeschlossen – keine offenen Issues
+**Aktive Arbeit:** Challenge-System vollständig implementiert – keine offenen Issues
 
-- **Epic:** kein aktiver Epic – nächste Aufgaben via `bd create` anlegen
+- **Epic:** Challenge-System Epic abgeschlossen (16/16 Issues, 5 Waves)
 - **Lessons Learned:** `docs/lessons-learned.md`
 
-**Änderungen seit Wachwechsel #5 (UX + Security):**
-- `e76ab16` – fix(SEC): Strava-Provider ausblenden wenn nicht konfiguriert
-- `7da8c4d` – fix(SEC): SECRET_KEY-Startup-Validierung (RuntimeError bei fehlendem Key)
-- `44a4527` – docs: SECRET_KEY als Pflichtfeld kennzeichnen
-- `71f7e25` – feat(UX): Bootstrap-Spinner + Button-Disable nach Garmin-Connect-Form-Submit
-- `5b04464` – feat(UX): ⚙-Settings-Dropdown in Navbar (Connectors + Admin), Logout separat
+**Änderungen seit Wachwechsel #6 (Challenge-System):**
+- `e8fb45f` – feat: Challenge-System mit Dashboard, Aktivitäts-Tracking, Strafberechnung und Bonus-Challenges
 
-**UI-Architektur-Ergänzungen:**
-- `app/templates/base.html` – `{% block scripts %}` Hook vor `</body>`; ⚙-Dropdown mit E-Mail als Trigger
-- `app/templates/connectors/connect.html` – Spinner + Button-Disable bei Submit (kein Doppelklick)
+**Challenge-System umfasst:**
+- 7 neue DB-Tabellen (Challenge, ChallengeParticipation, Activity, SickWeek, PenaltyOverride, BonusChallenge, BonusChallengeEntry)
+- 4 neue Blueprints (challenges, challenge_activities, dashboard, bonus)
+- 2 neue Services (penalty, weekly_summary)
+- Screenshot-Upload mit UUID-Naming, Typ-Validierung, 5 MB Limit
+- 27 neue Tests (68 gesamt)
 
 ### Einstieg für neue Sessions
 
@@ -104,7 +103,7 @@ Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `
 - `app/routes/activities.py` – `/activities/week` mit Wochennavigation und 30-Min-Filter
 
 **Phase 2 (abgeschlossen):** Multi-User mit Connector-Architektur.
-- `app/__init__.py` – App Factory mit Extensions-Init + user_loader
+- `app/__init__.py` – App Factory mit Extensions-Init + user_loader + 9 Blueprints
 - `app/extensions.py` – db, migrate, login_manager, csrf, limiter (Instanzen, kein init_app hier)
 - `app/models/user.py` – User + UserMixin, scrypt N=2^17 (OWASP), is_admin-Property
 - `app/models/connector.py` – ConnectorCredential mit `_JsonFernetField()` (Lazy-Init), UniqueConstraint(user_id, provider_type)
@@ -117,7 +116,23 @@ Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `
 - `app/routes/connectors.py` – /connectors/ Index + Connect + Disconnect (login_required, CSRF)
 - `app/routes/activities.py` – /activities/week via Connector-Abstraction, Redirect bei fehlendem Credential
 - `migrations/` – users + connector_credentials (Alembic)
-- `tests/` – 22 Tests: pytest, conftest.py mit app/client/db-Fixture (In-Memory-SQLite)
+
+**Phase 3 (abgeschlossen):** Challenge-System mit Leaderboard.
+- `app/models/challenge.py` – Challenge (name, start/end_date, penalty_per_miss=5.0, bailout_fee=25.0) + ChallengeParticipation (user_id, challenge_id, weekly_goal 2|3, status invited|accepted|bailed_out)
+- `app/models/activity.py` – Activity (user_id, challenge_id, activity_date, duration_minutes, sport_type, source manual|garmin|strava, external_id, screenshot_path)
+- `app/models/sick_week.py` – SickWeek (user_id, challenge_id, week_start, UniqueConstraint)
+- `app/models/penalty.py` – PenaltyOverride (user_id, challenge_id, week_start, override_amount, reason, set_by_id)
+- `app/models/bonus.py` – BonusChallenge (challenge_id, scheduled_date, description) + BonusChallengeEntry (user_id, bonus_challenge_id, time_seconds, UniqueConstraint)
+- `app/utils/uploads.py` – Screenshot-Upload: ALLOWED_EXTENSIONS {jpg,jpeg,png,webp}, UUID-Naming, 5 MB Limit
+- `app/services/penalty.py` – get_week_mondays(), count_fulfilled_days() (SQL GROUP BY/HAVING ≥30 min), calculate_weekly_penalty() (SickWeek→0, Override→amount, sonst missed×penalty), calculate_total_penalty() (Summe + Bailout-Fee)
+- `app/services/weekly_summary.py` – get_challenge_summary() → Wochen, Teilnehmer, fulfilled_days, is_sick, penalty, overachieved, total_penalty (sortiert nach Strafe ASC)
+- `app/routes/challenges.py` – 9 Routen: index, create (admin), detail, invite (admin), accept, decline, bailout, sick
+- `app/routes/challenge_activities.py` – 6 Routen: log_form, log_submit, my_week, delete_activity, import_form, import_submit
+- `app/routes/dashboard.py` – Leaderboard mit aktiver Challenge, Farbcodierung (success/warning/danger), Spendentopf
+- `app/routes/bonus.py` – 4 Routen: index (mit Inline-Entry + Ranking), create (admin), entry
+- `app/templates/` – challenges/ (3), activities/ (3), dashboard/ (1), bonus/ (2) – alle Bootstrap 5.3.3, responsive
+- `migrations/versions/2307226a4e48_*.py` – 7 neue Tabellen in einer Migration
+- `tests/` – 68 Tests: pytest, conftest.py mit app/client/db-Fixture (In-Memory-SQLite)
 
 ## Conventions & Patterns
 

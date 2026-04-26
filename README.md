@@ -1,12 +1,16 @@
 # Sport Challenge
 
-Flask-Webanwendung zur Anzeige von Fitness-Aktivitäten aus Garmin Connect – mit Multi-User-Support und Connector-Architektur.
+Flask-Webanwendung für Fitness-Challenges mit Leaderboard, Strafberechnung und Connector-Integration (Garmin, Strava).
 
 ## Was macht dieses Projekt?
 
-- Nutzer registrieren sich und verbinden ihren Garmin- oder Strava-Account
-- Die Wochenansicht zeigt alle Aktivitäten (mit optionalem 30-Minuten-Filter)
-- Connector-Architektur: Garmin (Credentials-Form) und Strava (OAuth2) bereits integriert; weitere Provider (Polar, …) einfach erweiterbar
+- **Challenge-System:** Admin erstellt Challenges mit Start-/Enddatum, lädt Teilnehmer ein, die individuell 2x oder 3x pro Woche ≥30 Min Sport als Ziel setzen
+- **Leaderboard/Dashboard:** Wochenweise Übersicht aller Teilnehmer mit Farbcodierung (grün/gelb/rot), Krankmeldungen (🤒) und Spendentopf
+- **Aktivitäts-Tracking:** Manuelles Eintragen (mit optionalem Screenshot-Upload) oder Import aus Garmin/Strava
+- **Automatische Strafberechnung:** 5 €/verpasster Tag, Admin-Override möglich, Krankmeldung befreit wochenweise
+- **Bonus-Challenges:** Admin-definierte Termine (z.B. 50 Squat Jumps), Zeiterfassung mit Ranking
+- **Bailout-Option:** Teilnehmer können aussteigen (+25 € Gebühr), werden im Leaderboard ausgegraut
+- **Connector-Architektur:** Garmin (Credentials-Form) und Strava (OAuth2) integriert; weitere Provider erweiterbar
 - Credentials werden Fernet-verschlüsselt in der DB gespeichert; Passwörter mit scrypt N=2^17 gehasht
 
 ## Lokale Entwicklung
@@ -55,7 +59,7 @@ SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 .venv/bin/pytest -v
 ```
 
-22 Tests (Auth, Connector, Retry, Smoke) – kein externer Service nötig.
+68 Tests (Auth, Connector, Challenge, Aktivitäten, Penalty, Dashboard, Bonus) – kein externer Service nötig.
 
 ### Schnell-Check für neue Sessions
 
@@ -67,33 +71,61 @@ SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 
 ```
 app/
-├── __init__.py          # App Factory
+├── __init__.py          # App Factory, 9 Blueprints
 ├── extensions.py        # db, migrate, login_manager, csrf, limiter
 ├── models/
 │   ├── user.py          # User + UserMixin, scrypt-Hashing
-│   └── connector.py     # ConnectorCredential mit Fernet-Encryption
+│   ├── connector.py     # ConnectorCredential mit Fernet-Encryption
+│   ├── challenge.py     # Challenge + ChallengeParticipation
+│   ├── activity.py      # Activity (manuell/Garmin/Strava)
+│   ├── sick_week.py     # SickWeek (wochenweise Krankmeldung)
+│   ├── penalty.py       # PenaltyOverride (Admin-Korrektur)
+│   └── bonus.py         # BonusChallenge + BonusChallengeEntry
 ├── connectors/
 │   ├── base.py          # BaseConnector ABC
 │   ├── __init__.py      # PROVIDER_REGISTRY + @register
 │   ├── garmin.py        # GarminConnector (Credentials-Form, Tokens Fernet-verschlüsselt in DB)
 │   └── strava.py        # StravaConnector (OAuth2, Token-Refresh automatisch)
+├── services/
+│   ├── penalty.py       # Strafberechnung (wöchentlich + gesamt)
+│   └── weekly_summary.py # Dashboard-Aggregation (Leaderboard-Daten)
 ├── routes/
 │   ├── auth.py          # Login/Register/Logout, Rate-Limit
-│   ├── activities.py    # /activities/week – Wochenansicht
+│   ├── activities.py    # /activities/week – Wochenansicht (Connector)
 │   ├── connectors.py    # /connectors/ – Verbinden + Status
-│   └── strava_oauth.py  # /strava/oauth/ – OAuth2-Start + Callback
+│   ├── strava_oauth.py  # /strava/oauth/ – OAuth2-Start + Callback
+│   ├── admin.py         # /admin/ – Nutzerverwaltung
+│   ├── challenges.py    # /challenges/ – Erstellen, Einladen, Annehmen, Bailout, Krankmeldung
+│   ├── challenge_activities.py  # /challenge-activities/ – Eintragen, Meine Woche, Import
+│   ├── dashboard.py     # /dashboard/ – Leaderboard
+│   └── bonus.py         # /bonus/ – Bonus-Challenges + Einträge
 ├── utils/
 │   ├── crypto.py        # HKDF-Key-Derivation + FernetField TypeDecorator
 │   ├── decorators.py    # admin_required
-│   └── retry.py         # @retry_on_rate_limit (exponential backoff)
+│   ├── retry.py         # @retry_on_rate_limit (exponential backoff)
+│   └── uploads.py       # Screenshot-Upload (UUID-Naming, Typ-Validierung, 5 MB)
 └── templates/
-    ├── activities/
-    └── connectors/
-migrations/              # Alembic-Migrationen
-tests/                   # pytest, In-Memory-SQLite
+    ├── base.html         # Bootstrap 5.3.3, Navbar mit Settings-Dropdown
+    ├── activities/       # Connector-Wochenansicht
+    ├── connectors/       # Connect/Disconnect
+    ├── challenges/       # Erstellen, Detail, Übersicht
+    ├── dashboard/        # Leaderboard-Tabelle
+    └── bonus/            # Bonus-Challenges + Ranking
+migrations/              # Alembic-Migrationen (9 Tabellen)
+tests/                   # 68 pytest-Tests, In-Memory-SQLite
 ```
 
-**Datenfluss Aktivitäten-Abruf:**
+**Datenfluss Challenge-System:**
+
+1. Admin erstellt Challenge (`/challenges/create`) mit Name, Start-/Enddatum
+2. Admin lädt Nutzer ein → `ChallengeParticipation` mit Status `invited`
+3. Nutzer nimmt an → setzt individuelles Wochenziel (2x oder 3x), Status `accepted`
+4. Nutzer trägt Aktivitäten ein (manuell oder Import aus Garmin/Strava)
+5. `penalty.py` berechnet pro Woche: Tage mit ≥30 Min Gesamtdauer → verfehlte Tage × 5 €
+6. `weekly_summary.py` aggregiert alle Daten für das Dashboard/Leaderboard
+7. Dashboard zeigt Fortschritt aller Teilnehmer, Spendentopf, Bonus-Rankings
+
+**Datenfluss Aktivitäten-Abruf (Connector):**
 
 1. User ruft `/activities/week` auf
 2. Route lädt `ConnectorCredential` für `current_user` (Fernet-entschlüsselt)
@@ -108,7 +140,8 @@ tests/                   # pytest, In-Memory-SQLite
 
 ## Weiterführend
 
-- **Plan:** `.schrammns_workflow/plans/2026-04-23-sport-challenge-multi-user-rebuild.md`
+- **Plan (Challenge-System):** `.schrammns_workflow/plans/2026-04-26-challenge-system.md`
+- **Plan (Multi-User Rebuild):** `.schrammns_workflow/plans/2026-04-23-sport-challenge-multi-user-rebuild.md`
 - **Research:** `.schrammns_workflow/research/`
 - **Lessons Learned:** `docs/lessons-learned.md`
 - **AI-Agent-Kontext:** `CLAUDE.md`
