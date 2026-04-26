@@ -195,3 +195,17 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wo sichtbar:** `app/garmin/client.py` – `login()` nutzt `tempfile.mkdtemp()` + `finally: shutil.rmtree()`, `reconnect()` nutzt `Garmin().login(tokenstore=token_json)`. `app/connectors/garmin.py` – `credentials["_garmin_tokens"]` enthält den Token-String.
 
 **Quelle:** Wachwechsel #5, 2026-04-24. Umgesetzt in I-01 bis I-06 (Commits `12cc765`–`e5016b2`).
+
+---
+
+## Tooling: Flask Blueprints
+
+### 2026-04-26: url_for-Endpunkt muss Funktionsnamen matchen, nicht Route-Pfad
+
+**Erkenntnis:** `url_for('challenge_activities.log')` schlägt fehl mit `BuildError`, wenn die Route-Funktion `log_form` heißt. Flask-Blueprints leiten Endpunktnamen vom Funktionsnamen ab, nicht vom URL-Pfad.
+
+**Warum relevant:** Der Fehler tritt erst zur Laufzeit auf, wenn ein Template gerendert wird, das den falschen Endpunkt referenziert. Tests für *andere* Routes (z.B. Admin-Seite) decken ihn auf, weil `base.html` bei jedem Request gerendert wird.
+
+**Wie vermeiden:** Nach Erstellen neuer Blueprint-Routes: `grep -r "url_for.*blueprint_name" app/templates/` gegen tatsächliche Funktionsnamen abgleichen.
+
+**Quelle:** Wave 2, 2026-04-26. Fix in Commit `e8fb45f`.
