@@ -4,6 +4,8 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import func
 
+from email_validator import validate_email, EmailNotValidError
+
 from app.extensions import db, limiter
 from app.models.user import User
 
@@ -71,27 +73,33 @@ def register():
         if not email or not password:
             error = "E-Mail und Passwort sind erforderlich."
         else:
-            existing = db.session.execute(
-                db.select(User).filter_by(email=email)
-            ).scalar_one_or_none()
-            if existing:
-                error = "Diese E-Mail ist bereits registriert."
-            else:
-                user = User(email=email)
-                user.set_password(password)
-                is_first_user = db.session.execute(
-                    db.select(func.count()).select_from(User)
-                ).scalar() == 0
-                if is_first_user:
-                    user.role = "admin"
-                    user.is_approved = True
-                db.session.add(user)
-                db.session.commit()
-                if is_first_user:
-                    login_user(user)
-                    return redirect(url_for("activities.week_view"))
-                flash("Registrierung erfolgreich – warte auf Admin-Freigabe.")
-                return redirect(url_for("auth.login"))
+            try:
+                result = validate_email(email, check_deliverability=False)
+                email = result.normalized
+            except EmailNotValidError:
+                error = "Ungültige E-Mail-Adresse."
+            if error is None:
+                existing = db.session.execute(
+                    db.select(User).filter_by(email=email)
+                ).scalar_one_or_none()
+                if existing:
+                    error = "Diese E-Mail ist bereits registriert."
+                else:
+                    user = User(email=email)
+                    user.set_password(password)
+                    is_first_user = db.session.execute(
+                        db.select(func.count()).select_from(User)
+                    ).scalar() == 0
+                    if is_first_user:
+                        user.role = "admin"
+                        user.is_approved = True
+                    db.session.add(user)
+                    db.session.commit()
+                    if is_first_user:
+                        login_user(user)
+                        return redirect(url_for("activities.week_view"))
+                    flash("Registrierung erfolgreich – warte auf Admin-Freigabe.")
+                    return redirect(url_for("auth.login"))
 
     return render_template("auth/register.html", error=error)
 
