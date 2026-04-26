@@ -45,7 +45,7 @@
             <button type="submit" class="btn btn-success btn-sm">Freischalten</button>
           </form>
           <form method="post" action="{{ url_for('admin.reject_user', user_id=user.id) }}" class="d-inline ms-1"
-                onsubmit="return confirm('{{ user.email }} wirklich ablehnen und löschen?')">
+                onsubmit="return confirm({{ user.email|tojson }} + ' wirklich ablehnen und löschen?')">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-danger btn-sm">Ablehnen</button>
           </form>
