@@ -1,3 +1,4 @@
+import uuid as _uuid
 from datetime import date, datetime, timezone
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -13,8 +14,12 @@ challenges_bp = Blueprint("challenges", __name__, template_folder="../templates"
 
 
 def _get_challenge_by_public_id(public_id: str) -> Challenge:
+    try:
+        uid = _uuid.UUID(public_id)
+    except (ValueError, AttributeError):
+        abort(404)
     challenge = db.session.execute(
-        db.select(Challenge).where(Challenge.public_id == public_id)
+        db.select(Challenge).where(Challenge.public_id == uid)
     ).scalar_one_or_none()
     if challenge is None:
         abort(404)

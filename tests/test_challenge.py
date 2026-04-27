@@ -83,7 +83,7 @@ def test_invite_user_to_challenge(client, db):
     db.session.commit()
 
     resp = client.post(
-        f"/challenges/{challenge.id}/invite",
+        f"/challenges/{challenge.public_id}/invite",
         data={"user_id": invitee.id},
         follow_redirects=False,
     )
@@ -122,7 +122,7 @@ def test_accept_invitation(client, db):
     client.post("/auth/login", data={"email": "invitee@test.com", "password": "pass123"})
 
     resp = client.post(
-        f"/challenges/{challenge.id}/accept",
+        f"/challenges/{challenge.public_id}/accept",
         data={"weekly_goal": "2"},
         follow_redirects=False,
     )
@@ -156,7 +156,7 @@ def test_decline_invitation(client, db):
     client.post("/auth/login", data={"email": "invitee@test.com", "password": "pass123"})
 
     resp = client.post(
-        f"/challenges/{challenge.id}/decline",
+        f"/challenges/{challenge.public_id}/decline",
         follow_redirects=False,
     )
     assert resp.status_code == 302
@@ -186,7 +186,7 @@ def test_bailout_from_challenge(client, db):
     client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
 
     resp = client.post(
-        f"/challenges/{challenge.id}/bailout",
+        f"/challenges/{challenge.public_id}/bailout",
         follow_redirects=False,
     )
     assert resp.status_code == 302
@@ -217,7 +217,7 @@ def test_sick_week_creation(client, db):
     client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
 
     resp = client.post(
-        f"/challenges/{challenge.id}/sick",
+        f"/challenges/{challenge.public_id}/sick",
         follow_redirects=False,
     )
     assert resp.status_code == 302
@@ -255,9 +255,9 @@ def test_duplicate_sick_week_rejected(client, db):
     client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
 
     # First sick report
-    client.post(f"/challenges/{challenge.id}/sick")
+    client.post(f"/challenges/{challenge.public_id}/sick")
     # Second sick report (duplicate)
-    client.post(f"/challenges/{challenge.id}/sick")
+    client.post(f"/challenges/{challenge.public_id}/sick")
 
     count = db.session.execute(
         db.select(SickWeek).where(
