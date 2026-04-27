@@ -49,7 +49,7 @@
                     {% else %}{{ loop.index }}{% endif %}
                   </td>
                   <td>
-                    {{ rank_entry.email }}
+                    {{ rank_entry.display_name }}
                     {% if rank_entry.user_id == current_user.id %}
                       <span class="badge bg-primary ms-1">Du</span>
                     {% endif %}

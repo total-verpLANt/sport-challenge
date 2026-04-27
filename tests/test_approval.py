@@ -56,7 +56,8 @@ def test_first_user_becomes_admin_and_approved(client, db):
         follow_redirects=False,
     )
     assert resp.status_code == 302
-    assert "/activities" in resp.headers["Location"]
+    # Erster User ohne Nickname → Redirect auf Settings für Nickname-Eingabe
+    assert "/settings" in resp.headers["Location"]
 
     user = db.session.execute(
         db.select(User).filter_by(email="first@example.com")

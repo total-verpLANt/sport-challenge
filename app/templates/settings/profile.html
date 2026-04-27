@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <h2 class="mb-4">Profil – Spitzname</h2>
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-body">
+        <p class="text-muted mb-1">E-Mail</p>
+        <p class="mb-3"><strong>{{ current_user.email }}</strong></p>
+
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label for="nickname" class="form-label">Spitzname</label>
+            <input type="text" class="form-control" id="nickname" name="nickname"
+                   value="{{ current_user.nickname or '' }}"
+                   placeholder="{{ current_user.email.split('@')[0] }}"
+                   minlength="3" maxlength="30" required>
+            <div class="form-text">3–30 Zeichen. Wird überall anstelle der E-Mail angezeigt.</div>
+          </div>
+          <button type="submit" class="btn btn-primary">Speichern</button>
+          <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary ms-2">Abbrechen</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

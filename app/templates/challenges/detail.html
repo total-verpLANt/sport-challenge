@@ -109,7 +109,7 @@
         <select name="user_id" class="form-select" required>
           <option value="" disabled selected>Benutzer auswählen…</option>
           {% for user in uninvited_users %}
-          <option value="{{ user.id }}">{{ user.email }}</option>
+          <option value="{{ user.id }}">{{ user.display_name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -130,7 +130,7 @@
   <table class="table table-striped table-hover">
     <thead>
       <tr>
-        <th>E-Mail</th>
+        <th>Teilnehmer</th>
         <th>Ziel</th>
         <th>Status</th>
         <th>Beigetreten am</th>
@@ -139,7 +139,7 @@
     <tbody>
       {% for p in participations %}
       <tr>
-        <td>{{ p.user.email }}</td>
+        <td>{{ p.user.display_name }}</td>
         <td>
           {% if p.status == "invited" %}
           <span class="text-muted">–</span>

@@ -88,8 +88,8 @@ def test_register_creates_user(client, db):
 # ---------------------------------------------------------------------------
 
 def test_login_with_valid_credentials(client, db):
-    # Vorbereitung: freigeschalteter User
-    user = User(email="valid@example.com", is_approved=True)
+    # Vorbereitung: freigeschalteter User mit Nickname → Redirect zu Activities
+    user = User(email="valid@example.com", is_approved=True, nickname="Käpt'n Test")
     user.set_password("richtiges_passwort")
     db.session.add(user)
     db.session.commit()
@@ -99,7 +99,7 @@ def test_login_with_valid_credentials(client, db):
         data={"email": "valid@example.com", "password": "richtiges_passwort"},
         follow_redirects=False,
     )
-    # Login erfolgreich → Redirect
+    # Login erfolgreich → Redirect zu Activities (Nickname bereits gesetzt)
     assert resp.status_code == 302
     assert "/activities" in resp.headers["Location"]
 

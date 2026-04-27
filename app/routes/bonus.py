@@ -66,7 +66,7 @@ def index():
             user = db.session.get(User, entry.user_id)
             ranked.append({
                 "user_id": entry.user_id,
-                "email": user.email if user else "Unbekannt",
+                "display_name": user.display_name if user else "Unbekannt",
                 "time_seconds": entry.time_seconds,
                 "time_formatted": format_time(entry.time_seconds),
             })

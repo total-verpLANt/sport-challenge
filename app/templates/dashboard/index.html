@@ -42,7 +42,7 @@
       <tr {% if is_bailed %}class="opacity-50"{% endif %}>
         <td class="text-nowrap">
           {% if is_bailed %}<s>{% endif %}
-          {{ p.user.email }}
+          {{ p.user.display_name }}
           {% if is_bailed %}</s> <span class="badge bg-secondary ms-1">Ausgestiegen</span>{% endif %}
         </td>
         <td class="text-center">{{ p.weekly_goal }}x</td>

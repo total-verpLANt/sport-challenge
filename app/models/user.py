@@ -13,6 +13,7 @@ class User(UserMixin, db.Model):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    nickname: Mapped[str | None] = mapped_column(String(30), unique=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
     role: Mapped[str] = mapped_column(String(32), nullable=False, default="user")
     created_at: Mapped[datetime] = mapped_column(
@@ -31,6 +32,10 @@ class User(UserMixin, db.Model):
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def display_name(self) -> str:
+        return self.nickname or self.email.split("@")[0]
 
     @property
     def is_active(self) -> bool:

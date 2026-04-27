@@ -37,7 +37,7 @@ def approve_user(user_id):
     user.approved_at = datetime.now(timezone.utc)
     user.approved_by_id = current_user.id
     db.session.commit()
-    flash(f"Benutzer {user.email} wurde freigeschaltet.")
+    flash(f"Benutzer {user.display_name} ({user.email}) wurde freigeschaltet.")
     return redirect(url_for("admin.users"))
 
 
@@ -52,8 +52,9 @@ def reject_user(user_id):
     if user.id == current_user.id:
         flash("Eigenen Account kann man nicht über dieses Formular verwalten.")
         return redirect(url_for("admin.users"))
+    name = user.display_name
     email = user.email
     db.session.delete(user)
     db.session.commit()
-    flash(f"Benutzer {email} wurde abgelehnt und gelöscht.")
+    flash(f"Benutzer {name} ({email}) wurde abgelehnt und gelöscht.")
     return redirect(url_for("admin.users"))

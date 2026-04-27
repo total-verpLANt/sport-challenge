@@ -66,6 +66,9 @@ def create_app(config_class=Config):
     from app.routes.dashboard import dashboard_bp
     app.register_blueprint(dashboard_bp, url_prefix="/dashboard")
 
+    from app.routes.settings import settings_bp
+    app.register_blueprint(settings_bp, url_prefix="/settings")
+
     @app.route("/")
     def index():
         from flask_login import current_user

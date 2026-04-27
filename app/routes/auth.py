@@ -48,6 +48,9 @@ def login():
                         error = "Konto wartet auf Admin-Freigabe."
                     else:
                         login_user(user)
+                        if user.nickname is None:
+                            flash("Willkommen! Gib dir einen Spitznamen – er wird überall angezeigt.")
+                            return redirect(url_for("settings.profile"))
                         return redirect(url_for("activities.week_view"))
                 else:
                     user.failed_login_attempts += 1
@@ -100,7 +103,8 @@ def register():
                     db.session.commit()
                     if is_first_user:
                         login_user(user)
-                        return redirect(url_for("activities.week_view"))
+                        flash("Willkommen! Gib dir einen Spitznamen – er wird überall angezeigt.")
+                        return redirect(url_for("settings.profile"))
                     flash("Registrierung erfolgreich – warte auf Admin-Freigabe.")
                     return redirect(url_for("auth.login"))
 

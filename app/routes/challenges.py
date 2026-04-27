@@ -184,7 +184,7 @@ def invite(challenge_id):
     ).scalar_one_or_none()
 
     if existing:
-        flash(f"{user.email} ist bereits in dieser Challenge.")
+        flash(f"{user.display_name} ist bereits in dieser Challenge.")
         return redirect(url_for("challenges.detail", challenge_id=challenge_id))
 
     participation = ChallengeParticipation(
@@ -195,7 +195,7 @@ def invite(challenge_id):
     db.session.add(participation)
     db.session.commit()
 
-    flash(f"{user.email} wurde zur Challenge eingeladen.")
+    flash(f"{user.display_name} wurde zur Challenge eingeladen.")
     return redirect(url_for("challenges.detail", challenge_id=challenge_id))
 
 

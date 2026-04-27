@@ -41,9 +41,13 @@
         <div class="dropdown">
           <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button"
                   data-bs-toggle="dropdown" aria-expanded="false">
-            ⚙ {{ current_user.email }}
+            ⚙ {{ current_user.display_name }}
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+              <a class="dropdown-item" href="{{ url_for('settings.profile') }}">Profil / Spitzname</a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
             <li>
               <a class="dropdown-item" href="{{ url_for('challenges.index') }}">Challenge</a>
             </li>
