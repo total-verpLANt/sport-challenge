@@ -316,6 +316,9 @@ def import_submit():
         return redirect(url_for("challenge_activities.import_form", offset=offset))
 
     selected_ext_ids = request.form.getlist("selected")
+    if len(selected_ext_ids) > 200:
+        flash("Maximal 200 Aktivitäten pro Import auswählbar.", "warning")
+        return redirect(url_for("challenge_activities.import_form"))
     raw_by_ext_id = {
         f"{provider_type}:{a['startTimeLocal']}": a for a in raw
     }
