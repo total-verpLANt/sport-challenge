@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "epic_id": "sport-challenge-ffh",
+  "wave_count": 1,
+  "fix_cycles": 0,
+  "issues_completed": 2,
+  "issues_total": 8,
+  "last_wave_summary": "Wave 1: ffh.1 (ActivityMedia-Model + Migration) und ffh.2 (uploads.py + config.py) abgeschlossen. 87 Tests grün. Migration 149d8863712f angelegt mit Legacy-Datenmigration. VIDEO_EXTENSIONS {mp4,mov,webm} hinzugefügt, MAX_CONTENT_LENGTH=50MB. Downgrade+Upgrade-Zyklus verifiziert.",
+  "wave_1_summary_length": 290,
+  "files_read_early": ["app/models/activity.py", "app/utils/uploads.py", "config.py", "migrations/versions/149d8863712f_add_activity_media_table.py"],
+  "plan_file": ".schrammns_workflow/plans/2026-04-27-multimedia-upload-aktivitaeten.md",
+  "decisions_made": [],
+  "last_updated": "2026-04-27T22:50:00Z"
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "epic_id": "sport-challenge-o9k",
+  "wave_count": 1,
+  "fix_cycles": 0,
+  "issues_completed": 1,
+  "issues_total": 5,
+  "last_wave_summary": "Wave 1 complete: I-01 (sport-challenge-t5h) geschlossen. Neue Route GET /challenge-activities/<id> + Template detail.html. User-Import in challenge_activities.py ergänzt. 82 Tests grün.",
+  "wave_1_summary_length": 178,
+  "files_read_early": ["app/routes/challenge_activities.py", "app/templates/activities/detail.html", "app/templates/activities/my_week.html"],
+  "plan_file": ".schrammns_workflow/plans/2026-04-27-aktivitaeten-detail-teilnehmer-profil.md",
+  "decisions_made": [],
+  "last_updated": "2026-04-27T00:00:00Z"
+}

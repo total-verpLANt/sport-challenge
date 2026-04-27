@@ -50,38 +50,37 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-04-27, Wachwechsel #8)
+## Aktueller Stand (2026-04-27, Wachwechsel #9)
 
 **Aktive Arbeit:** Keine offenen Issues
 
 - **Epic:** Kein aktiver Epic
 - **Lessons Learned:** `docs/lessons-learned.md`
 
-**Änderungen seit Wachwechsel #7 (UUID + Sichtbarkeit):**
-- `21c5cfd` – fix(alembic): render_as_batch=True für SQLite-Kompatibilität
-- `f6f1b84` – feat(model): public_id (UUID) und is_public zu Challenge
-- `2b7c24f` – feat(migration): public_id + is_public zu challenges-Tabelle (3-Schritt)
-- `be62913` – feat(routes): Challenge-Routen auf public_id umgestellt
-- `12ddf06` – feat(templates): Challenge-Templates + Card-Grid-Übersicht
-- `6aa3567` – fix(routes,tests): UUID-String-Konvertierung + 74 Tests grün
+**Änderungen seit Wachwechsel #8 (Multimedia-Upload):**
+- `58b0cf3` – feat(multimedia): Multi-File Upload (Fotos + Videos) für Aktivitäten
+- `c3b6f70` – fix(security): Path-Traversal-Guard in delete_upload()
+- `970e97e` – fix(security): media-src 'self' explizit in CSP setzen
 
-**UUID + Sichtbarkeits-Feature umfasst:**
-- `public_id` (Uuid, UUID4, index+unique) auf `Challenge`-Model – verhindert sequentielle Enumeration
-- `is_public` (Boolean, default=False) – steuert Sichtbarkeit für nicht eingeladene eingeloggte User
-- 3-Schritt-Alembic-Migration (nullable → UPDATE → NOT NULL) für SQLite
-- Alle 6 Challenge-Routen auf `/<string:public_id>` umgestellt, Integer-PK nur noch intern
-- `_get_challenge_by_public_id()` mit `uuid.UUID()`-Konvertierung (Pflicht, siehe Lessons Learned)
-- Challenge-Übersicht als Card-Grid: eigene Participations + öffentliche Challenges
-- Nicht-Teilnehmer: öffentliche Challenges sichtbar, private → HTTP 403
-- render_as_batch=True in migrations/env.py nachgezogen (war bisher nicht konfiguriert)
-- 74 Tests
+**Multimedia-Feature umfasst:**
+- `ActivityMedia`-Model (1:n zu Activity, ON DELETE CASCADE), Migration `149d8863712f`
+- `uploads.py`: `VIDEO_EXTENSIONS = {mp4,mov,webm}`, `get_media_type()`, `delete_media_files()`, 50 MB Limit (`MAX_CONTENT_LENGTH`)
+- Multi-File-Upload via `request.files.getlist("media")`, bis zu mehreren Dateien pro Aktivität
+- Retroaktiver Upload via neue Route `add_media(activity_id)` (Owner-Guard)
+- Drag-n-Drop-Interface (Vanilla JS, HTML5 dragover/drop) in `log.html` + `add_media.html`
+- Media-Galerie in `detail.html` (`<video controls>` für Videos, `<img>` für Bilder, Bootstrap-Grid)
+- Thumbnails in Listenansichten (`my_week.html`, `user_activities.html`)
+- Legacy `screenshot_path`-Fallback überall erhalten (kein Datenverlust)
+- Security: Path-Traversal-Guard (`is_relative_to`) + explizites `media-src 'self'` in CSP
+- **ACHTUNG:** `flask db migrate` erzeugt falschen Uuid-Diff für `challenges.public_id` → vor Upgrade aus Migration entfernen (siehe Lessons Learned)
+- 94 Tests
 
 ### Einstieg für neue Sessions
 
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories uuid-visibility           # Pointer für diesen Wachwechsel
+bd memories multimedia-upload         # Pointer für diesen Wachwechsel
 bd ready                              # nächste Issues (aktuell: keine offen)
 ```
 
@@ -128,20 +127,20 @@ Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `
 
 **Phase 3 (abgeschlossen):** Challenge-System mit Leaderboard.
 - `app/models/challenge.py` – Challenge (name, start/end_date, penalty_per_miss=5.0, bailout_fee=25.0) + ChallengeParticipation (user_id, challenge_id, weekly_goal 2|3, status invited|accepted|bailed_out)
-- `app/models/activity.py` – Activity (user_id, challenge_id, activity_date, duration_minutes, sport_type, source manual|garmin|strava, external_id, screenshot_path)
+- `app/models/activity.py` – Activity (user_id, challenge_id, activity_date, duration_minutes, sport_type, source manual|garmin|strava, external_id, screenshot_path) + ActivityMedia (1:n, file_path, media_type image|video, original_filename, file_size_bytes)
 - `app/models/sick_week.py` – SickWeek (user_id, challenge_id, week_start, UniqueConstraint)
 - `app/models/penalty.py` – PenaltyOverride (user_id, challenge_id, week_start, override_amount, reason, set_by_id)
 - `app/models/bonus.py` – BonusChallenge (challenge_id, scheduled_date, description) + BonusChallengeEntry (user_id, bonus_challenge_id, time_seconds, UniqueConstraint)
-- `app/utils/uploads.py` – Screenshot-Upload: ALLOWED_EXTENSIONS {jpg,jpeg,png,webp}, UUID-Naming, 5 MB Limit
+- `app/utils/uploads.py` – Medien-Upload: IMAGE_EXTENSIONS + VIDEO_EXTENSIONS, UUID-Naming, 50 MB Limit, `get_media_type()`, `delete_media_files()`, Path-Traversal-Guard (`is_relative_to`)
 - `app/services/penalty.py` – get_week_mondays(), count_fulfilled_days() (SQL GROUP BY/HAVING ≥30 min), calculate_weekly_penalty() (SickWeek→0, Override→amount, sonst missed×penalty), calculate_total_penalty() (Summe + Bailout-Fee)
 - `app/services/weekly_summary.py` – get_challenge_summary() → Wochen, Teilnehmer, fulfilled_days, is_sick, penalty, overachieved, total_penalty (sortiert nach Strafe ASC)
 - `app/routes/challenges.py` – 9 Routen: index, create (admin), detail, invite (admin), accept, decline, bailout, sick
-- `app/routes/challenge_activities.py` – 6 Routen: log_form, log_submit, my_week, delete_activity, import_form, import_submit
+- `app/routes/challenge_activities.py` – 7 Routen: log_form, log_submit, my_week, delete_activity, import_form, import_submit, add_media
 - `app/routes/dashboard.py` – Leaderboard mit aktiver Challenge, Farbcodierung (success/warning/danger), Spendentopf
 - `app/routes/bonus.py` – 4 Routen: index (mit Inline-Entry + Ranking), create (admin), entry
-- `app/templates/` – challenges/ (3), activities/ (3), dashboard/ (1), bonus/ (2) – alle Bootstrap 5.3.3, responsive
-- `migrations/versions/2307226a4e48_*.py` – 7 neue Tabellen in einer Migration
-- `tests/` – 68 Tests: pytest, conftest.py mit app/client/db-Fixture (In-Memory-SQLite)
+- `app/templates/` – challenges/ (3), activities/ (4: detail, log, my_week, add_media), dashboard/ (1), bonus/ (2) – alle Bootstrap 5.3.3, responsive
+- `migrations/versions/2307226a4e48_*.py` – 7 neue Tabellen; `149d8863712f_*.py` – activity_media + Legacy-Datenmigration
+- `tests/` – 94 Tests: pytest, conftest.py mit app/client/db-Fixture (In-Memory-SQLite)
 
 ## Conventions & Patterns
 

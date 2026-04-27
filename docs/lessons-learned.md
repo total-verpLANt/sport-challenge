@@ -228,6 +228,40 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 
 ---
 
+## Tooling: Alembic + SQLAlchemy (Fortsetzung 2)
+
+### 2026-04-27: Alembic autogenerate erkennt SQLAlchemy Uuid-Typ als falschen Diff
+
+**Erkenntnis:** `flask db migrate` erzeugte bei jeder neuen Migration einen falschen Diff für `challenges.public_id`: `VARCHAR(32)` → `Uuid()` – obwohl die Spalte bereits korrekt als `Uuid` in der DB lag. Das passiert, weil Alembics SQLite-Dialekt den Typ beim Lesen als `VARCHAR` zurückmeldet und er nicht mit dem Python-seitigen `Uuid()`-Typ übereinstimmt.
+
+**Warum relevant:** Dieser gefälschte Diff taucht in jeder neuen Migration auf. Wird er nicht manuell entfernt, zerstört er beim `flask db upgrade` womöglich den Typ der Spalte.
+
+**Wie lösen:** Nach `flask db migrate` die generierte Datei öffnen und die `alter_column`-Zeilen für `public_id` (von `existing_type=sa.VARCHAR(length=32)` auf `Uuid()`) löschen, bevor `flask db upgrade` ausgeführt wird.
+
+**Wie vermeiden:** Vor jeder Migration im generierten Script auf `public_id`-Zeilen prüfen. Alternativ: `compare_type=False` für diese Spalte in `env.py` konfigurieren (komplexer, aber dauerhafter Fix).
+
+**Wo sichtbar:** `migrations/versions/` – jede neue Migrationsdatei nach dem UUID-Feature sollte auf diesen Diff geprüft werden.
+
+**Quelle:** Wachwechsel #9, 2026-04-27. Aufgetreten bei der `activity_media`-Migration (149d8863712f).
+
+---
+
+## Security: Datei-Upload
+
+### 2026-04-27: Path-Traversal-Guard bei Datei-Löschung – is_relative_to() Pflicht
+
+**Erkenntnis:** Ohne explizite Pfadprüfung könnte ein manipulierter `file_path`-Wert in der DB (z.B. `../../config.py`) beim Löschen einer Aktivität eine beliebige Datei außerhalb des Upload-Verzeichnisses löschen. SQLAlchemy/Flask bieten dafür keinen automatischen Schutz.
+
+**Wie lösen:** In `delete_upload()` immer `.resolve()` auf Static-Root und Ziel-Pfad anwenden, dann `filepath.is_relative_to(static)` prüfen. Bei Fehler: `logger.warning()` und Return – kein Exception, kein HTTP-Error.
+
+**Wo sichtbar:** `app/utils/uploads.py` → `delete_upload()` – Guard wurde in Commit `c3b6f70` nachgezogen.
+
+**Warum relevant:** Das Muster ist für alle Projekte mit Datei-Uploads relevant, nicht nur für dieses. Upload-Pfade aus der DB sind genauso gefährlich wie direkte User-Inputs.
+
+**Quelle:** Security-Review Wachwechsel #9, 2026-04-27. Fix in Commit `c3b6f70`.
+
+---
+
 ## Tooling: Flask Blueprints
 
 ### 2026-04-26: url_for-Endpunkt muss Funktionsnamen matchen, nicht Route-Pfad
