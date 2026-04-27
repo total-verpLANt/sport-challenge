@@ -142,3 +142,88 @@ def test_cannot_delete_others_activity(client, db):
 
     still_there = db.session.get(Activity, activity_id)
     assert still_there is not None
+
+
+def test_activity_detail_owner(client, db):
+    user = _create_and_login(client, db, email="detail_owner@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    activity = Activity(
+        user_id=user.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=45,
+        sport_type="Laufen",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+
+    resp = client.get(f"/challenge-activities/{activity.id}", follow_redirects=False)
+    assert resp.status_code == 200
+    assert b"Laufen" in resp.data
+
+
+def test_activity_detail_other_participant(client, db):
+    # User A creates activity
+    user_a = _create_and_login(client, db, email="detail_usera@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user_a.id)
+
+    activity = Activity(
+        user_id=user_a.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=45,
+        sport_type="Laufen",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    activity_id = activity.id
+
+    # User B joins the same challenge
+    client.post("/auth/logout")
+    user_b = User(email="detail_userb@test.com", is_approved=True)
+    user_b.set_password("testpass123")
+    db.session.add(user_b)
+    db.session.commit()
+    participation_b = ChallengeParticipation(
+        user_id=user_b.id,
+        challenge_id=challenge.id,
+        status="accepted",
+    )
+    db.session.add(participation_b)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "detail_userb@test.com", "password": "testpass123"})
+
+    resp = client.get(f"/challenge-activities/{activity_id}", follow_redirects=False)
+    assert resp.status_code == 200
+
+
+def test_activity_detail_non_participant(client, db):
+    # User A creates activity
+    user_a = _create_and_login(client, db, email="detail_npart_a@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user_a.id)
+
+    activity = Activity(
+        user_id=user_a.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=45,
+        sport_type="Laufen",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    activity_id = activity.id
+
+    # User B has NO participation
+    client.post("/auth/logout")
+    user_b = User(email="detail_npart_b@test.com", is_approved=True)
+    user_b.set_password("testpass123")
+    db.session.add(user_b)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "detail_npart_b@test.com", "password": "testpass123"})
+
+    resp = client.get(f"/challenge-activities/{activity_id}", follow_redirects=False)
+    assert resp.status_code == 302

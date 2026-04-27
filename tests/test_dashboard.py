@@ -33,15 +33,8 @@ def test_dashboard_no_challenge(client, db):
     assert b"keine aktive Challenge" in resp.data or b"Challenge" in resp.data
 
 
-def test_dashboard_with_challenge(app, db):
-    """Verify the weekly_summary service correctly aggregates challenge data.
-
-    Note: The dashboard template contains a known url_for bug
-    ('challenge_activities.log' endpoint does not exist; it is 'log_form').
-    This makes the rendered dashboard crash whenever summary is not None.
-    This test therefore validates the service layer directly, which is what
-    the dashboard route depends on.
-    """
+def test_dashboard_with_challenge(client, app, db):
+    """Verify the weekly_summary service correctly aggregates challenge data."""
     today = date.today()
 
     # Create admin user
@@ -102,3 +95,99 @@ def test_dashboard_with_challenge(app, db):
     emails = {p["user"].email for p in summary["participants"]}
     assert "participant@test.com" in emails
     assert "admin@test.com" in emails
+
+    # HTTP test: log in as participant and verify dashboard renders
+    client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
+    resp = client.get("/dashboard/", follow_redirects=False)
+    assert resp.status_code == 200
+
+
+def test_user_activities_as_participant(client, db):
+    today = date.today()
+
+    # User A with challenge
+    user_a = _create_and_login(client, db, email="ua_part@test.com")
+    challenge = Challenge(
+        name="Part Test Challenge",
+        start_date=today - timedelta(days=7),
+        end_date=today + timedelta(days=30),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user_a.id,
+    )
+    db.session.add(challenge)
+    db.session.commit()
+
+    participation_a = ChallengeParticipation(
+        user_id=user_a.id,
+        challenge_id=challenge.id,
+        status="accepted",
+    )
+    db.session.add(participation_a)
+
+    # Create activity for User A
+    activity = Activity(
+        user_id=user_a.id,
+        challenge_id=challenge.id,
+        activity_date=today,
+        duration_minutes=45,
+        sport_type="running",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+
+    # User B joins same challenge
+    client.post("/auth/logout")
+    user_b = User(email="ub_part@test.com", is_approved=True)
+    user_b.set_password("testpass123")
+    db.session.add(user_b)
+    db.session.commit()
+    participation_b = ChallengeParticipation(
+        user_id=user_b.id,
+        challenge_id=challenge.id,
+        status="accepted",
+    )
+    db.session.add(participation_b)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "ub_part@test.com", "password": "testpass123"})
+
+    resp = client.get(f"/challenge-activities/user/{user_a.id}", follow_redirects=False)
+    assert resp.status_code == 200
+    assert b"ua_part" in resp.data
+
+
+def test_user_activities_as_non_participant(client, db):
+    today = date.today()
+
+    # User A with challenge
+    user_a = _create_and_login(client, db, email="ua_npart@test.com")
+    challenge = Challenge(
+        name="NonPart Test Challenge",
+        start_date=today - timedelta(days=7),
+        end_date=today + timedelta(days=30),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user_a.id,
+    )
+    db.session.add(challenge)
+    db.session.commit()
+
+    participation_a = ChallengeParticipation(
+        user_id=user_a.id,
+        challenge_id=challenge.id,
+        status="accepted",
+    )
+    db.session.add(participation_a)
+    db.session.commit()
+
+    # User B has NO participation
+    client.post("/auth/logout")
+    user_b = User(email="ub_npart@test.com", is_approved=True)
+    user_b.set_password("testpass123")
+    db.session.add(user_b)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "ub_npart@test.com", "password": "testpass123"})
+
+    resp = client.get(f"/challenge-activities/user/{user_a.id}", follow_redirects=False)
+    assert resp.status_code == 302
