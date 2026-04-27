@@ -85,8 +85,6 @@ def create_post():
     if start_date and end_date:
         if start_date >= end_date:
             errors.append("Startdatum muss vor Enddatum liegen.")
-        if start_date < date.today():
-            errors.append("Startdatum darf nicht in der Vergangenheit liegen.")
 
     try:
         penalty_val = float(penalty_per_miss)
