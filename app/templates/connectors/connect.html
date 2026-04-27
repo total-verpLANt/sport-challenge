@@ -59,7 +59,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce() }}">
   document.getElementById('connect-form').addEventListener('submit', function () {
     const btn = this.querySelector('[type="submit"]');
     btn.disabled = true;

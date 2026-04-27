@@ -92,7 +92,7 @@
 </form>
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce() }}">
   document.getElementById('select-all').addEventListener('change', function () {
     document.querySelectorAll('.activity-checkbox').forEach(function (cb) {
       cb.checked = this.checked;

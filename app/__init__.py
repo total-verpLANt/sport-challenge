@@ -7,12 +7,25 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
-    from app.extensions import csrf, db, limiter, login_manager, migrate
+    from app.extensions import csrf, db, limiter, login_manager, migrate, talisman
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)
+
+    csp = {
+        "default-src": "'self'",
+        "script-src": "'self' cdn.jsdelivr.net",
+        "style-src": "'self' 'unsafe-inline' cdn.jsdelivr.net",
+        "img-src": "'self' data:",
+    }
+    talisman.init_app(
+        app,
+        content_security_policy=csp,
+        content_security_policy_nonce_in=["script-src"],
+        force_https=False,
+    )
 
     from app.models.activity import Activity  # noqa: F401 – Alembic autogenerate
     from app.models.bonus import BonusChallenge, BonusChallengeEntry  # noqa: F401
