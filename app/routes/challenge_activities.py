@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models.activity import Activity
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.connector import ConnectorCredential
+from app.models.user import User
 from app.utils.uploads import delete_upload, save_upload
 
 challenge_activities_bp = Blueprint(
@@ -369,3 +370,33 @@ def delete_activity(activity_id):
 
     flash("Aktivität wurde gelöscht.")
     return redirect(url_for("challenge_activities.my_week"))
+
+
+@challenge_activities_bp.route("/<int:activity_id>", methods=["GET"])
+@login_required
+def activity_detail(activity_id):
+    activity = db.session.get(Activity, activity_id)
+    if activity is None:
+        flash("Aktivität nicht gefunden.", "danger")
+        return redirect(url_for("challenge_activities.my_week"))
+    # Berechtigungscheck: Eigentümer ODER Challenge-Teilnehmer
+    is_owner = activity.user_id == current_user.id
+    participation = db.session.scalar(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.user_id == current_user.id,
+            ChallengeParticipation.challenge_id == activity.challenge_id,
+            ChallengeParticipation.status.in_(["accepted", "bailed_out"]),
+        )
+    )
+    if not is_owner and participation is None:
+        flash("Keine Berechtigung für diese Aktivität.", "danger")
+        return redirect(url_for("challenge_activities.my_week"))
+    challenge = db.session.get(Challenge, activity.challenge_id)
+    owner = db.session.get(User, activity.user_id)
+    return render_template(
+        "activities/detail.html",
+        activity=activity,
+        challenge=challenge,
+        owner=owner,
+        is_owner=is_owner,
+    )

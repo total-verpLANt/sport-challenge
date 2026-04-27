@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h2 class="mb-0">Aktivitäts-Details</h2>
+  <a href="{{ url_for('challenge_activities.my_week') }}" class="btn btn-outline-secondary btn-sm">
+    &larr; Zurück zur Wochenansicht
+  </a>
+</div>
+
+{% if not is_owner %}
+<div class="alert alert-info py-2 mb-3">
+  <span class="badge bg-info text-dark me-1">Fremdaktivität</span>
+  Aktivität von <strong>{{ owner.display_name }}</strong>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+  <div class="card-header">
+    <strong>{{ challenge.name }}</strong>
+  </div>
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Datum</dt>
+      <dd class="col-sm-8">{{ activity.activity_date.strftime('%d.%m.%Y') }}</dd>
+
+      <dt class="col-sm-4">Sportart</dt>
+      <dd class="col-sm-8">{{ activity.sport_type }}</dd>
+
+      <dt class="col-sm-4">Dauer</dt>
+      <dd class="col-sm-8">{{ activity.duration_minutes }} Min</dd>
+
+      <dt class="col-sm-4">Quelle</dt>
+      <dd class="col-sm-8">
+        <span class="badge bg-secondary text-capitalize">{{ activity.source }}</span>
+      </dd>
+
+      <dt class="col-sm-4">Erstellt am</dt>
+      <dd class="col-sm-8">
+        {% if activity.created_at %}
+          {{ activity.created_at.strftime('%d.%m.%Y %H:%M') }} Uhr
+        {% else %}
+          –
+        {% endif %}
+      </dd>
+    </dl>
+  </div>
+</div>
+
+{% if activity.screenshot_path %}
+<div class="card mb-4">
+  <div class="card-header">Screenshot</div>
+  <div class="card-body text-center">
+    <a href="{{ url_for('static', filename=activity.screenshot_path) }}" target="_blank" rel="noopener">
+      <img src="{{ url_for('static', filename=activity.screenshot_path) }}"
+           alt="Screenshot"
+           class="img-fluid"
+           style="max-width: 100%;">
+    </a>
+    <div class="mt-2">
+      <a href="{{ url_for('static', filename=activity.screenshot_path) }}"
+         target="_blank" rel="noopener"
+         class="btn btn-outline-secondary btn-sm">
+        Original in neuem Tab öffnen
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
