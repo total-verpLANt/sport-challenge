@@ -42,7 +42,8 @@
       <tr {% if is_bailed %}class="opacity-50"{% endif %}>
         <td class="text-nowrap">
           {% if is_bailed %}<s>{% endif %}
-          {{ p.user.display_name }}
+          <a href="{{ url_for('challenge_activities.user_activities', user_id=p.user.id) }}"
+             class="text-decoration-none text-body">{{ p.user.display_name }}</a>
           {% if is_bailed %}</s> <span class="badge bg-secondary ms-1">Ausgestiegen</span>{% endif %}
         </td>
         <td class="text-center">{{ p.weekly_goal }}x</td>
