@@ -13,6 +13,7 @@ auth_bp = Blueprint("auth", __name__, template_folder="../templates")
 
 _MAX_FAILED_ATTEMPTS = 10
 _LOCKOUT_DURATION = timedelta(minutes=10)
+_MIN_PASSWORD_LENGTH = 8
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -72,6 +73,8 @@ def register():
         password = request.form.get("password", "")
         if not email or not password:
             error = "E-Mail und Passwort sind erforderlich."
+        elif len(password) < _MIN_PASSWORD_LENGTH:
+            error = f"Passwort muss mindestens {_MIN_PASSWORD_LENGTH} Zeichen lang sein."
         else:
             try:
                 result = validate_email(email, check_deliverability=False)

@@ -231,3 +231,36 @@ def test_register_accepts_valid_email_with_plus(client, db):
     ).scalars().all()
     assert len(users) == 1
     assert "user+tag@example.com" in users[0].email
+
+
+# ---------------------------------------------------------------------------
+# Test 11 – Registrierung lehnt zu kurzes Passwort ab
+# ---------------------------------------------------------------------------
+
+def test_register_rejects_short_password(client, db):
+    resp = client.post("/auth/register", data={
+        "email": "short@example.com",
+        "password": "1234567",
+    })
+    assert resp.status_code == 200
+    assert "mindestens 8 Zeichen" in resp.data.decode()
+    user = db.session.execute(
+        db.select(User).filter_by(email="short@example.com")
+    ).scalar_one_or_none()
+    assert user is None
+
+
+# ---------------------------------------------------------------------------
+# Test 12 – Registrierung akzeptiert Passwort mit genau 8 Zeichen
+# ---------------------------------------------------------------------------
+
+def test_register_accepts_password_with_8_chars(client, db):
+    resp = client.post("/auth/register", data={
+        "email": "exact8@example.com",
+        "password": "12345678",
+    }, follow_redirects=False)
+    assert resp.status_code == 302
+    user = db.session.execute(
+        db.select(User).filter_by(email="exact8@example.com")
+    ).scalar_one_or_none()
+    assert user is not None
