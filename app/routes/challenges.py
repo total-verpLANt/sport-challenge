@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
@@ -12,42 +12,75 @@ from app.utils.decorators import admin_required
 challenges_bp = Blueprint("challenges", __name__, template_folder="../templates")
 
 
+def _get_challenge_by_public_id(public_id: str) -> Challenge:
+    challenge = db.session.execute(
+        db.select(Challenge).where(Challenge.public_id == public_id)
+    ).scalar_one_or_none()
+    if challenge is None:
+        abort(404)
+    return challenge
+
+
 @challenges_bp.route("/")
 @login_required
 def index():
-    # Check for pending invitation for current user
-    pending_invitation = db.session.execute(
-        db.select(ChallengeParticipation)
-        .where(
-            ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.status == "invited",
+    # Alle Challenge-IDs, an denen der User teilnimmt (alle Status)
+    my_challenge_ids = db.session.scalars(
+        db.select(ChallengeParticipation.challenge_id).where(
+            ChallengeParticipation.user_id == current_user.id
         )
-    ).scalar_one_or_none()
+    ).all()
 
-    # Check for active participation
-    active_participation = db.session.execute(
-        db.select(ChallengeParticipation)
+    # Alle für den User sichtbaren Challenges: eigene Participations ODER öffentliche
+    visible_challenges = db.session.scalars(
+        db.select(Challenge)
         .where(
+            db.or_(
+                Challenge.id.in_(my_challenge_ids),
+                Challenge.is_public == True,  # noqa: E712
+            )
+        )
+        .order_by(Challenge.created_at.desc())
+    ).all()
+
+    # Admins sehen zusätzlich alle privaten Challenges
+    if current_user.is_admin:
+        visible_challenges = db.session.scalars(
+            db.select(Challenge).order_by(Challenge.created_at.desc())
+        ).all()
+
+    # Aktive Participation des Users (für schnellen Zugriff)
+    active_participation = db.session.execute(
+        db.select(ChallengeParticipation).where(
             ChallengeParticipation.user_id == current_user.id,
             ChallengeParticipation.status == "accepted",
         )
     ).scalar_one_or_none()
 
-    active_challenge = None
-    if active_participation:
-        active_challenge = db.session.get(Challenge, active_participation.challenge_id)
+    # Ausstehende Einladung
+    pending_invitation = db.session.execute(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.user_id == current_user.id,
+            ChallengeParticipation.status == "invited",
+        )
+    ).scalar_one_or_none()
 
-    # For admin: check if any active challenge exists
-    any_active_challenge = db.session.execute(
-        db.select(Challenge).order_by(Challenge.created_at.desc())
-    ).scalars().first()
+    # Teilnahme-Status-Map: challenge_id → participation (für Template-Kennzeichnung)
+    participation_by_challenge = {
+        p.challenge_id: p
+        for p in db.session.scalars(
+            db.select(ChallengeParticipation).where(
+                ChallengeParticipation.user_id == current_user.id
+            )
+        ).all()
+    }
 
     return render_template(
         "challenges/index.html",
+        visible_challenges=visible_challenges,
         pending_invitation=pending_invitation,
         active_participation=active_participation,
-        active_challenge=active_challenge,
-        any_active_challenge=any_active_challenge,
+        participation_by_challenge=participation_by_challenge,
     )
 
 
@@ -65,6 +98,7 @@ def create_post():
     end_date_str = request.form.get("end_date", "")
     penalty_per_miss = request.form.get("penalty_per_miss", "5")
     bailout_fee = request.form.get("bailout_fee", "25")
+    is_public = request.form.get("is_public") == "1"
 
     errors = []
     if not name:
@@ -112,40 +146,41 @@ def create_post():
         end_date=end_date,
         penalty_per_miss=penalty_val,
         bailout_fee=bailout_val,
+        is_public=is_public,
         created_by_id=current_user.id,
     )
     db.session.add(challenge)
     db.session.commit()
 
     flash(f"Challenge '{challenge.name}' wurde erfolgreich erstellt.")
-    return redirect(url_for("challenges.detail", challenge_id=challenge.id))
+    return redirect(url_for("challenges.detail", public_id=str(challenge.public_id)))
 
 
-@challenges_bp.route("/<int:challenge_id>")
+@challenges_bp.route("/<string:public_id>")
 @login_required
-def detail(challenge_id):
-    challenge = db.session.get(Challenge, challenge_id)
-    if challenge is None:
-        flash("Challenge nicht gefunden.")
-        return redirect(url_for("challenges.index"))
+def detail(public_id):
+    challenge = _get_challenge_by_public_id(public_id)
 
-    participations = db.session.execute(
-        db.select(ChallengeParticipation)
-        .where(ChallengeParticipation.challenge_id == challenge_id)
-    ).scalars().all()
+    participations = db.session.scalars(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.challenge_id == challenge.id
+        )
+    ).all()
 
-    # Current user's participation
     my_participation = next(
         (p for p in participations if p.user_id == current_user.id), None
     )
 
-    # For admin: users not yet in this challenge (approved users only)
+    # Sichtbarkeitsprüfung: nicht-öffentliche Challenges nur für Teilnehmer/Admin
+    if not challenge.is_public and not current_user.is_admin and my_participation is None:
+        abort(403)
+
     uninvited_users = []
     if current_user.is_admin:
         participant_ids = {p.user_id for p in participations}
-        all_approved_users = db.session.execute(
+        all_approved_users = db.session.scalars(
             db.select(User).where(User.is_approved == True)  # noqa: E712
-        ).scalars().all()
+        ).all()
         uninvited_users = [u for u in all_approved_users if u.id not in participant_ids]
 
     return render_template(
@@ -157,62 +192,60 @@ def detail(challenge_id):
     )
 
 
-@challenges_bp.route("/<int:challenge_id>/invite", methods=["POST"])
+@challenges_bp.route("/<string:public_id>/invite", methods=["POST"])
 @admin_required
-def invite(challenge_id):
-    challenge = db.session.get(Challenge, challenge_id)
-    if challenge is None:
-        flash("Challenge nicht gefunden.")
-        return redirect(url_for("challenges.index"))
+def invite(public_id):
+    challenge = _get_challenge_by_public_id(public_id)
 
     user_id = request.form.get("user_id", type=int)
     if not user_id:
         flash("Bitte einen Benutzer auswählen.")
-        return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+        return redirect(url_for("challenges.detail", public_id=public_id))
 
     user = db.session.get(User, user_id)
     if user is None:
         flash("Benutzer nicht gefunden.")
-        return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+        return redirect(url_for("challenges.detail", public_id=public_id))
 
-    # Check if already participating
     existing = db.session.execute(
         db.select(ChallengeParticipation).where(
             ChallengeParticipation.user_id == user_id,
-            ChallengeParticipation.challenge_id == challenge_id,
+            ChallengeParticipation.challenge_id == challenge.id,
         )
     ).scalar_one_or_none()
 
     if existing:
         flash(f"{user.display_name} ist bereits in dieser Challenge.")
-        return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+        return redirect(url_for("challenges.detail", public_id=public_id))
 
     participation = ChallengeParticipation(
         user_id=user_id,
-        challenge_id=challenge_id,
+        challenge_id=challenge.id,
         status="invited",
     )
     db.session.add(participation)
     db.session.commit()
 
     flash(f"{user.display_name} wurde zur Challenge eingeladen.")
-    return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+    return redirect(url_for("challenges.detail", public_id=public_id))
 
 
-@challenges_bp.route("/<int:challenge_id>/accept", methods=["POST"])
+@challenges_bp.route("/<string:public_id>/accept", methods=["POST"])
 @login_required
-def accept(challenge_id):
+def accept(public_id):
+    challenge = _get_challenge_by_public_id(public_id)
+
     participation = db.session.execute(
         db.select(ChallengeParticipation).where(
             ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.challenge_id == challenge_id,
+            ChallengeParticipation.challenge_id == challenge.id,
             ChallengeParticipation.status == "invited",
         )
     ).scalar_one_or_none()
 
     if participation is None:
         flash("Keine ausstehende Einladung gefunden.")
-        return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+        return redirect(url_for("challenges.detail", public_id=public_id))
 
     weekly_goal_str = request.form.get("weekly_goal", "3")
     try:
@@ -228,16 +261,18 @@ def accept(challenge_id):
     db.session.commit()
 
     flash("Du hast die Challenge-Einladung angenommen. Viel Erfolg!")
-    return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+    return redirect(url_for("challenges.detail", public_id=public_id))
 
 
-@challenges_bp.route("/<int:challenge_id>/decline", methods=["POST"])
+@challenges_bp.route("/<string:public_id>/decline", methods=["POST"])
 @login_required
-def decline(challenge_id):
+def decline(public_id):
+    challenge = _get_challenge_by_public_id(public_id)
+
     participation = db.session.execute(
         db.select(ChallengeParticipation).where(
             ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.challenge_id == challenge_id,
+            ChallengeParticipation.challenge_id == challenge.id,
             ChallengeParticipation.status == "invited",
         )
     ).scalar_one_or_none()
@@ -253,70 +288,70 @@ def decline(challenge_id):
     return redirect(url_for("challenges.index"))
 
 
-@challenges_bp.route("/<int:challenge_id>/bailout", methods=["POST"])
+@challenges_bp.route("/<string:public_id>/bailout", methods=["POST"])
 @login_required
-def bailout(challenge_id):
+def bailout(public_id):
+    challenge = _get_challenge_by_public_id(public_id)
+
     participation = db.session.execute(
         db.select(ChallengeParticipation).where(
             ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.challenge_id == challenge_id,
+            ChallengeParticipation.challenge_id == challenge.id,
             ChallengeParticipation.status == "accepted",
         )
     ).scalar_one_or_none()
 
     if participation is None:
         flash("Du bist kein aktiver Teilnehmer dieser Challenge.")
-        return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+        return redirect(url_for("challenges.detail", public_id=public_id))
 
-    challenge = db.session.get(Challenge, challenge_id)
     participation.status = "bailed_out"
     participation.bailed_out_at = datetime.now(timezone.utc)
     db.session.commit()
 
-    bailout_fee = challenge.bailout_fee if challenge else 0
-    flash(f"Du hast die Challenge verlassen. Bailout-Gebühr: {bailout_fee:.2f} €.")
-    return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+    flash(f"Du hast die Challenge verlassen. Bailout-Gebühr: {challenge.bailout_fee:.2f} €.")
+    return redirect(url_for("challenges.detail", public_id=public_id))
 
 
-@challenges_bp.route("/<int:challenge_id>/sick", methods=["POST"])
+@challenges_bp.route("/<string:public_id>/sick", methods=["POST"])
 @login_required
-def sick(challenge_id):
+def sick(public_id):
+    challenge = _get_challenge_by_public_id(public_id)
+
     participation = db.session.execute(
         db.select(ChallengeParticipation).where(
             ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.challenge_id == challenge_id,
+            ChallengeParticipation.challenge_id == challenge.id,
             ChallengeParticipation.status == "accepted",
         )
     ).scalar_one_or_none()
 
     if participation is None:
         flash("Du bist kein aktiver Teilnehmer dieser Challenge.")
-        return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+        return redirect(url_for("challenges.detail", public_id=public_id))
 
     today = date.today()
-    # Get Monday of current week
     week_start = today - __import__("datetime").timedelta(days=today.weekday())
 
-    # Check for duplicate
     existing = db.session.execute(
         db.select(SickWeek).where(
             SickWeek.user_id == current_user.id,
-            SickWeek.challenge_id == challenge_id,
+            SickWeek.challenge_id == challenge.id,
             SickWeek.week_start == week_start,
         )
     ).scalar_one_or_none()
 
     if existing:
         flash("Du hast dich für diese Woche bereits krank gemeldet.")
-        return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+        return redirect(url_for("challenges.detail", public_id=public_id))
 
     sick_week = SickWeek(
         user_id=current_user.id,
-        challenge_id=challenge_id,
+        challenge_id=challenge.id,
         week_start=week_start,
     )
     db.session.add(sick_week)
     db.session.commit()
 
     flash(f"Krankmeldung für die Woche ab {week_start.strftime('%d.%m.%Y')} eingetragen.")
-    return redirect(url_for("challenges.detail", challenge_id=challenge_id))
+    return redirect(url_for("challenges.detail", public_id=public_id))
