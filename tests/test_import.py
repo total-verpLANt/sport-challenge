@@ -273,3 +273,36 @@ def test_import_submit_handles_missing_ext_id(client, db):
         db.select(Activity).where(Activity.user_id == user.id)
     ).scalars().all()
     assert len(count) == 0
+
+
+def test_import_submit_handles_connector_error(client, db):
+    """POST /import wenn get_activities() eine Exception wirft → kein 500, 0 neue Activities."""
+    user = _create_and_login(client, db, email="connectorerr@test.com")
+    _create_challenge_with_participation(db, user.id)
+    _add_connector(db, user.id)
+
+    with (
+        patch("app.connectors.garmin.GarminConnector.connect") as mock_connect,
+        patch(
+            "app.connectors.garmin.GarminConnector.get_activities",
+            side_effect=RuntimeError("API nicht erreichbar"),
+        ),
+        patch(
+            "app.connectors.garmin.GarminConnector.get_token_updates",
+            return_value={},
+        ),
+    ):
+        mock_connect.return_value = None
+        resp = client.post(
+            "/challenge-activities/import",
+            data={"selected": [MOCK_EXT_ID]},
+            follow_redirects=False,
+        )
+
+    # Exception-Handler gibt Flash + Redirect zurück – kein ungefangener 500er
+    assert resp.status_code == 302
+
+    count = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalars().all()
+    assert len(count) == 0
