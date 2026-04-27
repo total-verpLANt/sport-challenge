@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import IntegrityError
 
 from app.connectors import PROVIDER_REGISTRY
 from app.extensions import db
@@ -314,50 +315,33 @@ def import_submit():
         flash("Import fehlgeschlagen. Bitte versuche es später erneut.", "danger")
         return redirect(url_for("challenge_activities.import_form", offset=offset))
 
-    selected_indices = request.form.getlist("selected")
-    imported_count = 0
-
-    for idx_str in selected_indices:
+    selected_ext_ids = request.form.getlist("selected")
+    raw_by_ext_id = {
+        f"{provider_type}:{a['startTimeLocal']}": a for a in raw
+    }
+    imported = 0
+    for ext_id in selected_ext_ids:
+        act = raw_by_ext_id.get(ext_id)
+        if act is None:
+            continue  # Aktivität nicht mehr in der Liste
         try:
-            idx = int(idx_str)
-            act = raw[idx]
-        except (ValueError, IndexError):
-            continue
+            activity = Activity(
+                user_id=current_user.id,
+                challenge_id=participation.challenge_id,
+                activity_date=date.fromisoformat(act["startTimeLocal"][:10]),
+                duration_minutes=max(1, int(act["duration"]) // 60),
+                sport_type=act.get("activityType", {}).get("typeKey", "unknown"),
+                source=provider_type,
+                external_id=ext_id,
+            )
+            db.session.add(activity)
+            db.session.commit()
+            imported += 1
+        except IntegrityError:
+            db.session.rollback()
+            # Duplikat – bereits importiert, kein Fehler anzeigen
 
-        start_time = act.get("startTimeLocal", "")
-        ext_id = f"{provider_type}:{start_time}"
-
-        # Deduplication check
-        existing = db.session.execute(
-            db.select(Activity).where(Activity.external_id == ext_id)
-        ).scalar_one_or_none()
-        if existing:
-            continue
-
-        activity_date_str = start_time[:10] if start_time else ""
-        try:
-            activity_date = date.fromisoformat(activity_date_str)
-        except ValueError:
-            activity_date = date.today()
-
-        duration_sec = act.get("duration", 0)
-        duration_min = max(1, int(duration_sec) // 60)
-        sport_type = act.get("activityType", {}).get("typeKey", "unknown")
-
-        activity = Activity(
-            user_id=current_user.id,
-            challenge_id=participation.challenge_id,
-            activity_date=activity_date,
-            duration_minutes=duration_min,
-            sport_type=sport_type,
-            source=provider_type,
-            external_id=ext_id,
-        )
-        db.session.add(activity)
-        imported_count += 1
-
-    db.session.commit()
-    flash(f"{imported_count} Aktivität(en) erfolgreich importiert.")
+    flash(f"{imported} Aktivität(en) erfolgreich importiert.")
     return redirect(url_for("challenge_activities.my_week"))
 
 
