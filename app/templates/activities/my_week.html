@@ -70,7 +70,8 @@
     <li class="list-group-item">
       <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
         <div class="flex-grow-1">
-          <strong>{{ activity.sport_type }}</strong>
+          <a href="{{ url_for('challenge_activities.activity_detail', activity_id=activity.id) }}"
+             class="text-decoration-none text-body fw-bold">{{ activity.sport_type }}</a>
           <span class="text-muted ms-2">{{ activity.duration_minutes }} Min</span>
           <span class="badge bg-secondary ms-1 text-capitalize">{{ activity.source }}</span>
 
