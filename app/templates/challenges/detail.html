@@ -46,7 +46,7 @@
       <p>Du wurdest zu dieser Challenge eingeladen. Möchtest du teilnehmen?</p>
       <div class="row g-2">
         <div class="col-12 col-md-6">
-          <form method="post" action="{{ url_for('challenges.accept', challenge_id=challenge.id) }}">
+          <form method="post" action="{{ url_for('challenges.accept', public_id=challenge.public_id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-2">
               <label for="weekly_goal" class="form-label">Wochenziel</label>
@@ -59,7 +59,7 @@
           </form>
         </div>
         <div class="col-12 col-md-6 d-flex align-items-end">
-          <form method="post" action="{{ url_for('challenges.decline', challenge_id=challenge.id) }}" class="w-100">
+          <form method="post" action="{{ url_for('challenges.decline', public_id=challenge.public_id) }}" class="w-100">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-secondary w-100">Ablehnen</button>
           </form>
@@ -75,11 +75,11 @@
         Du nimmst aktiv teil. Wochenziel: <strong>{{ my_participation.weekly_goal }} Einheiten</strong>
       </p>
       <div class="d-flex gap-2 flex-wrap">
-        <form method="post" action="{{ url_for('challenges.sick', challenge_id=challenge.id) }}">
+        <form method="post" action="{{ url_for('challenges.sick', public_id=challenge.public_id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-outline-warning">Krank melden (diese Woche)</button>
         </form>
-        <form method="post" action="{{ url_for('challenges.bailout', challenge_id=challenge.id) }}"
+        <form method="post" action="{{ url_for('challenges.bailout', public_id=challenge.public_id) }}"
               data-confirm="Wirklich aus der Challenge austreten? Bailout-Gebühr: {{ '%.2f'|format(challenge.bailout_fee) }} €">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-outline-danger">Challenge verlassen (Bailout)</button>
@@ -103,7 +103,7 @@
 <div class="card mb-4">
   <div class="card-header"><strong>Benutzer einladen</strong></div>
   <div class="card-body">
-    <form method="post" action="{{ url_for('challenges.invite', challenge_id=challenge.id) }}" class="row g-2">
+    <form method="post" action="{{ url_for('challenges.invite', public_id=challenge.public_id) }}" class="row g-2">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="col-12 col-md-8">
         <select name="user_id" class="form-select" required>

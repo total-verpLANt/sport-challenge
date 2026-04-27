@@ -39,6 +39,16 @@
              min="0" step="0.01" required>
     </div>
 
+    <div class="col-12">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="is_public" name="is_public" value="1"
+               {% if form_data and form_data.is_public == '1' %}checked{% endif %}>
+        <label class="form-check-label" for="is_public">
+          Öffentlich (für alle eingeloggten Nutzer sichtbar)
+        </label>
+      </div>
+    </div>
+
     <div class="col-12 mt-3">
       <button type="submit" class="btn btn-primary">Challenge erstellen</button>
       <a href="{{ url_for('challenges.index') }}" class="btn btn-outline-secondary ms-2">Abbrechen</a>

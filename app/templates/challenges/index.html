@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Challenge-Übersicht</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">Challenge-Übersicht</h2>
+  {% if current_user.is_admin %}
+  <a href="{{ url_for('challenges.create') }}" class="btn btn-primary btn-sm">Neue Challenge</a>
+  {% endif %}
+</div>
 
 {% if pending_invitation %}
 <div class="card border-warning mb-4">
@@ -20,7 +25,7 @@
 
     <div class="row g-2 mt-2">
       <div class="col-12 col-md-6">
-        <form method="post" action="{{ url_for('challenges.accept', challenge_id=pending_invitation.challenge_id) }}">
+        <form method="post" action="{{ url_for('challenges.accept', public_id=pending_invitation.challenge.public_id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-2">
             <label for="weekly_goal" class="form-label">Wochenziel (Trainingseinheiten)</label>
@@ -33,7 +38,7 @@
         </form>
       </div>
       <div class="col-12 col-md-6 d-flex align-items-end">
-        <form method="post" action="{{ url_for('challenges.decline', challenge_id=pending_invitation.challenge_id) }}" class="w-100">
+        <form method="post" action="{{ url_for('challenges.decline', public_id=pending_invitation.challenge.public_id) }}" class="w-100">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-outline-secondary w-100">Einladung ablehnen</button>
         </form>
@@ -43,38 +48,49 @@
 </div>
 {% endif %}
 
-{% if active_challenge and active_participation %}
-<div class="card mb-4">
-  <div class="card-header">
-    <strong>Aktive Challenge</strong>
+{% if visible_challenges %}
+<div class="row g-3">
+  {% for challenge in visible_challenges %}
+  {% set my_p = participation_by_challenge.get(challenge.id) %}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card h-100 {% if my_p and my_p.status == 'accepted' %}border-success{% elif my_p and my_p.status == 'invited' %}border-warning{% endif %}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h5 class="card-title mb-0">{{ challenge.name }}</h5>
+          <span class="badge {% if challenge.is_public %}bg-info text-dark{% else %}bg-secondary{% endif %} ms-2">
+            {% if challenge.is_public %}Öffentlich{% else %}Privat{% endif %}
+          </span>
+        </div>
+        <p class="card-text text-muted small">
+          {{ challenge.start_date.strftime('%d.%m.%Y') }} – {{ challenge.end_date.strftime('%d.%m.%Y') }}
+        </p>
+        <p class="card-text small">
+          Strafe: <strong>{{ "%.2f"|format(challenge.penalty_per_miss) }} €</strong> &nbsp;|&nbsp;
+          Bailout: <strong>{{ "%.2f"|format(challenge.bailout_fee) }} €</strong>
+        </p>
+        {% if my_p %}
+          {% if my_p.status == 'accepted' %}
+          <span class="badge bg-success mb-2">Aktiv</span>
+          {% elif my_p.status == 'invited' %}
+          <span class="badge bg-warning text-dark mb-2">Eingeladen</span>
+          {% elif my_p.status == 'bailed_out' %}
+          <span class="badge bg-secondary mb-2">Ausgestiegen</span>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div class="card-footer bg-transparent">
+        <a href="{{ url_for('challenges.detail', public_id=challenge.public_id) }}" class="btn btn-outline-primary btn-sm w-100">Details</a>
+      </div>
+    </div>
   </div>
-  <div class="card-body">
-    <h5 class="card-title">{{ active_challenge.name }}</h5>
-    <p class="card-text">
-      Zeitraum: {{ active_challenge.start_date.strftime('%d.%m.%Y') }} – {{ active_challenge.end_date.strftime('%d.%m.%Y') }}<br>
-      Dein Wochenziel: <strong>{{ active_participation.weekly_goal }} Einheiten</strong><br>
-      Strafe pro Versäumnis: <strong>{{ "%.2f"|format(active_challenge.penalty_per_miss) }} €</strong>
-    </p>
-    <a href="{{ url_for('challenges.detail', challenge_id=active_challenge.id) }}" class="btn btn-primary">Details anzeigen</a>
-  </div>
+  {% endfor %}
 </div>
-{% endif %}
-
-{% if current_user.is_admin and not any_active_challenge %}
-<div class="text-center py-4">
-  <p class="text-muted">Noch keine Challenge vorhanden.</p>
-  <a href="{{ url_for('challenges.create') }}" class="btn btn-primary">Neue Challenge erstellen</a>
-</div>
-{% elif current_user.is_admin and any_active_challenge %}
-<div class="mb-3">
-  <a href="{{ url_for('challenges.detail', challenge_id=any_active_challenge.id) }}" class="btn btn-outline-primary">Challenge verwalten</a>
-  <a href="{{ url_for('challenges.create') }}" class="btn btn-outline-secondary ms-2">Neue Challenge erstellen</a>
-</div>
-{% endif %}
-
-{% if not pending_invitation and not active_challenge and not current_user.is_admin %}
-<div class="alert alert-info">
-  Du hast aktuell keine aktive Challenge und keine ausstehenden Einladungen.
+{% else %}
+<div class="alert alert-info mt-3">
+  Keine Challenges verfügbar.
+  {% if current_user.is_admin %}
+  <a href="{{ url_for('challenges.create') }}" class="alert-link">Jetzt eine erstellen</a>.
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}
