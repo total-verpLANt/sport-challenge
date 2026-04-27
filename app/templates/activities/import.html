@@ -93,11 +93,14 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce() }}">
-  document.getElementById('select-all').addEventListener('change', function () {
-    document.querySelectorAll('.activity-checkbox').forEach(function (cb) {
-      cb.checked = this.checked;
-    }, this);
-  });
+  var selectAll = document.getElementById('select-all');
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      document.querySelectorAll('.activity-checkbox').forEach(function (cb) {
+        cb.checked = this.checked;
+      }, this);
+    });
+  }
 </script>
 {% endblock %}
 {% endif %}
