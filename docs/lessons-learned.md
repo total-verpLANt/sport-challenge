@@ -198,6 +198,36 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 
 ---
 
+## Tooling: Alembic + SQLAlchemy (Fortsetzung)
+
+### 2026-04-27: render_as_batch fehlte in migrations/env.py – stiller SQLite-DDL-Bug
+
+**Erkenntnis:** `render_as_batch=True` war nie in `migrations/env.py` (in `context.configure()`) gesetzt. Alle bisherigen ALTER-TABLE-Migrations wurden deshalb manuell mit `op.batch_alter_table()` gebaut – Autogenerate (`flask db migrate`) hätte SQLite-inkompatibles DDL erzeugt, ohne Fehler beim Generieren.
+
+**Warum relevant:** SQLite unterstützt kein `ALTER COLUMN`, `DROP COLUMN` oder `ADD CONSTRAINT` als standalone SQL. Alembic's Batch-Mode umgeht das durch Tabellen-Recreate. Ohne das Flag in `env.py` bricht jede automatisch generierte Migration, die eine bestehende Tabelle modifiziert, lautlos beim Upgrade.
+
+**Wie lösen:** In `migrations/env.py` → `context.configure()` → `conf_args.setdefault("render_as_batch", True)` ergänzen. Einmalig, wirkt auf alle zukünftigen `flask db migrate`-Aufrufe. Fix in Commit `21c5cfd`.
+
+**Wo sichtbar:** `migrations/env.py` → `run_migrations_online()` → `conf_args.setdefault("render_as_batch", True)`
+
+**Quelle:** Wachwechsel #8, 2026-04-27. Fix als Commit 0 des UUID-Features.
+
+---
+
+### 2026-04-27: SQLAlchemy Uuid-Typ erwartet uuid.UUID-Objekt – kein String-Vergleich
+
+**Erkenntnis:** `sqlalchemy.types.Uuid` (database-agnostischer UUID-Typ, SQLAlchemy 2.0+) konvertiert Python-seitig zu `uuid.UUID`-Objekten. Ein WHERE-Vergleich `Challenge.public_id == "a7d5aab1-..."` (String aus URL) schlägt mit `AttributeError: 'str' object has no attribute 'hex'` fehl – kein TypeMismatch-Fehler, kein Hinweis auf den Grund.
+
+**Warum relevant:** Der Fehler tritt erst zur Laufzeit auf (Tests mit Integer-IDs laufen durch), und die Fehlermeldung zeigt auf SQLAlchemy-Internals, nicht auf die eigene Query. Schwer zu diagnostizieren ohne Kenntnis des Typ-Systems.
+
+**Wie lösen:** URL-String vor dem Vergleich explizit konvertieren: `uuid.UUID(public_id)`. Ungültige Strings mit `try/except ValueError` abfangen und `abort(404)` zurückgeben. Fix in `_get_challenge_by_public_id()`.
+
+**Wo sichtbar:** `app/routes/challenges.py` → `_get_challenge_by_public_id()` Zeile 16–24
+
+**Quelle:** Wachwechsel #8, 2026-04-27. Fix in Commit `6aa3567`.
+
+---
+
 ## Tooling: Flask Blueprints
 
 ### 2026-04-26: url_for-Endpunkt muss Funktionsnamen matchen, nicht Route-Pfad

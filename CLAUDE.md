@@ -50,29 +50,38 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-04-26, Wachwechsel #7)
+## Aktueller Stand (2026-04-27, Wachwechsel #8)
 
-**Aktive Arbeit:** Challenge-System vollständig implementiert – keine offenen Issues
+**Aktive Arbeit:** Keine offenen Issues
 
-- **Epic:** Challenge-System Epic abgeschlossen (16/16 Issues, 5 Waves)
+- **Epic:** Kein aktiver Epic
 - **Lessons Learned:** `docs/lessons-learned.md`
 
-**Änderungen seit Wachwechsel #6 (Challenge-System):**
-- `e8fb45f` – feat: Challenge-System mit Dashboard, Aktivitäts-Tracking, Strafberechnung und Bonus-Challenges
+**Änderungen seit Wachwechsel #7 (UUID + Sichtbarkeit):**
+- `21c5cfd` – fix(alembic): render_as_batch=True für SQLite-Kompatibilität
+- `f6f1b84` – feat(model): public_id (UUID) und is_public zu Challenge
+- `2b7c24f` – feat(migration): public_id + is_public zu challenges-Tabelle (3-Schritt)
+- `be62913` – feat(routes): Challenge-Routen auf public_id umgestellt
+- `12ddf06` – feat(templates): Challenge-Templates + Card-Grid-Übersicht
+- `6aa3567` – fix(routes,tests): UUID-String-Konvertierung + 74 Tests grün
 
-**Challenge-System umfasst:**
-- 7 neue DB-Tabellen (Challenge, ChallengeParticipation, Activity, SickWeek, PenaltyOverride, BonusChallenge, BonusChallengeEntry)
-- 4 neue Blueprints (challenges, challenge_activities, dashboard, bonus)
-- 2 neue Services (penalty, weekly_summary)
-- Screenshot-Upload mit UUID-Naming, Typ-Validierung, 5 MB Limit
-- 27 neue Tests (68 gesamt)
+**UUID + Sichtbarkeits-Feature umfasst:**
+- `public_id` (Uuid, UUID4, index+unique) auf `Challenge`-Model – verhindert sequentielle Enumeration
+- `is_public` (Boolean, default=False) – steuert Sichtbarkeit für nicht eingeladene eingeloggte User
+- 3-Schritt-Alembic-Migration (nullable → UPDATE → NOT NULL) für SQLite
+- Alle 6 Challenge-Routen auf `/<string:public_id>` umgestellt, Integer-PK nur noch intern
+- `_get_challenge_by_public_id()` mit `uuid.UUID()`-Konvertierung (Pflicht, siehe Lessons Learned)
+- Challenge-Übersicht als Card-Grid: eigene Participations + öffentliche Challenges
+- Nicht-Teilnehmer: öffentliche Challenges sichtbar, private → HTTP 403
+- render_as_batch=True in migrations/env.py nachgezogen (war bisher nicht konfiguriert)
+- 74 Tests
 
 ### Einstieg für neue Sessions
 
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories multi-user                # gespeicherter Pointer mit allen IDs
+bd memories uuid-visibility           # Pointer für diesen Wachwechsel
 bd ready                              # nächste Issues (aktuell: keine offen)
 ```
 
