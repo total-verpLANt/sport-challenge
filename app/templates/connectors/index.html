@@ -31,7 +31,7 @@
           <form method="post"
                 action="{{ url_for('connectors.disconnect', provider=provider.provider_type) }}"
                 class="d-inline"
-                onsubmit="return confirm({{ provider.display_name|tojson }} + ' wirklich trennen?');">
+                data-confirm="{{ provider.display_name }} wirklich trennen?">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-danger btn-sm">Trennen</button>
           </form>

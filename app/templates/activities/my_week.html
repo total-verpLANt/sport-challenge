@@ -82,7 +82,7 @@
         {% if activity.source == "manual" %}
         <form method="post"
               action="{{ url_for('challenge_activities.delete_activity', activity_id=activity.id) }}"
-              onsubmit="return confirm('Aktivität wirklich löschen?');"
+              data-confirm="Aktivität wirklich löschen?"
               class="d-inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-outline-danger btn-sm">Löschen</button>
