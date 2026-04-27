@@ -1,9 +1,10 @@
 """Integration tests for challenge activity logging routes."""
 from datetime import date, timedelta
+from io import BytesIO
 
 import pytest
 
-from app.models.activity import Activity
+from app.models.activity import Activity, ActivityMedia
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.user import User
 
@@ -226,4 +227,187 @@ def test_activity_detail_non_participant(client, db):
     client.post("/auth/login", data={"email": "detail_npart_b@test.com", "password": "testpass123"})
 
     resp = client.get(f"/challenge-activities/{activity_id}", follow_redirects=False)
+    assert resp.status_code == 302
+
+
+# --- Upload-Tests ---
+
+def test_log_activity_with_image(client, db):
+    user = _create_and_login(client, db, email="upload_img@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "30",
+            "sport_type": "Laufen",
+            "media": (BytesIO(b"fake jpeg content"), "foto.jpg"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is not None
+    media = db.session.execute(
+        db.select(ActivityMedia).where(ActivityMedia.activity_id == activity.id)
+    ).scalars().all()
+    assert len(media) == 1
+    assert media[0].media_type == "image"
+    assert media[0].original_filename == "foto.jpg"
+
+
+def test_log_activity_with_video(client, db):
+    user = _create_and_login(client, db, email="upload_vid@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "30",
+            "sport_type": "Radfahren",
+            "media": (BytesIO(b"fake mp4 content"), "clip.mp4"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is not None
+    media = db.session.execute(
+        db.select(ActivityMedia).where(ActivityMedia.activity_id == activity.id)
+    ).scalars().all()
+    assert len(media) == 1
+    assert media[0].media_type == "video"
+
+
+def test_log_activity_invalid_format(client, db):
+    user = _create_and_login(client, db, email="upload_invalid@test.com")
+    _create_challenge_with_participation(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "30",
+            "sport_type": "Schwimmen",
+            "media": (BytesIO(b"fake bmp"), "photo.bmp"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    # Flash + Redirect zurück zu log_form
+    assert resp.status_code == 302
+    # Keine Activity angelegt
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is None
+
+
+def test_log_activity_no_file(client, db):
+    user = _create_and_login(client, db, email="upload_nofile@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "30",
+            "sport_type": "Yoga",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is not None
+    assert activity.media == []
+
+
+def test_add_media_get(client, db):
+    user = _create_and_login(client, db, email="addmedia_get@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    activity = Activity(
+        user_id=user.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=30,
+        sport_type="Joggen",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+
+    resp = client.get(f"/challenge-activities/{activity.id}/media/add", follow_redirects=False)
+    assert resp.status_code == 200
+    assert b"Medien hinzuf" in resp.data
+
+
+def test_add_media_post(client, db):
+    user = _create_and_login(client, db, email="addmedia_post@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    activity = Activity(
+        user_id=user.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=30,
+        sport_type="Joggen",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    activity_id = activity.id
+
+    resp = client.post(
+        f"/challenge-activities/{activity_id}/media/add",
+        data={"media": (BytesIO(b"fake png"), "bild.png")},
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    media = db.session.execute(
+        db.select(ActivityMedia).where(ActivityMedia.activity_id == activity_id)
+    ).scalars().all()
+    assert len(media) == 1
+    assert media[0].media_type == "image"
+
+
+def test_add_media_non_owner_redirected(client, db):
+    user_a = _create_and_login(client, db, email="addmedia_owner@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user_a.id)
+
+    activity = Activity(
+        user_id=user_a.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=30,
+        sport_type="Joggen",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    activity_id = activity.id
+
+    client.post("/auth/logout")
+    user_b = User(email="addmedia_other@test.com", is_approved=True)
+    user_b.set_password("testpass123")
+    db.session.add(user_b)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "addmedia_other@test.com", "password": "testpass123"})
+
+    resp = client.get(f"/challenge-activities/{activity_id}/media/add", follow_redirects=False)
     assert resp.status_code == 302

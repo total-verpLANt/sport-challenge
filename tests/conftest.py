@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import pytest
 
 from app import create_app
@@ -11,6 +14,7 @@ class TestConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = False
     RATELIMIT_ENABLED = False
+    UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), "sport_challenge_test_uploads")
 
 
 @pytest.fixture(scope="session")

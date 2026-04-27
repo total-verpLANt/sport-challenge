@@ -6,11 +6,11 @@ from sqlalchemy.exc import IntegrityError
 
 from app.connectors import PROVIDER_REGISTRY
 from app.extensions import db
-from app.models.activity import Activity
+from app.models.activity import Activity, ActivityMedia
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.connector import ConnectorCredential
 from app.models.user import User
-from app.utils.uploads import delete_upload, save_upload
+from app.utils.uploads import delete_media_files, delete_upload, get_media_type, save_upload
 
 challenge_activities_bp = Blueprint(
     "challenge_activities", __name__, template_folder="../templates"
@@ -92,14 +92,16 @@ def log_submit():
         flash("Bitte Sportart angeben.")
         return redirect(url_for("challenge_activities.log_form"))
 
-    # Optional screenshot upload
-    screenshot_path = None
-    screenshot_file = request.files.get("screenshot")
-    if screenshot_file and screenshot_file.filename:
-        screenshot_path = save_upload(screenshot_file)
-        if screenshot_path is None:
-            flash("Ungültiges Dateiformat für Screenshot (erlaubt: JPG, PNG, WebP, max. 5 MB).")
-            return redirect(url_for("challenge_activities.log_form"))
+    # Optional media upload (mehrere Dateien)
+    media_files = request.files.getlist("media")
+    saved_media = []
+    for f in media_files:
+        if f and f.filename:
+            path = save_upload(f)
+            if path is None:
+                flash("Ungültiges Dateiformat (erlaubt: JPG, PNG, WebP, MP4, MOV, WebM, max. 50 MB).")
+                return redirect(url_for("challenge_activities.log_form"))
+            saved_media.append((path, get_media_type(f.filename), f.filename))
 
     activity = Activity(
         user_id=current_user.id,
@@ -108,9 +110,17 @@ def log_submit():
         duration_minutes=duration_minutes,
         sport_type=sport_type,
         source="manual",
-        screenshot_path=screenshot_path,
     )
     db.session.add(activity)
+    db.session.flush()
+    for file_path, media_type, orig_name in saved_media:
+        db.session.add(ActivityMedia(
+            activity_id=activity.id,
+            file_path=file_path,
+            media_type=media_type,
+            original_filename=orig_name,
+            file_size_bytes=0,
+        ))
     db.session.commit()
 
     flash("Aktivität wurde eingetragen.")
@@ -362,7 +372,8 @@ def delete_activity(activity_id):
         flash("Aktivität nicht gefunden oder keine Berechtigung.")
         return redirect(url_for("challenge_activities.my_week"))
 
-    if activity.screenshot_path:
+    delete_media_files(activity.media)
+    if activity.screenshot_path:        # Legacy-Cleanup
         delete_upload(activity.screenshot_path)
 
     db.session.delete(activity)
@@ -440,3 +451,34 @@ def user_activities(user_id):
         challenge=challenge,
         activities=activities,
     )
+
+
+@challenge_activities_bp.route("/<int:activity_id>/media/add", methods=["GET", "POST"])
+@login_required
+def add_media(activity_id: int):
+    activity = db.session.get(Activity, activity_id)
+    if activity is None or activity.user_id != current_user.id:
+        flash("Keine Berechtigung.", "danger")
+        return redirect(url_for("challenge_activities.my_week"))
+    if request.method == "POST":
+        media_files = request.files.getlist("media")
+        any_saved = False
+        for f in media_files:
+            if f and f.filename:
+                path = save_upload(f)
+                if path is None:
+                    flash("Ungültiges Dateiformat (erlaubt: JPG, PNG, WebP, MP4, MOV, WebM, max. 50 MB).", "danger")
+                    return redirect(request.url)
+                db.session.add(ActivityMedia(
+                    activity_id=activity.id,
+                    file_path=path,
+                    media_type=get_media_type(f.filename),
+                    original_filename=f.filename,
+                    file_size_bytes=0,
+                ))
+                any_saved = True
+        if any_saved:
+            db.session.commit()
+            flash("Medien erfolgreich hinzugefügt.", "success")
+        return redirect(url_for("challenge_activities.activity_detail", activity_id=activity_id))
+    return render_template("activities/add_media.html", activity=activity)

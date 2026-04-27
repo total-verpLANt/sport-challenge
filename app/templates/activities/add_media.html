@@ -2,39 +2,41 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-12 col-md-8 col-lg-6">
-    <h2>Aktivität eintragen</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2>Medien hinzufügen</h2>
+      <a href="{{ url_for('challenge_activities.activity_detail', activity_id=activity.id) }}"
+         class="btn btn-outline-secondary btn-sm">← Zurück</a>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-body text-muted small">
+        {{ activity.activity_date.strftime('%d.%m.%Y') }} –
+        {{ activity.sport_type }} –
+        {{ activity.duration_minutes }} Min.
+      </div>
+    </div>
+
     <form method="post" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="mb-3">
-        <label for="activity_date" class="form-label">Datum</label>
-        <input type="date" class="form-control" id="activity_date" name="activity_date"
-               value="{{ today }}" required max="{{ today }}">
-      </div>
-      <div class="mb-3">
-        <label for="duration_minutes" class="form-label">Dauer (Minuten)</label>
-        <input type="number" class="form-control" id="duration_minutes" name="duration_minutes"
-               min="1" required placeholder="z.B. 30">
-      </div>
-      <div class="mb-3">
-        <label for="sport_type" class="form-label">Sportart</label>
-        <input type="text" class="form-control" id="sport_type" name="sport_type"
-               required placeholder="z.B. Laufen, Krafttraining, Schwimmen">
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Fotos / Videos (optional, mehrere möglich)</label>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Fotos / Videos</label>
         <div id="drop-zone"
-             class="border border-2 rounded p-3 text-center text-muted"
-             style="cursor:pointer;min-height:90px;border-style:dashed!important">
-          <span class="fs-5">📎</span>
-          <span id="drop-label"> Dateien hier ablegen oder klicken</span><br>
-          <small>JPG, PNG, WebP, MP4, MOV, WebM · max. 50 MB pro Datei</small>
+             class="border border-2 rounded p-4 text-center text-muted"
+             style="cursor:pointer;min-height:120px;border-style:dashed!important">
+          <div id="drop-label">
+            <span class="fs-4">📎</span><br>
+            Dateien hier ablegen oder klicken
+          </div>
+          <small class="d-block mt-1">JPG, PNG, WebP, MP4, MOV, WebM · max. 50 MB pro Datei</small>
           <input type="file" id="media-input" name="media" multiple
                  accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
                  class="d-none">
         </div>
         <div id="file-list" class="mt-2 small text-muted"></div>
       </div>
-      <button type="submit" class="btn btn-primary w-100">Eintragen</button>
+      <button type="submit" class="btn btn-primary">Hochladen</button>
+      <a href="{{ url_for('challenge_activities.activity_detail', activity_id=activity.id) }}"
+         class="btn btn-outline-secondary ms-2">Abbrechen</a>
     </form>
   </div>
 </div>

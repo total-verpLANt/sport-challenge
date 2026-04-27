@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
 
@@ -24,7 +24,30 @@ class Activity(db.Model):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+    media: Mapped[list["ActivityMedia"]] = relationship(
+        "ActivityMedia",
+        back_populates="activity",
+        cascade="all, delete-orphan",
+        order_by="ActivityMedia.created_at",
+    )
 
     __table_args__ = (
         UniqueConstraint("user_id", "external_id", name="uq_activity_user_external"),
     )
+
+
+class ActivityMedia(db.Model):
+    __tablename__ = "activity_media"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    activity_id: Mapped[int] = mapped_column(
+        ForeignKey("activities.id", ondelete="CASCADE"), index=True
+    )
+    file_path: Mapped[str] = mapped_column(String(500))
+    media_type: Mapped[str] = mapped_column(String(10))   # "image" | "video"
+    original_filename: Mapped[str] = mapped_column(String(255))
+    file_size_bytes: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    activity: Mapped["Activity"] = relationship(back_populates="media")

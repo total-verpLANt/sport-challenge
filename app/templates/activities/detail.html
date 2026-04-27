@@ -46,7 +46,29 @@
   </div>
 </div>
 
-{% if activity.screenshot_path %}
+{% if activity.media %}
+<div class="card mb-4">
+  <div class="card-header">Medien ({{ activity.media | length }})</div>
+  <div class="card-body">
+    <div class="row g-2">
+      {% for m in activity.media %}
+      <div class="col-6 col-md-4">
+        {% if m.media_type == "video" %}
+        <video src="{{ url_for('static', filename=m.file_path) }}"
+               controls class="img-fluid rounded w-100" style="max-height:200px;object-fit:contain"></video>
+        {% else %}
+        <a href="{{ url_for('static', filename=m.file_path) }}" target="_blank" rel="noopener">
+          <img src="{{ url_for('static', filename=m.file_path) }}"
+               alt="{{ m.original_filename }}"
+               class="img-fluid rounded w-100" style="max-height:200px;object-fit:cover">
+        </a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% elif activity.screenshot_path %}
 <div class="card mb-4">
   <div class="card-header">Screenshot</div>
   <div class="card-body text-center">
@@ -64,6 +86,13 @@
       </a>
     </div>
   </div>
+</div>
+{% endif %}
+
+{% if is_owner %}
+<div class="mb-4">
+  <a href="{{ url_for('challenge_activities.add_media', activity_id=activity.id) }}"
+     class="btn btn-outline-primary btn-sm">📎 Medien hinzufügen</a>
 </div>
 {% endif %}
 
