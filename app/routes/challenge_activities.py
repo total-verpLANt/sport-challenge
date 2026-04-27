@@ -400,3 +400,43 @@ def activity_detail(activity_id):
         owner=owner,
         is_owner=is_owner,
     )
+
+
+@challenge_activities_bp.route("/user/<int:user_id>", methods=["GET"])
+@login_required
+def user_activities(user_id):
+    target_user = db.session.get(User, user_id)
+    if target_user is None:
+        flash("Benutzer nicht gefunden.", "danger")
+        return redirect(url_for("dashboard.index"))
+    # Aktive Challenge des aktuellen Users
+    my_participation = _active_participation()
+    if my_participation is None:
+        flash("Du nimmst an keiner aktiven Challenge teil.", "warning")
+        return redirect(url_for("dashboard.index"))
+    challenge = db.session.get(Challenge, my_participation.challenge_id)
+    # Ziel-User muss dieselbe Challenge haben
+    target_participation = db.session.scalar(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.user_id == user_id,
+            ChallengeParticipation.challenge_id == challenge.id,
+        )
+    )
+    if target_participation is None:
+        flash("Dieser Benutzer nimmt nicht an deiner Challenge teil.", "warning")
+        return redirect(url_for("dashboard.index"))
+    activities = db.session.scalars(
+        db.select(Activity)
+        .where(
+            Activity.user_id == user_id,
+            Activity.challenge_id == challenge.id,
+        )
+        .order_by(Activity.activity_date.desc(), Activity.created_at.desc())
+    ).all()
+    return render_template(
+        "activities/user_activities.html",
+        target_user=target_user,
+        target_participation=target_participation,
+        challenge=challenge,
+        activities=activities,
+    )
