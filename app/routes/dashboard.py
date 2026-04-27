@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from flask import Blueprint, render_template
 from flask_login import login_required
@@ -32,7 +32,7 @@ def index():
         ).scalars().first()
 
     if challenge is None:
-        return render_template("dashboard/index.html", summary=None)
+        return render_template("dashboard/index.html", summary=None, timedelta=timedelta)
 
     summary = get_challenge_summary(challenge)
-    return render_template("dashboard/index.html", summary=summary)
+    return render_template("dashboard/index.html", summary=summary, timedelta=timedelta)

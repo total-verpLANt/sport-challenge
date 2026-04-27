@@ -29,7 +29,7 @@
         <th class="text-center text-nowrap">Ziel</th>
         {% for week_start in weeks %}
         <th class="text-center text-nowrap"
-            title="{{ week_start.strftime('%d.%m.') }} – {{ (week_start + __import__('datetime').timedelta(days=6)).strftime('%d.%m.%Y') }}">
+            title="{{ week_start.strftime('%d.%m.') }} – {{ (week_start + timedelta(days=6)).strftime('%d.%m.%Y') }}">
           KW {{ week_start.isocalendar()[1] }}
         </th>
         {% endfor %}
