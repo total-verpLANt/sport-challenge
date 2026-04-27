@@ -35,7 +35,11 @@ def save_upload(file) -> str | None:
 def delete_upload(relative_path: str) -> None:
     if not relative_path:
         return
-    filepath = Path(current_app.static_folder) / relative_path
+    static = Path(current_app.static_folder).resolve()
+    filepath = (static / relative_path).resolve()
+    if not filepath.is_relative_to(static):
+        current_app.logger.warning("delete_upload: path traversal blocked: %s", relative_path)
+        return
     if filepath.exists():
         filepath.unlink()
 
