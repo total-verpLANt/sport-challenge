@@ -5,6 +5,11 @@
   <a href="{{ url_for('challenge_activities.log_form') }}" class="btn btn-primary btn-sm">
     + Aktivität eintragen
   </a>
+  {% if has_connector %}
+  <a href="{{ url_for('challenge_activities.import_form') }}" class="btn btn-outline-secondary btn-sm ms-2">
+    ↓ Aus Garmin/Strava importieren
+  </a>
+  {% endif %}
 </div>
 
 {# Week navigation #}

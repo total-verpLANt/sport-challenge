@@ -160,6 +160,10 @@ def my_week():
     fulfilled_days = sum(1 for d in days if d["total_minutes"] >= 30)
     weekly_goal = participation.weekly_goal if participation else 3
 
+    has_connector = (
+        ConnectorCredential.query.filter_by(user_id=current_user.id).first() is not None
+    )
+
     return render_template(
         "activities/my_week.html",
         days=days,
@@ -169,6 +173,7 @@ def my_week():
         fulfilled_days=fulfilled_days,
         weekly_goal=weekly_goal,
         participation=participation,
+        has_connector=has_connector,
     )
 
 
