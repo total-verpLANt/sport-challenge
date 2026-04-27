@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "epic_id": "sport-challenge-o11",
+  "wave_count": 1,
+  "fix_cycles": 0,
+  "issues_completed": 2,
+  "issues_total": 4,
+  "last_wave_summary": "Wave 1 complete: yfi (UniqueConstraint + Migration 6edd5dce59eb) + qqt (Import-Button my_week.html) geschlossen. 74 Tests grün. 2x gepusht.",
+  "wave_1_summary_length": 140,
+  "files_read_early": ["app/models/activity.py", "app/routes/challenge_activities.py", "app/templates/activities/my_week.html"],
+  "plan_file": ".schrammns_workflow/plans/2026-04-27-garmin-strava-import-haertung-und-ux.md",
+  "decisions_made": [],
+  "last_updated": "2026-04-27T17:00:00Z"
+}
