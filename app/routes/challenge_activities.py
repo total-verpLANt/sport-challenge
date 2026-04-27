@@ -324,11 +324,16 @@ def import_submit():
         act = raw_by_ext_id.get(ext_id)
         if act is None:
             continue  # Aktivität nicht mehr in der Liste
+        # Periodenprüfung
+        activity_date = date.fromisoformat(act["startTimeLocal"][:10])
+        challenge = db.session.get(Challenge, participation.challenge_id)
+        if not (challenge.start_date <= activity_date <= challenge.end_date):
+            continue  # Aktivität liegt außerhalb der Challenge-Periode
         try:
             activity = Activity(
                 user_id=current_user.id,
                 challenge_id=participation.challenge_id,
-                activity_date=date.fromisoformat(act["startTimeLocal"][:10]),
+                activity_date=activity_date,
                 duration_minutes=max(1, int(act["duration"]) // 60),
                 sport_type=act.get("activityType", {}).get("typeKey", "unknown"),
                 source=provider_type,
