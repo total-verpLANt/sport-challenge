@@ -482,3 +482,30 @@ def add_media(activity_id: int):
             flash("Medien erfolgreich hinzugefügt.", "success")
         return redirect(url_for("challenge_activities.activity_detail", activity_id=activity_id))
     return render_template("activities/add_media.html", activity=activity)
+
+
+@challenge_activities_bp.route(
+    "/<int:activity_id>/media/<int:media_id>/delete", methods=["POST"]
+)
+@login_required
+def delete_media(activity_id: int, media_id: int):
+    activity = db.session.get(Activity, activity_id)
+    if activity is None or activity.user_id != current_user.id:
+        flash("Keine Berechtigung.", "danger")
+        return redirect(url_for("challenge_activities.my_week"))
+
+    media = db.session.get(ActivityMedia, media_id)
+    if media is None or media.activity_id != activity_id:
+        flash("Medium nicht gefunden.", "warning")
+        return redirect(
+            url_for("challenge_activities.activity_detail", activity_id=activity_id)
+        )
+
+    delete_upload(media.file_path)
+    db.session.delete(media)
+    db.session.commit()
+
+    flash("Medium wurde gelöscht.")
+    return redirect(
+        url_for("challenge_activities.activity_detail", activity_id=activity_id)
+    )
