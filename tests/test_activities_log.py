@@ -411,3 +411,74 @@ def test_add_media_non_owner_redirected(client, db):
 
     resp = client.get(f"/challenge-activities/{activity_id}/media/add", follow_redirects=False)
     assert resp.status_code == 302
+
+
+def _create_activity_with_media(db, user_id, challenge_id):
+    activity = Activity(
+        user_id=user_id,
+        challenge_id=challenge_id,
+        activity_date=date.today(),
+        duration_minutes=30,
+        sport_type="Joggen",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.flush()
+    media = ActivityMedia(
+        activity_id=activity.id,
+        file_path="uploads/fake_test.jpg",
+        media_type="image",
+        original_filename="fake_test.jpg",
+        file_size_bytes=0,
+    )
+    db.session.add(media)
+    db.session.commit()
+    return activity, media
+
+
+def test_delete_media_happy_path(client, db):
+    user = _create_and_login(client, db, email="delmedia_owner@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    activity, media = _create_activity_with_media(db, user.id, challenge.id)
+
+    resp = client.post(
+        f"/challenge-activities/{activity.id}/media/{media.id}/delete",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert db.session.get(ActivityMedia, media.id) is None
+
+
+def test_delete_media_non_owner_redirected(client, db):
+    user_a = _create_and_login(client, db, email="delmedia_ownerA@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user_a.id)
+    activity, media = _create_activity_with_media(db, user_a.id, challenge.id)
+
+    client.post("/auth/logout")
+    user_b = User(email="delmedia_otherB@test.com", is_approved=True)
+    user_b.set_password("testpass123")
+    db.session.add(user_b)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "delmedia_otherB@test.com", "password": "testpass123"})
+
+    resp = client.post(
+        f"/challenge-activities/{activity.id}/media/{media.id}/delete",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert "my-week" in resp.headers["Location"]
+    assert db.session.get(ActivityMedia, media.id) is not None
+
+
+def test_delete_media_wrong_activity(client, db):
+    user = _create_and_login(client, db, email="delmedia_wrong@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    activity_a, media_a = _create_activity_with_media(db, user.id, challenge.id)
+    activity_b, _ = _create_activity_with_media(db, user.id, challenge.id)
+
+    resp = client.post(
+        f"/challenge-activities/{activity_b.id}/media/{media_a.id}/delete",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert db.session.get(ActivityMedia, media_a.id) is not None
