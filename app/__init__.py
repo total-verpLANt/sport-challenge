@@ -70,6 +70,15 @@ def create_app(config_class=Config):
     from app.routes.settings import settings_bp
     app.register_blueprint(settings_bp, url_prefix="/settings")
 
+    from app.routes.misc import misc_bp
+    app.register_blueprint(misc_bp)
+
+    from app.version import __version__
+
+    @app.context_processor
+    def inject_version():
+        return {"app_version": __version__}
+
     @app.route("/")
     def index():
         from flask_login import current_user

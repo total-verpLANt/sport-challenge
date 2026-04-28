@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <h2 class="mb-4">Changelog</h2>
+    <div class="changelog-content">
+      {% for line in changelog.splitlines() %}
+        {% if line.startswith('## ') %}
+          {% if not loop.first %}</ul>{% endif %}
+          <h4 class="mt-4">{{ line[3:] }}</h4>
+          <ul>
+        {% elif line.startswith('### ') %}
+          <li class="fw-semibold mt-2 list-unstyled">{{ line[4:] }}</li>
+        {% elif line.startswith('- ') %}
+          <li>{{ line[2:] }}</li>
+        {% elif line.startswith('# ') %}
+          {# Hauptüberschrift wird ausgelassen, da h2 oben steht #}
+        {% endif %}
+      {% endfor %}
+      {% if changelog %}</ul>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
