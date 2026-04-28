@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] – 2026-04-29
+
+### Neu
+- SVG-Favicon (Läufer-Icon, Darkmode-responsiv via `prefers-color-scheme`)
+
 ## [0.7.0] – 2026-04-29
 
 ### Neu
