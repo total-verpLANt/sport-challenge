@@ -97,6 +97,9 @@
   document.querySelectorAll('[data-autosubmit]').forEach(function(el){
     el.addEventListener('change',function(){this.form.submit();});
   });
+  ['dragover','drop'].forEach(function(ev){
+    document.addEventListener(ev,function(e){e.preventDefault();});
+  });
   </script>
   {% block scripts %}{% endblock %}
 </body>

@@ -41,18 +41,24 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function () {
-  const zone = document.getElementById('drop-zone');
+  const zone  = document.getElementById('drop-zone');
   const input = document.getElementById('media-input');
-  const list = document.getElementById('file-list');
+  const list  = document.getElementById('file-list');
+  input.addEventListener('click', e => e.stopPropagation());
   zone.addEventListener('click', () => input.click());
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('bg-light'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('bg-light'));
+  zone.addEventListener('dragleave', e => {
+    if (!zone.contains(e.relatedTarget)) zone.classList.remove('bg-light');
+  });
   zone.addEventListener('drop', e => {
     e.preventDefault();
     zone.classList.remove('bg-light');
-    input.files = e.dataTransfer.files;
+    const dt = new DataTransfer();
+    for (const file of e.dataTransfer.files) dt.items.add(file);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
     renderList();
   });
   input.addEventListener('change', renderList);
