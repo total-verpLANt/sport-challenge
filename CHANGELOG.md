@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.7.2] – 2026-04-29
+
+### Neu
+- Toggle-Admin-Funktion in Benutzerverwaltung (Admin ↔ User)
+
+### Sicherheit
+- Last-Admin-Guard verhindert Null-Admin-Zustand (Defense-in-depth)
+
 ## [0.7.1] – 2026-04-29
 
 ### Neu
