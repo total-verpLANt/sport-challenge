@@ -58,3 +58,27 @@ def reject_user(user_id):
     db.session.commit()
     flash(f"Benutzer {name} ({email}) wurde abgelehnt und gelöscht.")
     return redirect(url_for("admin.users"))
+
+
+@admin_bp.route("/users/<int:user_id>/toggle-admin", methods=["POST"])
+@admin_required
+def toggle_admin(user_id):
+    from flask_login import current_user
+    user = db.session.get(User, user_id)
+    if user is None:
+        flash("Benutzer nicht gefunden.")
+        return redirect(url_for("admin.users"))
+    if user.id == current_user.id:
+        flash("Du kannst dir nicht selbst die Admin-Rolle entziehen.")
+        return redirect(url_for("admin.users"))
+    if not user.is_approved:
+        flash("Nur freigeschaltete Benutzer können zum Admin befördert werden.")
+        return redirect(url_for("admin.users"))
+    if user.is_admin:
+        user.role = "user"
+        flash(f"{user.display_name} ist kein Admin mehr.")
+    else:
+        user.role = "admin"
+        flash(f"{user.display_name} wurde zum Admin befördert.")
+    db.session.commit()
+    return redirect(url_for("admin.users"))
