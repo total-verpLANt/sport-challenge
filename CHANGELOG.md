@@ -4,6 +4,13 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] – 2026-04-29
+
+### Neu
+- Darkmode-Toggle in der Navbar (🌙/☀️), Persistenz via localStorage
+- FOUC-Prevention: Theme wird vor Bootstrap-CSS-Load gesetzt
+- Bootstrap 5.3 `data-bs-theme` auf `<html>` für natives Dark-Mode-Switching
+
 ## [0.6.0] – 2026-04-28
 
 ### Neu
