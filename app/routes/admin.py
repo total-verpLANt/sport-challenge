@@ -75,6 +75,12 @@ def toggle_admin(user_id):
         flash("Nur freigeschaltete Benutzer können zum Admin befördert werden.")
         return redirect(url_for("admin.users"))
     if user.is_admin:
+        admin_count = db.session.execute(
+            db.select(func.count()).select_from(User).where(User.role == "admin")
+        ).scalar()
+        if admin_count <= 1:
+            flash("Mindestens ein Admin muss bestehen bleiben.")
+            return redirect(url_for("admin.users"))
         user.role = "user"
         flash(f"{user.display_name} ist kein Admin mehr.")
     else:
