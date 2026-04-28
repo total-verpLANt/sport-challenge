@@ -52,16 +52,30 @@
   <div class="card-body">
     <div class="row g-2">
       {% for m in activity.media %}
-      <div class="col-6 col-md-4">
+      <div class="col-6 col-md-4 position-relative">
         {% if m.media_type == "video" %}
         <video src="{{ url_for('static', filename=m.file_path) }}"
                controls class="img-fluid rounded w-100" style="max-height:200px;object-fit:contain"></video>
         {% else %}
-        <a href="{{ url_for('static', filename=m.file_path) }}" target="_blank" rel="noopener">
+        <a href="{{ url_for('static', filename=m.file_path) }}"
+           class="glightbox"
+           data-gallery="activity-media"
+           data-title="{{ m.original_filename }}">
           <img src="{{ url_for('static', filename=m.file_path) }}"
                alt="{{ m.original_filename }}"
                class="img-fluid rounded w-100" style="max-height:200px;object-fit:cover">
         </a>
+        {% endif %}
+        {% if is_owner %}
+        <form method="post"
+              action="{{ url_for('challenge_activities.delete_media', activity_id=activity.id, media_id=m.id) }}"
+              data-confirm="Dieses Medium wirklich löschen?"
+              class="position-absolute top-0 end-0 m-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit"
+                  class="btn btn-danger btn-sm py-0 px-1 lh-1"
+                  title="Medium löschen">&times;</button>
+        </form>
         {% endif %}
       </div>
       {% endfor %}
@@ -96,4 +110,10 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+  GLightbox({ selector: '.glightbox', touchNavigation: true });
+</script>
 {% endblock %}
