@@ -27,3 +27,6 @@ test-results/
 *.png
 *.jpeg
 *.webm
+
+# Claude Code – Skills und lokale MCP-Artefakte
+.claude/skills/
