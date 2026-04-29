@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.7.4] – 2026-04-29
+
+### Geändert
+- Produktions-Webserver von Flask Dev-Server auf Gunicorn umgestellt (3 Worker, graceful reload via SIGHUP)
+
 ## [0.7.3] – 2026-04-29
 
 ### Neu
