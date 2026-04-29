@@ -172,7 +172,7 @@ def feed():
             "id": a.id,
             "user_display_name": user.display_name if user else "Unbekannt",
             "activity_date": a.activity_date.strftime("%d.%m.%Y"),
-            "created_at_time": a.created_at.strftime("%H:%M"),
+            "created_at_time": (a.started_at or a.created_at).strftime("%H:%M"),
             "sport_type": a.sport_type,
             "duration_minutes": a.duration_minutes,
             "notes": a.notes or "",

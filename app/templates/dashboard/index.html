@@ -117,7 +117,7 @@
     <div class="card-body">
       <p class="card-text mb-1">
         <strong>{{ feed_user_names.get(activity.user_id, 'Unbekannt') }}</strong> hat um
-        <strong>{{ activity.created_at.strftime('%H:%M') }} Uhr</strong> am
+        <strong>{{ (activity.started_at or activity.created_at).strftime('%H:%M') }} Uhr</strong> am
         {{ activity.activity_date.strftime('%d.%m.%Y') }}
         <em>{{ activity.sport_type }}</em> gemacht.
         Die Einheit hat <strong>{{ activity.duration_minutes }} Minuten</strong> gedauert.
