@@ -2,7 +2,29 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-12 col-md-8 col-lg-6">
-    <h2>Aktivität eintragen</h2>
+    <h2 class="mb-3">Eintragen</h2>
+
+    <ul class="nav nav-tabs mb-4" id="logTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="activity-tab" data-bs-toggle="tab"
+                data-bs-target="#activity-panel" type="button" role="tab"
+                aria-controls="activity-panel" aria-selected="true">
+          Aktivität
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="sick-tab" data-bs-toggle="tab"
+                data-bs-target="#sick-panel" type="button" role="tab"
+                aria-controls="sick-panel" aria-selected="false">
+          Krankmeldung
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+
+    {# Tab 1: Aktivität #}
+    <div class="tab-pane fade show active" id="activity-panel" role="tabpanel">
     <form method="post" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
@@ -48,8 +70,40 @@
         </div>
         <div id="file-list" class="mt-2 small text-muted"></div>
       </div>
-      <button type="submit" class="btn btn-primary w-100">Eintragen</button>
+      <button type="submit" class="btn btn-primary w-100">Aktivität eintragen</button>
     </form>
+    </div>{# end activity-panel #}
+
+    {# Tab 2: Krankmeldung #}
+    <div class="tab-pane fade" id="sick-panel" role="tabpanel">
+      <form method="post" action="{{ url_for('challenge_activities.sick_week_submit') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+          <label for="sick_week_date" class="form-label">
+            Datum (beliebiger Tag der betroffenen Woche)
+          </label>
+          <input type="date" class="form-control" id="sick_week_date" name="week_date"
+                 value="{{ today }}" max="{{ today }}" required>
+          <div class="form-text">Die Kalenderwoche wird automatisch ermittelt (Mo–So).</div>
+        </div>
+        <div class="mb-3">
+          <label for="log_sick_days" class="form-label">Krankentage</label>
+          <select class="form-select" id="log_sick_days" name="sick_days" required>
+            <option value="1">1 Tag</option>
+            <option value="2">2 Tage (–1 Aktivität)</option>
+            <option value="3">3 Tage (–1 Aktivität)</option>
+            <option value="4">4 Tage (–2 Aktivitäten)</option>
+            <option value="5">5 Tage (–2 Aktivitäten)</option>
+            <option value="6">6 Tage (–3 Aktivitäten)</option>
+            <option value="7">7 Tage – ganze Woche (keine Strafe)</option>
+          </select>
+          <div class="form-text">Pro 2 Krankentage wird eine benötigte Aktivität abgezogen.</div>
+        </div>
+        <button type="submit" class="btn btn-outline-warning w-100">Krankmeldung eintragen</button>
+      </form>
+    </div>{# end sick-panel #}
+
+    </div>{# end tab-content #}
   </div>
 </div>
 

@@ -9,6 +9,7 @@ Versionierung nach [Semantic Versioning](https://semver.org/).
 ### Neu
 - Partielle Krankmeldung: 1–7 einzelne Krankentage pro Woche meldbar (statt nur ganze Woche)
 - Rückwirkende Krankmeldung über Wochen-Navigation in „Meine Woche" (beliebige Vorwochen)
+- Krankmeldung auch direkt über „Eintragen" (Tab „Krankmeldung") mit freier Datumswahl erreichbar
 - Formel: je 2 Krankentage = 1 Aktivitäts-Abzug vom Wochenziel (`deductions = sick_days // 2`); ab 6 Tagen keine Strafe
 - Effektives Wochenziel wird in der Fortschrittsanzeige ausgewiesen
 - Bestehende Krankmeldung kann über dasselbe Formular korrigiert werden
