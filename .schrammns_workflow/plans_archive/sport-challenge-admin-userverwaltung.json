@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "epic_id": "sport-challenge-admin-userverwaltung",
+  "wave_count": 1,
+  "fix_cycles": 0,
+  "issues_completed": 1,
+  "issues_total": 6,
+  "last_wave_summary": "Wave 1 complete: sport-challenge-bb0 geschlossen. GET /admin/users/<id> Route + Template admin/user_detail.html erstellt, Details-Link in users.html ergänzt. 7 Regressionstests grün.",
+  "wave_1_summary_length": 200,
+  "files_read_early": ["app/routes/admin.py", "app/templates/admin/users.html"],
+  "plan_file": ".schrammns_workflow/plans/2026-04-29-admin-userverwaltung-erweiterung.md",
+  "decisions_made": [],
+  "last_updated": "2026-04-29T00:00:00Z"
+}

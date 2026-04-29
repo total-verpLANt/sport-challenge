@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "epic_id": "sport-challenge-3uw",
+  "wave_count": 1,
+  "fix_cycles": 0,
+  "issues_completed": 4,
+  "issues_total": 6,
+  "last_wave_summary": "Wave 1 complete: Issues j9x (FS-Leak Bugfix), duh (SickWeek+Activity), 14f (BonusChallenge-Delete), 091 (Challenge-Delete) geschlossen. Alle Tests grün (20+13+19 passed). Neue Routen: delete_sick_week(), delete_challenge(), delete_bonus_challenge(). Admin-Overrides in delete_activity() und delete_sick_week() korrekt implementiert.",
+  "wave_1_summary_length": 380,
+  "files_read_early": ["app/routes/admin.py","app/routes/challenge_activities.py","app/routes/bonus.py","app/routes/challenges.py","app/templates/activities/my_week.html","app/templates/activities/user_activities.html","app/templates/bonus/index.html","app/templates/challenges/detail.html"],
+  "plan_file": ".schrammns_workflow/plans/2026-04-30-loeschfunktionalitaet-komplett.md",
+  "decisions_made": [],
+  "last_updated": "2026-04-30T00:00:00Z"
+}
