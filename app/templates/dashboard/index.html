@@ -180,6 +180,10 @@
     return d.innerHTML;
   }
 
+  const lightbox = typeof GLightbox !== 'undefined'
+    ? GLightbox({ selector: '.glightbox', touchNavigation: true })
+    : null;
+
   const csrfToken = document.querySelector('[data-csrf]')?.dataset?.csrf
     || document.querySelector('.like-btn')?.dataset?.csrf || '';
 
@@ -294,6 +298,8 @@
 
           feed.appendChild(card);
         });
+
+        if (lightbox) lightbox.reload();
 
         if (data.has_more) {
           loadMoreBtn.dataset.page = page + 1;

@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] – 2026-04-29
+
+### Neu
+- Social-Media-Timeline im Dashboard: Activity-Feed mit den 10 neuesten Aktivitäten aller Challenge-Teilnehmer (AJAX-Nachladen, je 10 weitere)
+- Jede Feed-Karte zeigt Sport-Typ, Dauer, Datum/Uhrzeit, zufälligen Motivationsspruch (100 deutsche Quotes), Medien (Fotos/Videos) und Trainingsnotiz
+- Like/Heart-Button pro Aktivität (AJAX-Toggle, CSRF-geschützt, Rate-Limit 30/min, Teilnahme-Guard)
+- Top-5-Leaderboard auf der Dashboard-Startseite; vollständiges Leaderboard unter `/dashboard/leaderboard` erreichbar
+- „Leaderboard"-Link in der Navbar
+- ActivityComment-Model als Code-Stub für spätere Implementierung (kein UI)
+- GLightbox-Instanz bleibt nach AJAX-Nachladen funktionsfähig (`lightbox.reload()`)
+
 ## [0.7.7] – 2026-04-29
 
 ### Neu
