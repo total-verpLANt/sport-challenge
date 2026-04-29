@@ -11,6 +11,12 @@
                value="{{ today }}" required max="{{ today }}">
       </div>
       <div class="mb-3">
+        <label for="started_at_time" class="form-label">
+          Uhrzeit <span class="text-muted">(optional)</span>
+        </label>
+        <input type="time" class="form-control" id="started_at_time" name="started_at_time">
+      </div>
+      <div class="mb-3">
         <label for="duration_minutes" class="form-label">Dauer (Minuten)</label>
         <input type="number" class="form-control" id="duration_minutes" name="duration_minutes"
                min="1" required placeholder="z.B. 30">

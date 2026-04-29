@@ -98,6 +98,16 @@ def log_submit():
         flash("Bitte Sportart angeben.")
         return redirect(url_for("challenge_activities.log_form"))
 
+    # Optionale Startzeit
+    started_at_time = request.form.get("started_at_time", "").strip()
+    if started_at_time:
+        try:
+            started_at = datetime.fromisoformat(f"{activity_date}T{started_at_time}")
+        except ValueError:
+            started_at = None
+    else:
+        started_at = None
+
     # Optional media upload (mehrere Dateien)
     media_files = request.files.getlist("media")
     saved_media = []
@@ -117,6 +127,7 @@ def log_submit():
         sport_type=sport_type,
         source="manual",
         notes=notes,
+        started_at=started_at,
     )
     db.session.add(activity)
     db.session.flush()
