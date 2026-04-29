@@ -20,6 +20,7 @@ class Activity(db.Model):
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     screenshot_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
