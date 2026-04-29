@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -351,6 +351,11 @@ def import_submit():
         if not (challenge.start_date <= activity_date <= challenge.end_date):
             continue  # Aktivität liegt außerhalb der Challenge-Periode
         try:
+            started_at_str = act.get("startTimeLocal", "")
+            try:
+                started_at = datetime.fromisoformat(started_at_str)
+            except (ValueError, TypeError):
+                started_at = None
             activity = Activity(
                 user_id=current_user.id,
                 challenge_id=participation.challenge_id,
@@ -359,6 +364,7 @@ def import_submit():
                 sport_type=act.get("activityType", {}).get("typeKey", "unknown"),
                 source=provider_type,
                 external_id=ext_id,
+                started_at=started_at,
             )
             db.session.add(activity)
             db.session.commit()
