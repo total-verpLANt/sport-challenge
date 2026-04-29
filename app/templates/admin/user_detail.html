@@ -89,7 +89,7 @@
       <div class="card-body">
         <div class="row g-3">
 
-          <!-- Sperren / Entsperren -->
+          <!-- Sperren / Entsperren / Admin-Toggle -->
           <div class="col-12 col-md-4">
             <div class="card border-secondary h-100">
               <div class="card-body">
@@ -103,6 +103,17 @@
                 <form method="post" action="{{ url_for('admin.unsuspend_user', user_id=user.id) }}" class="d-inline">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-success btn-sm">Entsperren</button>
+                </form>
+                {% endif %}
+                {% if user.id != current_user.id %}
+                <hr class="my-2">
+                <form method="post" action="{{ url_for('admin.toggle_admin', user_id=user.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  {% if user.is_admin %}
+                  <button type="submit" class="btn btn-outline-warning btn-sm">Admin entziehen</button>
+                  {% else %}
+                  <button type="submit" class="btn btn-outline-primary btn-sm">Zum Admin machen</button>
+                  {% endif %}
                 </form>
                 {% endif %}
               </div>

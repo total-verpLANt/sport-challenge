@@ -52,18 +52,6 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-danger btn-sm">Ablehnen</button>
           </form>
-          {% elif user.id != current_user.id %}
-          <form method="post" action="{{ url_for('admin.toggle_admin', user_id=user.id) }}" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            {% if user.is_admin %}
-            <button type="submit" class="btn btn-outline-warning btn-sm"
-                    data-confirm="Admin-Rechte von {{ user.display_name }} wirklich entziehen?">Admin entziehen</button>
-            {% else %}
-            <button type="submit" class="btn btn-outline-primary btn-sm">Zum Admin machen</button>
-            {% endif %}
-          </form>
-          {% else %}
-          <span class="text-muted small">Du</span>
           {% endif %}
           <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary ms-1">Details</a>
         </td>
