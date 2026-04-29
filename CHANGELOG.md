@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.7.6] – 2026-04-29
+
+### Neu
+- Benutzer können ihr Passwort im Profil (`/settings/`) selbst ändern (altes Passwort als Bestätigung, Sichtbarkeits-Toggle, Rate-Limit 5/min)
+
 ## [0.7.5] – 2026-04-29
 
 ### Geändert
