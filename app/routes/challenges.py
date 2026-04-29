@@ -5,10 +5,14 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user, login_required
 
 from app.extensions import db
+from app.models.activity import Activity
+from app.models.bonus import BonusChallenge, BonusChallengeEntry
 from app.models.challenge import Challenge, ChallengeParticipation
+from app.models.penalty import PenaltyOverride
 from app.models.sick_week import SickWeek
 from app.models.user import User
 from app.utils.decorators import admin_required
+from app.utils.uploads import delete_media_files, delete_upload
 
 challenges_bp = Blueprint("challenges", __name__, template_folder="../templates")
 
@@ -361,3 +365,40 @@ def sick(public_id):
 
     flash(f"Krankmeldung für die Woche ab {week_start.strftime('%d.%m.%Y')} eingetragen.")
     return redirect(url_for("challenges.detail", public_id=public_id))
+
+
+@challenges_bp.route("/<string:public_id>/delete", methods=["POST"])
+@admin_required
+def delete_challenge(public_id: str):
+    challenge = _get_challenge_by_public_id(public_id)
+
+    # Cascade-Reihenfolge (KEINE DB-Cascades konfiguriert):
+    # 1. BonusChallengeEntry via BonusChallenge
+    bonus_ids = [
+        bc.id
+        for bc in BonusChallenge.query.filter_by(challenge_id=challenge.id).all()
+    ]
+    if bonus_ids:
+        BonusChallengeEntry.query.filter(
+            BonusChallengeEntry.bonus_challenge_id.in_(bonus_ids)
+        ).delete(synchronize_session="fetch")
+    # 2. BonusChallenge
+    BonusChallenge.query.filter_by(challenge_id=challenge.id).delete()
+    # 3. PenaltyOverride
+    PenaltyOverride.query.filter_by(challenge_id=challenge.id).delete()
+    # 4. SickWeek
+    SickWeek.query.filter_by(challenge_id=challenge.id).delete()
+    # 5. Activity – ORM-Iteration wegen ActivityMedia-Dateisystem-Cleanup!
+    for _act in Activity.query.filter_by(challenge_id=challenge.id).all():
+        delete_media_files(_act.media)
+        if _act.screenshot_path:
+            delete_upload(_act.screenshot_path)
+        db.session.delete(_act)
+    # 6. ChallengeParticipation
+    ChallengeParticipation.query.filter_by(challenge_id=challenge.id).delete()
+    # 7. Challenge selbst
+    challenge_name = challenge.name
+    db.session.delete(challenge)
+    db.session.commit()
+    flash(f"Challenge '{challenge_name}' wurde gelöscht.", "success")
+    return redirect(url_for("challenges.index"))

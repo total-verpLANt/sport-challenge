@@ -522,9 +522,14 @@ def import_submit():
 @login_required
 def delete_activity(activity_id):
     activity = db.session.get(Activity, activity_id)
-    if activity is None or activity.user_id != current_user.id:
+    if activity is None or (
+        activity.user_id != current_user.id and not current_user.is_admin
+    ):
         flash("Aktivität nicht gefunden oder keine Berechtigung.")
         return redirect(url_for("challenge_activities.my_week"))
+
+    target_user_id = activity.user_id
+    challenge_id = activity.challenge_id
 
     delete_media_files(activity.media)
     if activity.screenshot_path:        # Legacy-Cleanup
@@ -533,7 +538,32 @@ def delete_activity(activity_id):
     db.session.delete(activity)
     db.session.commit()
 
-    flash("Aktivität wurde gelöscht.")
+    flash("Aktivität wurde gelöscht.", "success")
+    if current_user.is_admin and target_user_id != current_user.id:
+        return redirect(url_for("challenge_activities.user_activities",
+                                user_id=target_user_id,
+                                challenge_id=challenge_id))
+    return redirect(url_for("challenge_activities.my_week"))
+
+
+@challenge_activities_bp.route("/sick-week/<int:sick_week_id>/delete", methods=["POST"])
+@login_required
+def delete_sick_week(sick_week_id: int):
+    sick_week = db.session.get(SickWeek, sick_week_id)
+    if sick_week is None or (
+        sick_week.user_id != current_user.id and not current_user.is_admin
+    ):
+        flash("Krankmeldung nicht gefunden.", "warning")
+        return redirect(url_for("challenge_activities.my_week"))
+    user_id = sick_week.user_id
+    challenge_id = sick_week.challenge_id
+    db.session.delete(sick_week)
+    db.session.commit()
+    flash("Krankmeldung wurde gelöscht.", "success")
+    if current_user.is_admin and user_id != current_user.id:
+        return redirect(url_for("challenge_activities.user_activities",
+                                user_id=user_id,
+                                challenge_id=challenge_id))
     return redirect(url_for("challenge_activities.my_week"))
 
 

@@ -15,6 +15,7 @@ from app.models.penalty import PenaltyOverride
 from app.models.sick_week import SickWeek
 from app.models.user import User
 from app.utils.decorators import admin_required
+from app.utils.uploads import delete_media_files, delete_upload
 
 _MIN_PASSWORD_LENGTH = 8
 
@@ -185,7 +186,11 @@ def delete_user(user_id):
         or_(PenaltyOverride.user_id == user.id, PenaltyOverride.set_by_id == user.id)
     ).delete()
     SickWeek.query.filter_by(user_id=user.id).delete()
-    Activity.query.filter_by(user_id=user.id).delete()
+    for _act in Activity.query.filter_by(user_id=user.id).all():
+        delete_media_files(_act.media)
+        if _act.screenshot_path:
+            delete_upload(_act.screenshot_path)
+        db.session.delete(_act)
     ChallengeParticipation.query.filter_by(user_id=user.id).delete()
     ConnectorCredential.query.filter_by(user_id=user.id).delete()
 

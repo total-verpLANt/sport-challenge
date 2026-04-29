@@ -548,3 +548,93 @@ def test_log_activity_notes_too_long(client, db):
         db.select(Activity).where(Activity.user_id == user.id)
     ).scalar_one_or_none()
     assert activity is None
+
+
+# --- SickWeek Delete Tests ---
+
+def test_delete_sick_week_own(client, db):
+    """User kann eigene Krankmeldung löschen."""
+    from app.models.sick_week import SickWeek
+    from datetime import date
+    user = _create_and_login(client, db, email="sw_delete@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    week_start = date(2024, 1, 1)
+    sw = SickWeek(user_id=user.id, challenge_id=challenge.id, week_start=week_start)
+    db.session.add(sw)
+    db.session.commit()
+    sw_id = sw.id
+
+    resp = client.post(f"/challenge-activities/sick-week/{sw_id}/delete",
+                       follow_redirects=False)
+    assert resp.status_code == 302
+    assert db.session.get(SickWeek, sw_id) is None
+
+
+def test_delete_sick_week_other_user_rejected(client, db):
+    """User B kann Krankmeldung von User A nicht löschen."""
+    from app.models.sick_week import SickWeek
+    from datetime import date
+    # User A erstellt Krankmeldung
+    user_a = _create_and_login(client, db, email="sw_a@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user_a.id)
+    sw = SickWeek(user_id=user_a.id, challenge_id=challenge.id, week_start=date(2024, 1, 1))
+    db.session.add(sw)
+    db.session.commit()
+    sw_id = sw.id
+    # User B einloggen (explizit ausloggen vorher – Flask-Login ersetzt Session sonst nicht)
+    client.post("/auth/logout")
+    _create_and_login(client, db, email="sw_b@test.com")
+
+    resp = client.post(f"/challenge-activities/sick-week/{sw_id}/delete",
+                       follow_redirects=False)
+    assert resp.status_code == 302
+    assert db.session.get(SickWeek, sw_id) is not None  # Noch vorhanden!
+
+
+def test_admin_deletes_sick_week_of_other_user(client, db):
+    """Admin kann fremde Krankmeldung löschen."""
+    from app.models.sick_week import SickWeek
+    from app.models.user import User
+    from datetime import date
+    # User erstellt Krankmeldung
+    user = _create_and_login(client, db, email="sw_victim@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    sw = SickWeek(user_id=user.id, challenge_id=challenge.id, week_start=date(2024, 1, 1))
+    db.session.add(sw)
+    db.session.commit()
+    sw_id = sw.id
+    # Admin einloggen
+    admin = _create_and_login(client, db, email="sw_admin@test.com")
+    admin.role = "admin"
+    db.session.commit()
+
+    resp = client.post(f"/challenge-activities/sick-week/{sw_id}/delete",
+                       follow_redirects=False)
+    assert resp.status_code == 302
+    assert db.session.get(SickWeek, sw_id) is None  # Gelöscht!
+
+
+def test_admin_deletes_others_activity(client, db):
+    """Admin kann fremde Aktivität löschen."""
+    from app.models.activity import Activity
+    from datetime import date
+    # User erstellt Aktivität
+    user = _create_and_login(client, db, email="act_victim@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    activity = Activity(
+        user_id=user.id, challenge_id=challenge.id,
+        activity_date=date.today(), duration_minutes=30,
+        sport_type="cycling", source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    activity_id = activity.id
+    # Admin einloggen
+    admin = _create_and_login(client, db, email="act_admin@test.com")
+    admin.role = "admin"
+    db.session.commit()
+
+    resp = client.post(f"/challenge-activities/{activity_id}/delete",
+                       follow_redirects=False)
+    assert resp.status_code == 302
+    assert db.session.get(Activity, activity_id) is None  # Gelöscht!

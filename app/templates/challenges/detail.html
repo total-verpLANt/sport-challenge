@@ -173,4 +173,24 @@
 {% else %}
 <p class="text-muted">Noch keine Teilnehmer eingeladen.</p>
 {% endif %}
+
+{% if current_user.is_admin %}
+<div class="row mt-4">
+  <div class="col">
+    <div class="card border-danger">
+      <div class="card-body">
+        <h6 class="card-title text-danger">Gefahrenzone</h6>
+        <p class="card-text text-muted small">Diese Aktion löscht die Challenge unwiderruflich mit allen Aktivitäten, Krankmeldungen, Bonus-Challenges und Teilnahmen.</p>
+        <form method="post"
+              action="{{ url_for('challenges.delete_challenge', public_id=challenge.public_id) }}"
+              data-confirm="Challenge '{{ challenge.name }}' wirklich löschen? Alle Aktivitäten, Krankmeldungen, Bonus-Challenges und Teilnahmen werden entfernt. Diese Aktion kann NICHT rückgängig gemacht werden."
+              class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger">Challenge löschen</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

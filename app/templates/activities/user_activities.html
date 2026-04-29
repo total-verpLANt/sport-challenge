@@ -69,6 +69,15 @@
           </div>
         {% endif %}
       </div>
+      {% if current_user.is_admin %}
+      <form method="post"
+            action="{{ url_for('challenge_activities.delete_activity', activity_id=activity.id) }}"
+            data-confirm="Aktivität von {{ target_user.display_name }} wirklich löschen?"
+            class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger btn-sm">Löschen</button>
+      </form>
+      {% endif %}
     </div>
   </div>
   {% endfor %}

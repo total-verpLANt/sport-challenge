@@ -4,6 +4,18 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] – 2026-04-30
+
+### Neu
+- Benutzer können eigene Krankmeldungen löschen (mit Bestätigungs-Dialog)
+- Admin kann Krankmeldungen aller Nutzer löschen
+- Admin kann Aktivitäten aller Nutzer löschen
+- Admin kann Bonus-Challenges inkl. aller Einträge löschen
+- Admin kann Challenges inkl. aller Aktivitäten, Krankmeldungen und Bonus-Challenges löschen (vollständige 7-stufige Cascade)
+
+### Behoben
+- Filesystem-Leak beim Löschen eines Nutzers: ActivityMedia-Dateien blieben physisch auf dem Server, weil Bulk-Delete keine ORM-Cascades auslöst
+
 ## [0.8.2] – 2026-04-29
 
 ### Neu

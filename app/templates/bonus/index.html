@@ -23,7 +23,18 @@
       <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
           <strong>{{ bc.description }}</strong>
-          <span class="text-muted small">{{ bc.scheduled_date.strftime('%d.%m.%Y') }}</span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">{{ bc.scheduled_date.strftime('%d.%m.%Y') }}</span>
+            {% if current_user.is_admin %}
+            <form method="post"
+                  action="{{ url_for('bonus.delete_bonus_challenge', bonus_id=bc.id) }}"
+                  data-confirm="Bonus-Challenge '{{ bc.description[:40] }}' wirklich löschen? Alle Einträge werden entfernt."
+                  class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-outline-danger btn-sm">Löschen</button>
+            </form>
+            {% endif %}
+          </div>
         </div>
         <div class="card-body">
 

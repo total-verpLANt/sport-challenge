@@ -1,6 +1,6 @@
 from datetime import date
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
 
@@ -148,6 +148,20 @@ def create_post():
     db.session.commit()
 
     flash(f"Bonus-Challenge '{description}' am {scheduled_date_val.strftime('%d.%m.%Y')} wurde erstellt.")
+    return redirect(url_for("bonus.index"))
+
+
+@bonus_bp.route("/<int:bonus_id>/delete", methods=["POST"])
+@admin_required
+def delete_bonus_challenge(bonus_id: int):
+    bonus = db.session.get(BonusChallenge, bonus_id)
+    if bonus is None:
+        abort(404)
+    # Cascade: Entries zuerst löschen (kein DB-ondelete CASCADE)
+    BonusChallengeEntry.query.filter_by(bonus_challenge_id=bonus.id).delete()
+    db.session.delete(bonus)
+    db.session.commit()
+    flash("Bonus-Challenge wurde gelöscht.", "success")
     return redirect(url_for("bonus.index"))
 
 
