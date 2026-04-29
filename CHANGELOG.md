@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.7.5] – 2026-04-29
+
+### Geändert
+- `migrations/env.py`: veralteten `db.get_engine()`-Aufruf durch `db.engine` ersetzt (Flask-SQLAlchemy >= 3)
+
 ## [0.7.4] – 2026-04-29
 
 ### Geändert
