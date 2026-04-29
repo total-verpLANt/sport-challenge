@@ -32,17 +32,62 @@
   <div class="card-body">
     <h5 class="card-title">Fortschritt diese Woche</h5>
     <p class="card-text mb-2">
-      <strong>{{ fulfilled_days }} von {{ weekly_goal }} Tagen</strong> mit mindestens 30 Minuten
+      {% if sick_week %}
+        {% set eff_goal = [0, weekly_goal - (sick_week.sick_days // 2)]|max %}
+        <strong>{{ fulfilled_days }} von {{ eff_goal }} Tagen</strong> mit mindestens 30 Minuten
+        <small class="text-muted">({{ sick_week.sick_days }} Krankentag(e), effektives Ziel)</small>
+      {% else %}
+        {% set eff_goal = weekly_goal %}
+        <strong>{{ fulfilled_days }} von {{ weekly_goal }} Tagen</strong> mit mindestens 30 Minuten
+      {% endif %}
     </p>
     <div class="progress" style="height: 20px;" role="progressbar"
-         aria-valuenow="{{ fulfilled_days }}" aria-valuemin="0" aria-valuemax="{{ weekly_goal }}">
-      <div class="progress-bar {% if fulfilled_days >= weekly_goal %}bg-success{% elif fulfilled_days > 0 %}bg-warning{% else %}bg-danger{% endif %}"
-           style="width: {{ [[(fulfilled_days / weekly_goal * 100)|int, 0]|max, 100]|min }}%">
-        {{ fulfilled_days }}/{{ weekly_goal }}
+         aria-valuenow="{{ fulfilled_days }}" aria-valuemin="0" aria-valuemax="{{ eff_goal }}">
+      <div class="progress-bar {% if eff_goal == 0 or fulfilled_days >= eff_goal %}bg-success{% elif fulfilled_days > 0 %}bg-warning{% else %}bg-danger{% endif %}"
+           style="width: {% if eff_goal == 0 %}100{% else %}{{ [[(fulfilled_days / eff_goal * 100)|int, 0]|max, 100]|min }}{% endif %}%">
+        {{ fulfilled_days }}/{{ eff_goal }}
       </div>
     </div>
   </div>
 </div>
+
+{# Sick-Entry-Section #}
+{% if participation and participation.status == "accepted" and offset <= 0 %}
+<div class="card mb-4 {% if sick_week %}border-warning{% endif %}">
+  <div class="card-header {% if sick_week %}bg-warning text-dark{% endif %}">
+    <strong>Krankheit melden</strong>
+    {% if sick_week %}
+      <span class="ms-2 small">– {{ sick_week.sick_days }} Tag(e) eingetragen</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <form method="post"
+          action="{{ url_for('challenge_activities.sick_week_submit') }}"
+          class="row g-2 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="offset" value="{{ offset }}">
+      <div class="col-12 col-sm-6">
+        <label for="sick_days" class="form-label">
+          Krankentage diese Woche <small class="text-muted">(1–7)</small>
+        </label>
+        <select name="sick_days" id="sick_days" class="form-select">
+          {% for d in range(1, 8) %}
+          <option value="{{ d }}"
+            {% if sick_week and sick_week.sick_days == d %}selected{% endif %}>
+            {{ d }} Tag{% if d > 1 %}e{% endif %}{% if d >= 2 %} (–{{ d // 2 }} Aktivität{% if d // 2 > 1 %}en{% endif %}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-sm-6">
+        <button type="submit" class="btn btn-outline-warning w-100">
+          {% if sick_week %}Krankmeldung aktualisieren{% else %}Krank melden{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 
 {# Per-day breakdown #}
 {% for day in days %}

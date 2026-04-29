@@ -354,6 +354,7 @@ def sick(public_id):
         user_id=current_user.id,
         challenge_id=challenge.id,
         week_start=week_start,
+        sick_days=7,
     )
     db.session.add(sick_week)
     db.session.commit()

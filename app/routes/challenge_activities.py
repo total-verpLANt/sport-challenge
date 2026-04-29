@@ -9,6 +9,7 @@ from app.connectors import PROVIDER_REGISTRY
 from app.extensions import db
 from app.models.activity import Activity, ActivityMedia
 from app.models.challenge import Challenge, ChallengeParticipation
+from app.models.sick_week import SickWeek
 from app.models.connector import ConnectorCredential
 from app.models.user import User
 from app.utils.uploads import delete_media_files, delete_upload, get_media_type, save_upload
@@ -194,6 +195,16 @@ def my_week():
         ConnectorCredential.query.filter_by(user_id=current_user.id).first() is not None
     )
 
+    sick_week = None
+    if participation:
+        sick_week = db.session.execute(
+            db.select(SickWeek).where(
+                SickWeek.user_id == current_user.id,
+                SickWeek.challenge_id == participation.challenge_id,
+                SickWeek.week_start == monday,
+            )
+        ).scalar_one_or_none()
+
     return render_template(
         "activities/my_week.html",
         days=days,
@@ -204,7 +215,65 @@ def my_week():
         weekly_goal=weekly_goal,
         participation=participation,
         has_connector=has_connector,
+        sick_week=sick_week,
     )
+
+
+@challenge_activities_bp.route("/sick-week", methods=["POST"])
+@login_required
+def sick_week_submit():
+    participation = _active_participation()
+    if participation is None:
+        flash("Du nimmst aktuell an keiner Challenge teil.")
+        return redirect(url_for("challenges.index"))
+
+    try:
+        offset = int(request.form.get("offset", 0))
+    except (TypeError, ValueError):
+        offset = 0
+
+    if offset > 0:
+        flash("Krankmeldungen für zukünftige Wochen sind nicht möglich.")
+        return redirect(url_for("challenge_activities.my_week", offset=offset))
+
+    monday, _ = _get_week_bounds(offset)
+
+    try:
+        sick_days = int(request.form.get("sick_days", 0))
+        if not (1 <= sick_days <= 7):
+            raise ValueError
+    except (TypeError, ValueError):
+        flash("Bitte 1–7 Krankentage angeben.")
+        return redirect(url_for("challenge_activities.my_week", offset=offset))
+
+    challenge = participation.challenge
+    if monday > challenge.end_date or (monday + timedelta(days=6)) < challenge.start_date:
+        flash("Diese Woche liegt außerhalb der Challenge-Periode.")
+        return redirect(url_for("challenge_activities.my_week", offset=offset))
+
+    existing = db.session.execute(
+        db.select(SickWeek).where(
+            SickWeek.user_id == current_user.id,
+            SickWeek.challenge_id == participation.challenge_id,
+            SickWeek.week_start == monday,
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        existing.sick_days = sick_days
+        db.session.commit()
+        flash(f"Krankmeldung aktualisiert: {sick_days} Tag(e) für KW ab {monday.strftime('%d.%m.%Y')}.")
+    else:
+        db.session.add(SickWeek(
+            user_id=current_user.id,
+            challenge_id=participation.challenge_id,
+            week_start=monday,
+            sick_days=sick_days,
+        ))
+        db.session.commit()
+        flash(f"Krankmeldung eingetragen: {sick_days} Tag(e) für KW ab {monday.strftime('%d.%m.%Y')}.")
+
+    return redirect(url_for("challenge_activities.my_week", offset=offset))
 
 
 @challenge_activities_bp.route("/import", methods=["GET"])

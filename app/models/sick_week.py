@@ -14,6 +14,7 @@ class SickWeek(db.Model):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     challenge_id: Mapped[int] = mapped_column(ForeignKey("challenges.id"), nullable=False)
     week_start: Mapped[date] = mapped_column(Date, nullable=False)  # Monday of the week
+    sick_days: Mapped[int] = mapped_column(nullable=False, server_default="7")  # 1-7
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

@@ -61,9 +61,9 @@ def get_challenge_summary(challenge: Challenge) -> dict:
     sick_weeks_rows = db.session.execute(
         db.select(SickWeek).where(SickWeek.challenge_id == challenge.id)
     ).scalars().all()
-    # Index: (user_id, week_start) -> True
-    sick_index: set[tuple[int, date]] = {
-        (sw.user_id, sw.week_start) for sw in sick_weeks_rows
+    # Index: (user_id, week_start) -> sick_days
+    sick_index: dict[tuple[int, date], int] = {
+        (sw.user_id, sw.week_start): sw.sick_days for sw in sick_weeks_rows
     }
 
     # 4. Build per-participant data
@@ -75,7 +75,8 @@ def get_challenge_summary(challenge: Challenge) -> dict:
         weeks_data: dict[date, dict] = {}
         for week_start in weeks:
             fulfilled_days = count_fulfilled_days(user.id, challenge.id, week_start)
-            is_sick = (user.id, week_start) in sick_index
+            sick_days_val = sick_index.get((user.id, week_start))
+            is_sick = sick_days_val is not None
 
             penalty = calculate_weekly_penalty(
                 user_id=user.id,
@@ -88,6 +89,7 @@ def get_challenge_summary(challenge: Challenge) -> dict:
             weeks_data[week_start] = {
                 "fulfilled_days": fulfilled_days,
                 "is_sick": is_sick,
+                "sick_days": sick_days_val,
                 "penalty": penalty,
                 # "3+" indicator: participant exceeded weekly goal
                 "overachieved": fulfilled_days > weekly_goal,

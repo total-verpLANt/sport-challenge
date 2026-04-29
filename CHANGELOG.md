@@ -4,6 +4,15 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.8.2] – 2026-04-29
+
+### Neu
+- Partielle Krankmeldung: 1–7 einzelne Krankentage pro Woche meldbar (statt nur ganze Woche)
+- Rückwirkende Krankmeldung über Wochen-Navigation in „Meine Woche" (beliebige Vorwochen)
+- Formel: je 2 Krankentage = 1 Aktivitäts-Abzug vom Wochenziel (`deductions = sick_days // 2`); ab 6 Tagen keine Strafe
+- Effektives Wochenziel wird in der Fortschrittsanzeige ausgewiesen
+- Bestehende Krankmeldung kann über dasselbe Formular korrigiert werden
+
 ## [0.8.1] – 2026-04-29
 
 ### Sicherheit

@@ -53,7 +53,13 @@ def calculate_weekly_penalty(
         )
     ).scalar_one_or_none()
     if sick_week is not None:
-        return 0.0
+        deductions = sick_week.sick_days // 2
+        effective_goal = max(0, weekly_goal - deductions)
+        if effective_goal <= 0:
+            return 0.0
+        fulfilled = count_fulfilled_days(user_id, challenge_id, week_start)
+        missed = max(0, effective_goal - fulfilled)
+        return missed * penalty_per_miss
 
     # 2. Check PenaltyOverride
     override = db.session.execute(

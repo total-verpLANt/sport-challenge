@@ -266,3 +266,93 @@ def test_duplicate_sick_week_rejected(client, db):
         )
     ).scalars().all()
     assert len(count) == 1
+
+
+def _create_participant(db, challenge_id, email="p@test.com"):
+    user = User(email=email, is_approved=True)
+    user.set_password("pass123")
+    db.session.add(user)
+    db.session.commit()
+    participation = ChallengeParticipation(
+        user_id=user.id,
+        challenge_id=challenge_id,
+        status="accepted",
+    )
+    db.session.add(participation)
+    db.session.commit()
+    return user
+
+
+def test_sick_week_submit_partial(client, db):
+    """POST /sick-week mit sick_days=3 legt partiellen Eintrag an."""
+    admin = _create_and_login(client, db, email="admin_sw@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+    client.post("/auth/logout")
+
+    participant = _create_participant(db, challenge.id, email="p_sw@test.com")
+    client.post("/auth/login", data={"email": "p_sw@test.com", "password": "pass123"})
+
+    resp = client.post(
+        "/challenge-activities/sick-week",
+        data={"sick_days": "3", "offset": "0"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    sw = db.session.execute(
+        db.select(SickWeek).where(
+            SickWeek.user_id == participant.id,
+            SickWeek.challenge_id == challenge.id,
+            SickWeek.week_start == monday,
+        )
+    ).scalar_one_or_none()
+    assert sw is not None
+    assert sw.sick_days == 3
+
+
+def test_sick_week_submit_update(client, db):
+    """Zweiter POST aktualisiert sick_days statt Duplikat anzulegen."""
+    admin = _create_and_login(client, db, email="admin_upd@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+    client.post("/auth/logout")
+
+    participant = _create_participant(db, challenge.id, email="p_upd@test.com")
+    client.post("/auth/login", data={"email": "p_upd@test.com", "password": "pass123"})
+
+    client.post("/challenge-activities/sick-week", data={"sick_days": "2", "offset": "0"})
+    client.post("/challenge-activities/sick-week", data={"sick_days": "5", "offset": "0"})
+
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    rows = db.session.execute(
+        db.select(SickWeek).where(
+            SickWeek.user_id == participant.id,
+            SickWeek.challenge_id == challenge.id,
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].sick_days == 5
+
+
+def test_sick_week_submit_future_rejected(client, db):
+    """offset=1 (zukünftige Woche) wird abgelehnt – kein Eintrag."""
+    admin = _create_and_login(client, db, email="admin_fut@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+    client.post("/auth/logout")
+
+    participant = _create_participant(db, challenge.id, email="p_fut@test.com")
+    client.post("/auth/login", data={"email": "p_fut@test.com", "password": "pass123"})
+
+    resp = client.post(
+        "/challenge-activities/sick-week",
+        data={"sick_days": "3", "offset": "1"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    count = db.session.execute(
+        db.select(SickWeek).where(SickWeek.user_id == participant.id)
+    ).scalars().all()
+    assert len(count) == 0

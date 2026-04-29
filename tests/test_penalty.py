@@ -242,3 +242,73 @@ def test_day_aggregation(app, db):
             penalty_per_miss=5.0,
         )
         assert penalty == 0.0
+
+
+@pytest.mark.parametrize("sick_days,expected_penalty", [
+    (1, 15.0),  # 1 Tag → 0 Abzüge, effective_goal=3, 0 Aktivitäten → 3×5=15
+    (2, 10.0),  # 2 Tage → 1 Abzug, effective_goal=2, 0 Aktivitäten → 2×5=10
+    (3, 10.0),  # 3 Tage → 1 Abzug, effective_goal=2 → 2×5=10
+    (4,  5.0),  # 4 Tage → 2 Abzüge, effective_goal=1 → 1×5=5
+    (5,  5.0),  # 5 Tage → 2 Abzüge, effective_goal=1 → 1×5=5
+    (6,  0.0),  # 6 Tage → 3 Abzüge, effective_goal=0 → 0
+    (7,  0.0),  # 7 Tage → 3 Abzüge, effective_goal=0 → 0
+])
+def test_sick_days_deduction_table(app, db, sick_days, expected_penalty):
+    """Pro 2 Krankentage wird 1 Aktivität vom Wochenziel abgezogen."""
+    with app.app_context():
+        week_start = date(2026, 5, 4)
+        challenge = _make_challenge(db, week_start, week_start + timedelta(days=13))
+        user, participation = _make_participant(db, challenge.id, weekly_goal=3)
+
+        sw = SickWeek(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            week_start=week_start,
+            sick_days=sick_days,
+        )
+        db.session.add(sw)
+        db.session.commit()
+
+        penalty = calculate_weekly_penalty(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            week_start=week_start,
+            weekly_goal=3,
+            penalty_per_miss=5.0,
+        )
+        assert penalty == expected_penalty
+
+
+def test_partial_sick_week_goal_met(app, db):
+    """2 Krankentage + 1 Aktivität → effective_goal=2, fulfilled=1 → 1×5=5€."""
+    with app.app_context():
+        week_start = date(2026, 5, 4)
+        challenge = _make_challenge(db, week_start, week_start + timedelta(days=13))
+        user, participation = _make_participant(db, challenge.id, weekly_goal=3)
+
+        sw = SickWeek(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            week_start=week_start,
+            sick_days=2,
+        )
+        db.session.add(sw)
+        activity = Activity(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            activity_date=week_start,
+            duration_minutes=30,
+            sport_type="running",
+            source="manual",
+        )
+        db.session.add(activity)
+        db.session.commit()
+
+        penalty = calculate_weekly_penalty(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            week_start=week_start,
+            weekly_goal=3,
+            penalty_per_miss=5.0,
+        )
+        assert penalty == 5.0
