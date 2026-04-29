@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user, login_required
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db, limiter
@@ -63,7 +64,7 @@ def index():
             Activity.challenge_id == challenge.id,
             Activity.user_id.in_(participant_ids),
         )
-        .order_by(Activity.activity_date.desc(), Activity.created_at.desc())
+        .order_by(Activity.activity_date.desc(), func.coalesce(Activity.started_at, Activity.created_at).desc())
         .limit(10)
         .options(selectinload(Activity.media), selectinload(Activity.likes))
     ).all()
@@ -149,7 +150,7 @@ def feed():
             Activity.challenge_id == challenge_id,
             Activity.user_id.in_(participant_ids),
         )
-        .order_by(Activity.activity_date.desc(), Activity.created_at.desc())
+        .order_by(Activity.activity_date.desc(), func.coalesce(Activity.started_at, Activity.created_at).desc())
         .offset(offset)
         .limit(11)  # 11 laden um has_more zu prüfen
         .options(selectinload(Activity.media), selectinload(Activity.likes))
