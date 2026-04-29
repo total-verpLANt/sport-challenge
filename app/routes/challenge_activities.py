@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
+from werkzeug.utils import secure_filename
 
 from app.connectors import PROVIDER_REGISTRY
 from app.extensions import db
@@ -106,7 +107,7 @@ def log_submit():
             if path is None:
                 flash("Ungültiges Dateiformat (erlaubt: JPG, PNG, WebP, MP4, MOV, WebM, max. 50 MB).")
                 return redirect(url_for("challenge_activities.log_form"))
-            saved_media.append((path, get_media_type(f.filename), f.filename))
+            saved_media.append((path, get_media_type(f.filename), secure_filename(f.filename)))
 
     activity = Activity(
         user_id=current_user.id,
@@ -479,7 +480,7 @@ def add_media(activity_id: int):
                     activity_id=activity.id,
                     file_path=path,
                     media_type=get_media_type(f.filename),
-                    original_filename=f.filename,
+                    original_filename=secure_filename(f.filename),
                     file_size_bytes=0,
                 ))
                 any_saved = True

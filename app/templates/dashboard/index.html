@@ -237,20 +237,6 @@
           card.className = 'card mb-3';
           card.id = 'feed-post-' + a.id;
 
-          let mediaHtml = '';
-          if (a.media && a.media.length > 0) {
-            mediaHtml = '<div class="d-flex flex-wrap gap-2 mb-2">';
-            a.media.forEach(function(m) {
-              const url = '/static/' + esc(m.file_path);
-              if (m.media_type === 'video') {
-                mediaHtml += '<video src="' + url + '" controls class="rounded" style="max-height:180px;max-width:240px;object-fit:cover"></video>';
-              } else {
-                mediaHtml += '<img src="' + url + '" alt="' + esc(m.original_filename) + '" class="img-thumbnail" style="max-height:180px;max-width:240px;object-fit:cover">';
-              }
-            });
-            mediaHtml += '</div>';
-          }
-
           const notesHtml = a.notes
             ? '<p class="card-text text-secondary small mt-1 mb-2">' + esc(a.notes) + '</p>'
             : '';
@@ -264,13 +250,39 @@
               esc(a.activity_date) + ' <em>' + esc(a.sport_type) + '</em> gemacht. ' +
               'Die Einheit hat <strong>' + esc(a.duration_minutes) + ' Minuten</strong> gedauert.</p>' +
               '<p class="text-muted fst-italic small mb-2">💪 ' + esc(a.quote) + '</p>' +
-              mediaHtml +
+              '<div class="js-media-slot"></div>' +
               notesHtml +
               '<button class="btn btn-sm ' + likedClass + ' like-btn" ' +
               'data-activity-id="' + esc(a.id) + '" ' +
               'data-liked="' + (a.liked_by_me ? 'true' : 'false') + '" ' +
               'data-csrf="' + esc(csrf) + '">❤️ <span class="like-count">' + esc(a.like_count) + '</span></button>' +
             '</div>';
+
+          if (a.media && a.media.length > 0) {
+            const mediaWrapper = document.createElement('div');
+            mediaWrapper.className = 'd-flex flex-wrap gap-2 mb-2';
+            a.media.forEach(function(m) {
+              const url = '/static/' + m.file_path;
+              let el;
+              if (m.media_type === 'video') {
+                el = document.createElement('video');
+                el.src = url;
+                el.controls = true;
+                el.className = 'rounded';
+                el.style.cssText = 'max-height:180px;max-width:240px;object-fit:cover';
+              } else {
+                el = document.createElement('img');
+                el.src = url;
+                el.alt = m.original_filename;
+                el.className = 'img-thumbnail';
+                el.style.cssText = 'max-height:180px;max-width:240px;object-fit:cover';
+              }
+              mediaWrapper.appendChild(el);
+            });
+            card.querySelector('.js-media-slot').replaceWith(mediaWrapper);
+          } else {
+            card.querySelector('.js-media-slot').remove();
+          }
 
           // Like-Handler für dynamisch erstellten Button
           card.querySelector('.like-btn').addEventListener('click', function() {
