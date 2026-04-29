@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] – 2026-04-29
+
+### Sicherheit
+- fix(security): Stored XSS via `original_filename` im AJAX-Feed-Card-Builder behoben: Media-Elemente werden jetzt per DOM-API (`createElement`/Property-Set) erzeugt statt via innerHTML-String-Konkatenation (kein Attribut-Breakout mehr möglich)
+- Defense-in-Depth: `werkzeug.utils.secure_filename()` wird auf Dateinamen vor der Persistierung angewendet, eliminiert `"`, `<`, `>` und Pfad-Separatoren aus `original_filename`
+
 ## [0.8.0] – 2026-04-29
 
 ### Neu
