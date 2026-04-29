@@ -42,6 +42,11 @@
           –
         {% endif %}
       </dd>
+
+      {% if activity.notes %}
+      <dt class="col-sm-4">Trainingsnotiz</dt>
+      <dd class="col-sm-8" style="white-space:pre-wrap">{{ activity.notes }}</dd>
+      {% endif %}
     </dl>
   </div>
 </div>

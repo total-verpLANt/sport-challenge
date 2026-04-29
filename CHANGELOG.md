@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.7.7] – 2026-04-29
+
+### Neu
+- Optionales Freitextfeld „Trainingsnotiz" (max. 2000 Zeichen) beim Aktivitäten-Eintragen; Notiz wird in der Detail-Ansicht und als Kurzvorschau in der Wochenansicht angezeigt
+
 ## [0.7.6] – 2026-04-29
 
 ### Neu

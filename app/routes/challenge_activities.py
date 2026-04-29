@@ -62,6 +62,11 @@ def log_submit():
     raw_date = request.form.get("activity_date", "").strip()
     raw_duration = request.form.get("duration_minutes", "").strip()
     sport_type = request.form.get("sport_type", "").strip()
+    notes_raw = request.form.get("notes", "").strip()
+    if len(notes_raw) > 2000:
+        flash("Die Trainingsnotiz darf maximal 2000 Zeichen lang sein.")
+        return redirect(url_for("challenge_activities.log_form"))
+    notes = notes_raw or None
 
     # Validate date
     try:
@@ -110,6 +115,7 @@ def log_submit():
         duration_minutes=duration_minutes,
         sport_type=sport_type,
         source="manual",
+        notes=notes,
     )
     db.session.add(activity)
     db.session.flush()

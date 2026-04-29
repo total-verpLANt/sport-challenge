@@ -21,6 +21,14 @@
                required placeholder="z.B. Laufen, Krafttraining, Schwimmen">
       </div>
       <div class="mb-3">
+        <label for="notes" class="form-label">
+          Trainingsnotiz <span class="text-muted">(optional)</span>
+        </label>
+        <textarea class="form-control" id="notes" name="notes" rows="3" maxlength="2000"
+                  placeholder="Wie war das Training? Besondere Eindrücke, Wetter, Befinden …"></textarea>
+        <div class="form-text text-end"><span id="notes-counter">0</span> / 2000</div>
+      </div>
+      <div class="mb-3">
         <label class="form-label">Fotos / Videos (optional, mehrere möglich)</label>
         <div id="drop-zone"
              class="border border-2 rounded p-3 text-center text-muted"
@@ -40,6 +48,11 @@
 </div>
 
 <script nonce="{{ csp_nonce() }}">
+(function () {
+  const notesEl   = document.getElementById('notes');
+  const counterEl = document.getElementById('notes-counter');
+  notesEl.addEventListener('input', () => { counterEl.textContent = notesEl.value.length; });
+})();
 (function () {
   const zone  = document.getElementById('drop-zone');
   const input = document.getElementById('media-input');

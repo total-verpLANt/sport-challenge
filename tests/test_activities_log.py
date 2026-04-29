@@ -482,3 +482,69 @@ def test_delete_media_wrong_activity(client, db):
     )
     assert resp.status_code == 302
     assert db.session.get(ActivityMedia, media_a.id) is not None
+
+
+def test_log_activity_with_notes(client, db):
+    user = _create_and_login(client, db, email="notes_yes@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "45",
+            "sport_type": "Laufen",
+            "notes": "Gutes Training, leichter Wind, Knie hat nicht gezwickt.",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is not None
+    assert activity.notes == "Gutes Training, leichter Wind, Knie hat nicht gezwickt."
+
+
+def test_log_activity_without_notes(client, db):
+    user = _create_and_login(client, db, email="notes_no@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "30",
+            "sport_type": "Schwimmen",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is not None
+    assert activity.notes is None
+
+
+def test_log_activity_notes_too_long(client, db):
+    user = _create_and_login(client, db, email="notes_toolong@test.com")
+    _create_challenge_with_participation(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "30",
+            "sport_type": "Yoga",
+            "notes": "x" * 2001,
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is None
