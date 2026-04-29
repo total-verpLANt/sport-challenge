@@ -4,6 +4,19 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.7.3] – 2026-04-29
+
+### Neu
+- Admin: User-Detailseite (`/admin/users/<id>`) mit E-Mail, Nickname, Rolle, Approval-Status und eingerichteten Integrationen (nur `provider_type`)
+- Admin: Konto sperren/entsperren (setzt `is_approved` – gesperrte User können sich nicht einloggen)
+- Admin: Passwort eines Users direkt zurücksetzen (serverseitige Mindestlängen-Validierung)
+- Admin: User löschen mit zweistufiger Bestätigung (Bootstrap-Modal + E-Mail-Eingabe) und manuellem Cascade-Delete
+
+### Sicherheit
+- Löschen blockiert wenn User Challenges erstellt hat (Datenverlust-Schutz)
+- E-Mail-Bestätigung serverseitig geprüft (Defense in depth, kein Verlass auf JS)
+- Self-Delete und Self-Suspend blockiert
+
 ## [0.7.2] – 2026-04-29
 
 ### Neu

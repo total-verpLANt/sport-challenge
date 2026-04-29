@@ -65,6 +65,7 @@
           {% else %}
           <span class="text-muted small">Du</span>
           {% endif %}
+          <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary ms-1">Details</a>
         </td>
       </tr>
       {% endfor %}

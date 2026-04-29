@@ -1,11 +1,22 @@
 from datetime import datetime, timezone
 
-from flask import Blueprint, flash, redirect, render_template, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user
 from sqlalchemy import func
 
+from sqlalchemy import or_
+
 from app.extensions import db
+from app.models.activity import Activity
+from app.models.bonus import BonusChallengeEntry
+from app.models.challenge import Challenge, ChallengeParticipation
+from app.models.connector import ConnectorCredential
+from app.models.penalty import PenaltyOverride
+from app.models.sick_week import SickWeek
 from app.models.user import User
 from app.utils.decorators import admin_required
+
+_MIN_PASSWORD_LENGTH = 8
 
 admin_bp = Blueprint("admin", __name__, template_folder="../templates")
 
@@ -22,10 +33,23 @@ def users():
     return render_template("admin/users.html", users=all_users, pending_count=pending_count)
 
 
+@admin_bp.route("/users/<int:user_id>")
+@admin_required
+def user_detail(user_id):
+    user = db.get_or_404(User, user_id)
+    connectors = ConnectorCredential.query.filter_by(user_id=user.id).all()
+    has_challenges = Challenge.query.filter_by(created_by_id=user.id).first() is not None
+    return render_template(
+        "admin/user_detail.html",
+        user=user,
+        connectors=connectors,
+        has_challenges=has_challenges,
+    )
+
+
 @admin_bp.route("/users/<int:user_id>/approve", methods=["POST"])
 @admin_required
 def approve_user(user_id):
-    from flask_login import current_user
     user = db.session.get(User, user_id)
     if user is None:
         flash("Benutzer nicht gefunden.")
@@ -44,7 +68,6 @@ def approve_user(user_id):
 @admin_bp.route("/users/<int:user_id>/reject", methods=["POST"])
 @admin_required
 def reject_user(user_id):
-    from flask_login import current_user
     user = db.session.get(User, user_id)
     if user is None:
         flash("Benutzer nicht gefunden.")
@@ -60,10 +83,46 @@ def reject_user(user_id):
     return redirect(url_for("admin.users"))
 
 
+@admin_bp.route("/users/<int:user_id>/suspend", methods=["POST"])
+@admin_required
+def suspend_user(user_id):
+    user = db.get_or_404(User, user_id)
+    if user.id == current_user.id:
+        flash("Eigenes Konto kann nicht gesperrt werden.", "danger")
+        return redirect(url_for("admin.user_detail", user_id=user_id))
+    user.is_approved = False
+    db.session.commit()
+    flash(f"Konto {user.display_name} gesperrt.", "warning")
+    return redirect(url_for("admin.user_detail", user_id=user_id))
+
+
+@admin_bp.route("/users/<int:user_id>/unsuspend", methods=["POST"])
+@admin_required
+def unsuspend_user(user_id):
+    user = db.get_or_404(User, user_id)
+    user.is_approved = True
+    db.session.commit()
+    flash(f"Konto {user.display_name} entsperrt.", "success")
+    return redirect(url_for("admin.user_detail", user_id=user_id))
+
+
+@admin_bp.route("/users/<int:user_id>/reset-password", methods=["POST"])
+@admin_required
+def reset_password(user_id):
+    user = db.get_or_404(User, user_id)
+    new_password = request.form.get("new_password", "")
+    if len(new_password) < _MIN_PASSWORD_LENGTH:
+        flash(f"Passwort muss mindestens {_MIN_PASSWORD_LENGTH} Zeichen lang sein.", "danger")
+        return redirect(url_for("admin.user_detail", user_id=user_id))
+    user.set_password(new_password)
+    db.session.commit()
+    flash(f"Passwort für {user.display_name} zurückgesetzt.", "success")
+    return redirect(url_for("admin.user_detail", user_id=user_id))
+
+
 @admin_bp.route("/users/<int:user_id>/toggle-admin", methods=["POST"])
 @admin_required
 def toggle_admin(user_id):
-    from flask_login import current_user
     user = db.session.get(User, user_id)
     if user is None:
         flash("Benutzer nicht gefunden.")
@@ -87,4 +146,51 @@ def toggle_admin(user_id):
         user.role = "admin"
         flash(f"{user.display_name} wurde zum Admin befördert.")
     db.session.commit()
+    return redirect(url_for("admin.users"))
+
+
+@admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def delete_user(user_id):
+    user = db.get_or_404(User, user_id)
+
+    # Self-Delete blockieren
+    if user.id == current_user.id:
+        flash("Eigenes Konto kann nicht gelöscht werden.", "danger")
+        return redirect(url_for("admin.user_detail", user_id=user_id))
+
+    # Last-Admin-Guard
+    if user.is_admin:
+        admin_count = db.session.scalar(
+            db.select(func.count()).select_from(User).where(User.role == "admin")
+        )
+        if admin_count <= 1:
+            flash("Letzter Admin kann nicht gelöscht werden.", "danger")
+            return redirect(url_for("admin.user_detail", user_id=user_id))
+
+    # Block wenn User Challenges erstellt hat
+    if Challenge.query.filter_by(created_by_id=user.id).first():
+        flash("User hat Challenges erstellt – bitte zuerst Challenges löschen oder übertragen.", "danger")
+        return redirect(url_for("admin.user_detail", user_id=user_id))
+
+    # Zweistufige Bestätigung: E-Mail-Prüfung serverseitig
+    confirm_email = request.form.get("confirm_email", "").strip()
+    if confirm_email != user.email:
+        flash("E-Mail-Bestätigung stimmt nicht überein.", "danger")
+        return redirect(url_for("admin.user_detail", user_id=user_id))
+
+    # Cascade-Löschen in Reihenfolge
+    BonusChallengeEntry.query.filter_by(user_id=user.id).delete()
+    PenaltyOverride.query.filter(
+        or_(PenaltyOverride.user_id == user.id, PenaltyOverride.set_by_id == user.id)
+    ).delete()
+    SickWeek.query.filter_by(user_id=user.id).delete()
+    Activity.query.filter_by(user_id=user.id).delete()
+    ChallengeParticipation.query.filter_by(user_id=user.id).delete()
+    ConnectorCredential.query.filter_by(user_id=user.id).delete()
+
+    display = user.display_name
+    db.session.delete(user)
+    db.session.commit()
+    flash(f"Konto {display} wurde gelöscht.", "success")
     return redirect(url_for("admin.users"))

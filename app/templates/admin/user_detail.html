@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2>Benutzer-Details</h2>
+  <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary">
+    &larr; Zurück zur Übersicht
+  </a>
+</div>
+
+<div class="row g-4">
+
+  <!-- Stammdaten -->
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="card-title mb-0">Stammdaten</h5>
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4">Anzeigename</dt>
+          <dd class="col-sm-8">{{ user.display_name }}</dd>
+
+          <dt class="col-sm-4">E-Mail</dt>
+          <dd class="col-sm-8">{{ user.email }}</dd>
+
+          <dt class="col-sm-4">Rolle</dt>
+          <dd class="col-sm-8">
+            {% if user.is_admin %}
+            <span class="badge bg-danger">Admin</span>
+            {% else %}
+            <span class="badge bg-secondary">User</span>
+            {% endif %}
+          </dd>
+
+          <dt class="col-sm-4">Status</dt>
+          <dd class="col-sm-8">
+            {% if user.is_approved %}
+            <span class="badge bg-success">Aktiv</span>
+            {% else %}
+            <span class="badge bg-warning text-dark">Ausstehend</span>
+            {% endif %}
+          </dd>
+
+          <dt class="col-sm-4">Registriert</dt>
+          <dd class="col-sm-8">{{ user.created_at.strftime('%d.%m.%Y %H:%M') }}</dd>
+
+          <dt class="col-sm-4">Freigeschaltet</dt>
+          <dd class="col-sm-8">
+            {% if user.approved_at %}
+            {{ user.approved_at.strftime('%d.%m.%Y %H:%M') }}
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Integrationen -->
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h5 class="card-title mb-0">Integrationen</h5>
+      </div>
+      <div class="card-body">
+        {% if connectors %}
+        <ul class="list-group list-group-flush">
+          {% for connector in connectors %}
+          <li class="list-group-item d-flex align-items-center gap-2">
+            <span class="badge bg-primary">{{ connector.provider_type }}</span>
+            <span class="text-muted small">verbunden</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted mb-0">Keine Integrationen verbunden.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Aktionen -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">Aktionen</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+
+          <!-- Sperren / Entsperren -->
+          <div class="col-12 col-md-4">
+            <div class="card border-secondary h-100">
+              <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Konto-Status</h6>
+                {% if user.is_approved %}
+                <form method="post" action="{{ url_for('admin.suspend_user', user_id=user.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-warning btn-sm">Sperren</button>
+                </form>
+                {% else %}
+                <form method="post" action="{{ url_for('admin.unsuspend_user', user_id=user.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-success btn-sm">Entsperren</button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Passwort-Reset -->
+          <div class="col-12 col-md-4">
+            <div class="card border-secondary h-100">
+              <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Passwort zurücksetzen</h6>
+                <form method="post" action="{{ url_for('admin.reset_password', user_id=user.id) }}" class="mt-3">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="mb-2">
+                    <label class="form-label fw-semibold">Neues Passwort setzen</label>
+                    <input type="password" name="new_password" class="form-control" minlength="8" required placeholder="Neues Passwort (min. 8 Zeichen)">
+                  </div>
+                  <button type="submit" class="btn btn-outline-warning btn-sm">Passwort zurücksetzen</button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Löschen -->
+          <div class="col-12 col-md-4">
+            <div class="card border-danger h-100">
+              <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-danger">Konto löschen</h6>
+                {% if has_challenges %}
+                <p class="small text-muted mb-2">Nicht möglich: Benutzer hat Challenges erstellt.</p>
+                <button type="button" class="btn btn-danger btn-sm w-100" disabled>Löschen</button>
+                {% else %}
+                <p class="small text-muted mb-2">Diese Aktion ist unwiderruflich.</p>
+                <button type="button" class="btn btn-danger btn-sm w-100"
+                        data-bs-toggle="modal" data-bs-target="#deleteUserModal">
+                  Löschen
+                </button>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Delete Confirmation Modal -->
+{% if not has_challenges %}
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteUserModalLabel">User löschen</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-danger fw-bold">Diese Aktion ist unwiderruflich!</p>
+        <p>Alle Aktivitäten, Verbindungen und Daten von <strong>{{ user.email }}</strong> werden gelöscht.</p>
+        <p>Zur Bestätigung bitte die E-Mail-Adresse des Users eingeben:</p>
+        <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" id="deleteUserForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <input type="email" name="confirm_email" id="confirmEmail" class="form-control"
+                   placeholder="{{ user.email }}" autocomplete="off" required>
+          </div>
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+            <button type="submit" class="btn btn-danger" id="confirmDeleteBtn" disabled>Endgültig löschen</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('confirmEmail').addEventListener('input', function() {
+  var expected = {{ user.email | tojson }};
+  document.getElementById('confirmDeleteBtn').disabled = (this.value !== expected);
+});
+</script>
+{% endif %}
+
+{% endblock %}
