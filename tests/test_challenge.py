@@ -356,3 +356,83 @@ def test_sick_week_submit_future_rejected(client, db):
         db.select(SickWeek).where(SickWeek.user_id == participant.id)
     ).scalars().all()
     assert len(count) == 0
+
+
+def test_sick_week_submit_von_bis_single_week(client, db):
+    """von/bis innerhalb einer Woche: ein SickWeek-Eintrag mit korrektem sick_days."""
+    admin = _create_and_login(client, db, email="admin_vb1@test.com", is_admin=True)
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    challenge = Challenge(
+        name="VonBis Test",
+        start_date=monday - timedelta(weeks=4),
+        end_date=monday + timedelta(weeks=4),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=admin.id,
+    )
+    db.session.add(challenge)
+    db.session.commit()
+    client.post("/auth/logout")
+
+    participant = _create_participant(db, challenge.id, email="p_vb1@test.com")
+    client.post("/auth/login", data={"email": "p_vb1@test.com", "password": "pass123"})
+
+    # Di bis Do der aktuellen Woche = 3 Tage
+    sick_from = monday + timedelta(days=1)
+    sick_to = monday + timedelta(days=3)
+    resp = client.post(
+        "/challenge-activities/sick-week",
+        data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    rows = db.session.execute(
+        db.select(SickWeek).where(SickWeek.user_id == participant.id)
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].week_start == monday
+    assert rows[0].sick_days == 3
+
+
+def test_sick_week_submit_von_bis_two_weeks(client, db):
+    """von/bis über Wochengrenze: zwei separate SickWeek-Einträge."""
+    admin = _create_and_login(client, db, email="admin_vb2@test.com", is_admin=True)
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    prev_monday = monday - timedelta(weeks=1)
+    challenge = Challenge(
+        name="VonBis Zwei Wochen",
+        start_date=prev_monday - timedelta(weeks=2),
+        end_date=monday + timedelta(weeks=4),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=admin.id,
+    )
+    db.session.add(challenge)
+    db.session.commit()
+    client.post("/auth/logout")
+
+    participant = _create_participant(db, challenge.id, email="p_vb2@test.com")
+    client.post("/auth/login", data={"email": "p_vb2@test.com", "password": "pass123"})
+
+    # Do der Vorwoche bis Di dieser Woche = 3 + 2 = 5 Tage über 2 Wochen
+    sick_from = prev_monday + timedelta(days=3)  # Donnerstag Vorwoche
+    sick_to = monday + timedelta(days=1)         # Dienstag diese Woche
+    client.post(
+        "/challenge-activities/sick-week",
+        data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
+    )
+
+    rows = db.session.execute(
+        db.select(SickWeek).where(
+            SickWeek.user_id == participant.id,
+            SickWeek.challenge_id == challenge.id,
+        ).order_by(SickWeek.week_start)
+    ).scalars().all()
+    assert len(rows) == 2
+    assert rows[0].week_start == prev_monday
+    assert rows[0].sick_days == 4   # Do, Fr, Sa, So
+    assert rows[1].week_start == monday
+    assert rows[1].sick_days == 2   # Mo, Di

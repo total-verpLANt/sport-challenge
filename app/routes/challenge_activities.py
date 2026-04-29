@@ -219,6 +219,17 @@ def my_week():
     )
 
 
+def _sick_days_per_week(sick_from: date, sick_to: date) -> dict[date, int]:
+    """Return {monday: sick_day_count} for each calendar week in the range."""
+    result: dict[date, int] = {}
+    current = sick_from
+    while current <= sick_to:
+        monday = current - timedelta(days=current.weekday())
+        result[monday] = result.get(monday, 0) + 1
+        current += timedelta(days=1)
+    return result
+
+
 @challenge_activities_bp.route("/sick-week", methods=["POST"])
 @login_required
 def sick_week_submit():
@@ -227,28 +238,66 @@ def sick_week_submit():
         flash("Du nimmst aktuell an keiner Challenge teil.")
         return redirect(url_for("challenges.index"))
 
-    # Determine the target Monday: week_date (from log form) takes precedence over offset
-    week_date_raw = request.form.get("week_date", "").strip()
-    from_log = bool(week_date_raw)
-    if from_log:
+    # Path A: von/bis from log form
+    sick_from_raw = request.form.get("sick_from", "").strip()
+    if sick_from_raw:
+        sick_to_raw = request.form.get("sick_to", "").strip()
         try:
-            ref_date = date.fromisoformat(week_date_raw)
+            sick_from = date.fromisoformat(sick_from_raw)
+            sick_to = date.fromisoformat(sick_to_raw)
         except ValueError:
-            flash("Ungültiges Datum für die Krankmeldung.")
+            flash("Ungültige Datumsangabe.")
             return redirect(url_for("challenge_activities.log_form"))
-        monday = ref_date - timedelta(days=ref_date.weekday())
-        if ref_date > date.today():
-            flash("Krankmeldungen für zukünftige Wochen sind nicht möglich.")
+
+        today = date.today()
+        if sick_from > sick_to:
+            flash("Das Von-Datum muss vor oder gleich dem Bis-Datum liegen.")
             return redirect(url_for("challenge_activities.log_form"))
-    else:
-        try:
-            offset = int(request.form.get("offset", 0))
-        except (TypeError, ValueError):
-            offset = 0
-        if offset > 0:
-            flash("Krankmeldungen für zukünftige Wochen sind nicht möglich.")
-            return redirect(url_for("challenge_activities.my_week", offset=offset))
-        monday, _ = _get_week_bounds(offset)
+        if sick_to > today:
+            flash("Krankmeldungen für zukünftige Tage sind nicht möglich.")
+            return redirect(url_for("challenge_activities.log_form"))
+
+        challenge = participation.challenge
+        weeks = _sick_days_per_week(sick_from, sick_to)
+        saved = []
+        for monday, days_count in weeks.items():
+            days_count = min(days_count, 7)
+            if monday > challenge.end_date or (monday + timedelta(days=6)) < challenge.start_date:
+                continue
+            existing = db.session.execute(
+                db.select(SickWeek).where(
+                    SickWeek.user_id == current_user.id,
+                    SickWeek.challenge_id == participation.challenge_id,
+                    SickWeek.week_start == monday,
+                )
+            ).scalar_one_or_none()
+            if existing:
+                existing.sick_days = days_count
+            else:
+                db.session.add(SickWeek(
+                    user_id=current_user.id,
+                    challenge_id=participation.challenge_id,
+                    week_start=monday,
+                    sick_days=days_count,
+                ))
+            saved.append(f"KW ab {monday.strftime('%d.%m.')} ({days_count} Tag(e))")
+
+        db.session.commit()
+        if saved:
+            flash("Krankmeldung eingetragen: " + ", ".join(saved) + ".")
+        else:
+            flash("Keine Woche innerhalb der Challenge-Periode gefunden.")
+        return redirect(url_for("challenge_activities.log_form"))
+
+    # Path B: offset + sick_days from my_week
+    try:
+        offset = int(request.form.get("offset", 0))
+    except (TypeError, ValueError):
+        offset = 0
+    if offset > 0:
+        flash("Krankmeldungen für zukünftige Wochen sind nicht möglich.")
+        return redirect(url_for("challenge_activities.my_week", offset=offset))
+    monday, _ = _get_week_bounds(offset)
 
     try:
         sick_days = int(request.form.get("sick_days", 0))
@@ -256,14 +305,12 @@ def sick_week_submit():
             raise ValueError
     except (TypeError, ValueError):
         flash("Bitte 1–7 Krankentage angeben.")
-        return redirect(url_for("challenge_activities.log_form") if from_log
-                        else url_for("challenge_activities.my_week", offset=offset))
+        return redirect(url_for("challenge_activities.my_week", offset=offset))
 
     challenge = participation.challenge
     if monday > challenge.end_date or (monday + timedelta(days=6)) < challenge.start_date:
         flash("Diese Woche liegt außerhalb der Challenge-Periode.")
-        return redirect(url_for("challenge_activities.log_form") if from_log
-                        else url_for("challenge_activities.my_week", offset=offset))
+        return redirect(url_for("challenge_activities.my_week", offset=offset))
 
     existing = db.session.execute(
         db.select(SickWeek).where(
@@ -287,8 +334,7 @@ def sick_week_submit():
         db.session.commit()
         flash(f"Krankmeldung eingetragen: {sick_days} Tag(e) für KW ab {monday.strftime('%d.%m.%Y')}.")
 
-    return redirect(url_for("challenge_activities.log_form") if from_log
-                   else url_for("challenge_activities.my_week", offset=offset))
+    return redirect(url_for("challenge_activities.my_week", offset=offset))
 
 
 @challenge_activities_bp.route("/import", methods=["GET"])
