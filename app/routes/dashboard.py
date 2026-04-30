@@ -181,7 +181,7 @@ def feed():
             "like_count": len(a.likes),
             "media": [
                 {
-                    "file_path": m.file_path,
+                    "url": url_for('static', filename=m.file_path),
                     "media_type": m.media_type,
                     "original_filename": m.original_filename,
                 }

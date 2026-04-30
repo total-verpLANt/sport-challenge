@@ -184,14 +184,13 @@
     ? GLightbox({ selector: '.glightbox', touchNavigation: true })
     : null;
 
-  const csrfToken = document.querySelector('[data-csrf]')?.dataset?.csrf
-    || document.querySelector('.like-btn')?.dataset?.csrf || '';
-
-  // Like-Toggle
-  document.querySelectorAll('.like-btn').forEach(function(btn) {
+  function attachLikeHandler(btn) {
     btn.addEventListener('click', function() {
+      if (this.disabled) return;
+      this.disabled = true;
       const activityId = this.dataset.activityId;
       const csrf = this.dataset.csrf;
+      const self = this;
       fetch('/dashboard/activities/' + activityId + '/like', {
         method: 'POST',
         headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
@@ -199,21 +198,25 @@
       })
       .then(r => r.json())
       .then(data => {
-        const countEl = this.querySelector('.like-count');
+        const countEl = self.querySelector('.like-count');
         if (countEl) countEl.textContent = data.count;
         if (data.liked) {
-          this.classList.remove('btn-outline-danger');
-          this.classList.add('btn-danger');
-          this.dataset.liked = 'true';
+          self.classList.remove('btn-outline-danger');
+          self.classList.add('btn-danger');
+          self.dataset.liked = 'true';
         } else {
-          this.classList.remove('btn-danger');
-          this.classList.add('btn-outline-danger');
-          this.dataset.liked = 'false';
+          self.classList.remove('btn-danger');
+          self.classList.add('btn-outline-danger');
+          self.dataset.liked = 'false';
         }
       })
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => { self.disabled = false; });
     });
-  });
+  }
+
+  // Initial
+  document.querySelectorAll('.like-btn').forEach(attachLikeHandler);
 
   // Mehr laden
   const loadMoreBtn = document.getElementById('load-more-btn');
@@ -262,7 +265,7 @@
             const mediaWrapper = document.createElement('div');
             mediaWrapper.className = 'd-flex flex-wrap gap-2 mb-2';
             a.media.forEach(function(m) {
-              const url = '/static/' + m.file_path;
+              const url = m.url;
               let el;
               if (m.media_type === 'video') {
                 el = document.createElement('video');
@@ -271,11 +274,17 @@
                 el.className = 'rounded';
                 el.style.cssText = 'max-height:180px;max-width:240px;object-fit:cover';
               } else {
-                el = document.createElement('img');
-                el.src = url;
-                el.alt = m.original_filename;
-                el.className = 'img-thumbnail';
-                el.style.cssText = 'max-height:180px;max-width:240px;object-fit:cover';
+                const anchor = document.createElement('a');
+                anchor.href = url;
+                anchor.className = 'glightbox';
+                anchor.dataset.gallery = 'feed-' + a.id;
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = m.original_filename;
+                img.className = 'img-thumbnail';
+                img.style.cssText = 'max-height:180px;max-width:240px;object-fit:cover';
+                anchor.appendChild(img);
+                el = anchor;
               }
               mediaWrapper.appendChild(el);
             });
@@ -285,28 +294,7 @@
           }
 
           // Like-Handler für dynamisch erstellten Button
-          card.querySelector('.like-btn').addEventListener('click', function() {
-            const aid = this.dataset.activityId;
-            const tok = this.dataset.csrf;
-            fetch('/dashboard/activities/' + aid + '/like', {
-              method: 'POST',
-              headers: { 'X-CSRFToken': tok, 'Content-Type': 'application/json' },
-              credentials: 'same-origin',
-            })
-            .then(r => r.json())
-            .then(d => {
-              const c = this.querySelector('.like-count');
-              if (c) c.textContent = d.count;
-              if (d.liked) {
-                this.classList.remove('btn-outline-danger');
-                this.classList.add('btn-danger');
-              } else {
-                this.classList.remove('btn-danger');
-                this.classList.add('btn-outline-danger');
-              }
-            })
-            .catch(console.error);
-          });
+          attachLikeHandler(card.querySelector('.like-btn'));
 
           feed.appendChild(card);
         });
