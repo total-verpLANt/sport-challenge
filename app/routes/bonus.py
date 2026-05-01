@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -9,7 +9,7 @@ from app.models.bonus import BonusChallenge, BonusChallengeEntry
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.user import User
 from app.utils.decorators import admin_required
-from app.utils.uploads import delete_upload, get_media_type, save_upload
+from app.utils.uploads import delete_upload, extract_video_recorded_at, get_media_type, save_upload
 
 bonus_bp = Blueprint("bonus", __name__, template_folder="../templates")
 
@@ -70,6 +70,7 @@ def index():
                 "display_name": user.display_name if user else "Unbekannt",
                 "time_seconds": entry.time_seconds,
                 "time_formatted": format_time(entry.time_seconds),
+                "recorded_at": entry.recorded_at,
             })
         rankings[bc.id] = ranked
 
@@ -208,14 +209,6 @@ def add_entry(bonus_id):
         flash("Du bist kein akzeptierter Teilnehmer dieser Challenge.")
         return redirect(url_for("bonus.index"))
 
-    # Einsendungen nur am exakten Datum der Bonus-Challenge erlaubt
-    today = datetime.now(timezone.utc).date()
-    if today != bonus_challenge.scheduled_date:
-        flash(
-            f"Einsendungen sind nur am {bonus_challenge.scheduled_date.strftime('%d.%m.%Y')} möglich."
-        )
-        return redirect(url_for("bonus.index"))
-
     time_str = request.form.get("time", "").strip()
     if not time_str:
         flash("Bitte eine Zeit eingeben.")
@@ -251,11 +244,14 @@ def add_entry(bonus_id):
         flash("Nur Videodateien sind erlaubt (MP4, MOV, WebM).")
         return redirect(url_for("bonus.index"))
 
+    recorded_at = extract_video_recorded_at(video_path)
+
     entry = BonusChallengeEntry(
         user_id=current_user.id,
         bonus_challenge_id=bonus_id,
         time_seconds=total_seconds,
         video_path=video_path,
+        recorded_at=recorded_at,
     )
     db.session.add(entry)
     try:

@@ -159,14 +159,15 @@ def test_bonus_requires_login(client, db):
     assert "/auth/login" in resp.headers["Location"]
 
 
-def test_entry_rejected_wrong_date(client, db):
+def test_entry_accepted_for_past_date(client, db):
+    """Einsendungen sind auch nach dem scheduled_date erlaubt (kein Datum-Limit)."""
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
     participant = _make_participant(db, challenge.id)
 
     bonus = BonusChallenge(
         challenge_id=challenge.id,
-        scheduled_date=date.today() - timedelta(days=1),  # gestern
+        scheduled_date=date.today() - timedelta(days=14),  # längst vergangen
         description="50 Squat Jumps",
     )
     db.session.add(bonus)
@@ -184,11 +185,9 @@ def test_entry_rejected_wrong_date(client, db):
     assert resp.status_code == 302
 
     entry = db.session.execute(
-        db.select(BonusChallengeEntry).where(
-            BonusChallengeEntry.user_id == participant.id,
-        )
+        db.select(BonusChallengeEntry).where(BonusChallengeEntry.user_id == participant.id)
     ).scalar_one_or_none()
-    assert entry is None  # Kein Eintrag erlaubt
+    assert entry is not None  # Nachträgliche Einsendung muss akzeptiert werden
 
 
 def test_entry_requires_video(client, db):

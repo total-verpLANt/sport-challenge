@@ -1,4 +1,7 @@
+import json
+import subprocess
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import current_app
@@ -44,6 +47,35 @@ def delete_upload(relative_path: str) -> None:
         return
     if filepath.exists():
         filepath.unlink()
+
+
+def extract_video_recorded_at(relative_path: str) -> datetime | None:
+    """Liest creation_time aus dem Video-Container via ffprobe. Gibt None zurück wenn nicht verfügbar."""
+    upload_dir = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
+    filename = Path(relative_path).name
+    filepath = upload_dir / filename
+    if not filepath.exists():
+        return None
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet",
+                "-print_format", "json",
+                "-show_entries", "format_tags=creation_time",
+                str(filepath),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        data = json.loads(result.stdout)
+        creation_time_str = data.get("format", {}).get("tags", {}).get("creation_time")
+        if not creation_time_str:
+            return None
+        # Format: "2026-04-27T14:35:00.000000Z"
+        return datetime.fromisoformat(creation_time_str.replace("Z", "+00:00"))
+    except Exception:
+        return None
 
 
 def delete_media_files(media_list) -> None:

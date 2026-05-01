@@ -54,6 +54,7 @@
                   <th scope="col" style="width: 3rem;">Platz</th>
                   <th scope="col">Name</th>
                   <th scope="col" style="width: 8rem;">Zeit</th>
+                  <th scope="col" style="width: 10rem;">Aufnahme</th>
                 </tr>
               </thead>
               <tbody>
@@ -72,6 +73,13 @@
                     {% endif %}
                   </td>
                   <td class="font-monospace">{{ rank_entry.time_formatted }}</td>
+                  <td class="text-muted small">
+                    {% if rank_entry.recorded_at %}
+                      {{ rank_entry.recorded_at.strftime('%d.%m.%Y %H:%M') }}
+                    {% else %}
+                      <span class="text-muted">–</span>
+                    {% endif %}
+                  </td>
                 </tr>
                 {% endfor %}
               </tbody>
