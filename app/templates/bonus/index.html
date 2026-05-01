@@ -24,7 +24,13 @@
         <div class="card-header d-flex justify-content-between align-items-center">
           <strong>{{ bc.description }}</strong>
           <div class="d-flex align-items-center gap-2">
-            <span class="text-muted small">{{ bc.scheduled_date.strftime('%d.%m.%Y') }}</span>
+            {% if bc.scheduled_date == today_date %}
+              <span class="badge bg-success">Heute – Einsendung möglich!</span>
+            {% elif bc.scheduled_date > today_date %}
+              <span class="badge bg-secondary">{{ bc.scheduled_date.strftime('%d.%m.%Y') }}</span>
+            {% else %}
+              <span class="badge bg-light text-muted border">{{ bc.scheduled_date.strftime('%d.%m.%Y') }} (abgelaufen)</span>
+            {% endif %}
             {% if current_user.is_admin %}
             <form method="post"
                   action="{{ url_for('bonus.delete_bonus_challenge', bonus_id=bc.id) }}"
@@ -77,6 +83,7 @@
 
           {% if is_participant and not user_entries[bc.id] %}
           <form method="post" action="{{ url_for('bonus.add_entry', bonus_id=bc.id) }}"
+                enctype="multipart/form-data"
                 class="row g-2 align-items-end">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="col-12 col-sm-auto">
@@ -89,7 +96,15 @@
                      style="max-width: 120px;"
                      required>
             </div>
-            <div class="col-auto">
+            <div class="col-12 col-sm-auto">
+              <label for="video_{{ bc.id }}" class="form-label mb-1">Beweisvideo</label>
+              <input type="file" class="form-control form-control-sm"
+                     id="video_{{ bc.id }}" name="video"
+                     accept="video/mp4,video/quicktime,video/webm"
+                     required>
+              <div class="form-text text-muted">MP4/MOV/WebM · max. 50 MB · kein Vorspulen (außer mit Timer im Bild)</div>
+            </div>
+            <div class="col-auto align-self-start mt-4">
               <button type="submit" class="btn btn-primary btn-sm">Zeit eintragen</button>
             </div>
           </form>
@@ -108,5 +123,46 @@
     </div>
     {% endfor %}
   </div>
+
+  {% if overall_ranking %}
+  <div class="card mt-4 border-warning">
+    <div class="card-header bg-warning text-dark fw-bold">
+      🏆 Wanderpokal – Gesamtwertung (beste Einzelzeit aller Runden)
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col" style="width: 3rem;">Platz</th>
+              <th scope="col">Name</th>
+              <th scope="col" style="width: 8rem;">Beste Zeit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in overall_ranking %}
+            <tr {% if r.user_id == current_user.id %}class="table-primary"{% endif %}>
+              <td>
+                {% if loop.index == 1 %}🥇
+                {% elif loop.index == 2 %}🥈
+                {% elif loop.index == 3 %}🥉
+                {% else %}{{ loop.index }}{% endif %}
+              </td>
+              <td>
+                {{ r.display_name }}
+                {% if r.user_id == current_user.id %}
+                  <span class="badge bg-primary ms-1">Du</span>
+                {% endif %}
+              </td>
+              <td class="font-monospace">{{ r.time_formatted }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
 {% endif %}
 {% endblock %}
