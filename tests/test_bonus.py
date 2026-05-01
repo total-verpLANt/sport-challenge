@@ -1,4 +1,5 @@
 """Integration tests for the Bonus Challenge routes."""
+import io
 from datetime import date, timedelta
 
 import pytest
@@ -34,6 +35,26 @@ def _create_challenge(db, creator_id):
     return challenge
 
 
+def _make_participant(db, challenge_id, email="participant@test.com", password="pass123"):
+    user = User(email=email, is_approved=True)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    participation = ChallengeParticipation(
+        user_id=user.id,
+        challenge_id=challenge_id,
+        status="accepted",
+        weekly_goal=3,
+    )
+    db.session.add(participation)
+    db.session.commit()
+    return user
+
+
+def _fake_video(filename="proof.mp4"):
+    return (io.BytesIO(b"fake video content"), filename)
+
+
 def test_admin_can_create_bonus_challenge(client, db):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
@@ -56,26 +77,11 @@ def test_admin_can_create_bonus_challenge(client, db):
     assert bonus.description == "50 Burpees"
 
 
-def test_submit_bonus_entry(client, db):
+def test_submit_bonus_entry(client, db, app):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
+    participant = _make_participant(db, challenge.id)
 
-    # Create an accepted participant
-    participant = User(email="participant@test.com", is_approved=True)
-    participant.set_password("pass123")
-    db.session.add(participant)
-    db.session.commit()
-
-    participation = ChallengeParticipation(
-        user_id=participant.id,
-        challenge_id=challenge.id,
-        status="accepted",
-        weekly_goal=3,
-    )
-    db.session.add(participation)
-    db.session.commit()
-
-    # Create a bonus challenge
     bonus = BonusChallenge(
         challenge_id=challenge.id,
         scheduled_date=date.today(),
@@ -84,13 +90,13 @@ def test_submit_bonus_entry(client, db):
     db.session.add(bonus)
     db.session.commit()
 
-    # Login as participant and submit
     client.post("/auth/logout")
     client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
 
     resp = client.post(
         f"/bonus/{bonus.id}/entry",
-        data={"time": "2:35"},
+        data={"time": "2:35", "video": _fake_video()},
+        content_type="multipart/form-data",
         follow_redirects=False,
     )
     assert resp.status_code == 302
@@ -103,25 +109,13 @@ def test_submit_bonus_entry(client, db):
     ).scalar_one_or_none()
     assert entry is not None
     assert entry.time_seconds == 155  # 2*60 + 35
+    assert entry.video_path is not None
 
 
-def test_duplicate_entry_rejected(client, db):
+def test_duplicate_entry_rejected(client, db, app):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
-
-    participant = User(email="participant@test.com", is_approved=True)
-    participant.set_password("pass123")
-    db.session.add(participant)
-    db.session.commit()
-
-    participation = ChallengeParticipation(
-        user_id=participant.id,
-        challenge_id=challenge.id,
-        status="accepted",
-        weekly_goal=3,
-    )
-    db.session.add(participation)
-    db.session.commit()
+    participant = _make_participant(db, challenge.id)
 
     bonus = BonusChallenge(
         challenge_id=challenge.id,
@@ -131,19 +125,23 @@ def test_duplicate_entry_rejected(client, db):
     db.session.add(bonus)
     db.session.commit()
 
-    # Login as participant
     client.post("/auth/logout")
     client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
 
     # First entry
-    client.post(f"/bonus/{bonus.id}/entry", data={"time": "3:00"})
-    # Second entry (duplicate) — should be handled gracefully (IntegrityError)
+    client.post(
+        f"/bonus/{bonus.id}/entry",
+        data={"time": "3:00", "video": _fake_video("first.mp4")},
+        content_type="multipart/form-data",
+    )
+    # Second entry (duplicate) — should be handled gracefully
     resp = client.post(
         f"/bonus/{bonus.id}/entry",
-        data={"time": "2:50"},
+        data={"time": "2:50", "video": _fake_video("second.mp4")},
+        content_type="multipart/form-data",
         follow_redirects=False,
     )
-    assert resp.status_code == 302  # Redirect with flash, no 500
+    assert resp.status_code == 302
 
     entries = db.session.execute(
         db.select(BonusChallengeEntry).where(
@@ -158,3 +156,115 @@ def test_bonus_requires_login(client, db):
     resp = client.get("/bonus/", follow_redirects=False)
     assert resp.status_code == 302
     assert "/auth/login" in resp.headers["Location"]
+
+
+def test_entry_rejected_wrong_date(client, db):
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+    participant = _make_participant(db, challenge.id)
+
+    bonus = BonusChallenge(
+        challenge_id=challenge.id,
+        scheduled_date=date.today() - timedelta(days=1),  # gestern
+        description="50 Squat Jumps",
+    )
+    db.session.add(bonus)
+    db.session.commit()
+
+    client.post("/auth/logout")
+    client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
+
+    resp = client.post(
+        f"/bonus/{bonus.id}/entry",
+        data={"time": "2:35", "video": _fake_video()},
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    entry = db.session.execute(
+        db.select(BonusChallengeEntry).where(
+            BonusChallengeEntry.user_id == participant.id,
+        )
+    ).scalar_one_or_none()
+    assert entry is None  # Kein Eintrag erlaubt
+
+
+def test_entry_requires_video(client, db):
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+    participant = _make_participant(db, challenge.id)
+
+    bonus = BonusChallenge(
+        challenge_id=challenge.id,
+        scheduled_date=date.today(),
+        description="50 Squat Jumps",
+    )
+    db.session.add(bonus)
+    db.session.commit()
+
+    client.post("/auth/logout")
+    client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
+
+    resp = client.post(
+        f"/bonus/{bonus.id}/entry",
+        data={"time": "2:35"},  # kein video
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    entry = db.session.execute(
+        db.select(BonusChallengeEntry).where(BonusChallengeEntry.user_id == participant.id)
+    ).scalar_one_or_none()
+    assert entry is None
+
+
+def test_entry_rejects_image_file(client, db):
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+    participant = _make_participant(db, challenge.id)
+
+    bonus = BonusChallenge(
+        challenge_id=challenge.id,
+        scheduled_date=date.today(),
+        description="50 Squat Jumps",
+    )
+    db.session.add(bonus)
+    db.session.commit()
+
+    client.post("/auth/logout")
+    client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
+
+    resp = client.post(
+        f"/bonus/{bonus.id}/entry",
+        data={"time": "2:35", "video": (io.BytesIO(b"fake image"), "photo.jpg")},
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    entry = db.session.execute(
+        db.select(BonusChallengeEntry).where(BonusChallengeEntry.user_id == participant.id)
+    ).scalar_one_or_none()
+    assert entry is None
+
+
+def test_overall_ranking_best_time(client, db, app):
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+    participant = _make_participant(db, challenge.id)
+
+    # Zwei Bonus-Challenges: User hat 3:00 beim ersten, 2:00 beim zweiten
+    bc1 = BonusChallenge(challenge_id=challenge.id, scheduled_date=date.today() - timedelta(days=14), description="Runde 1")
+    bc2 = BonusChallenge(challenge_id=challenge.id, scheduled_date=date.today() - timedelta(days=7), description="Runde 2")
+    db.session.add_all([bc1, bc2])
+    db.session.commit()
+
+    db.session.add(BonusChallengeEntry(user_id=participant.id, bonus_challenge_id=bc1.id, time_seconds=180.0))
+    db.session.add(BonusChallengeEntry(user_id=participant.id, bonus_challenge_id=bc2.id, time_seconds=120.0))
+    db.session.commit()
+
+    resp = client.get("/bonus/")
+    assert resp.status_code == 200
+    # Beste Zeit 2:00 muss erscheinen, nicht 3:00
+    assert b"2:00" in resp.data
