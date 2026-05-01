@@ -1,4 +1,9 @@
-from flask import Flask, redirect, url_for
+import logging
+import time
+
+from flask import Flask, g, redirect, request, url_for
+from flask_login import current_user
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
 
@@ -6,6 +11,15 @@ from config import Config
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+    if not app.debug:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)-5s %(name)s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
 
     from app.extensions import csrf, db, limiter, login_manager, migrate, talisman
     db.init_app(app)
@@ -27,6 +41,25 @@ def create_app(config_class=Config):
         content_security_policy_nonce_in=["script-src"],
         force_https=False,
     )
+
+    @app.before_request
+    def _log_request_start():
+        g.request_start = time.monotonic()
+
+    @app.after_request
+    def _log_request(response):
+        duration_ms = int((time.monotonic() - g.get("request_start", time.monotonic())) * 1000)
+        user_id = current_user.id if current_user.is_authenticated else "anon"
+        app.logger.info(
+            "%s %s %s %d %dms user=%s",
+            request.remote_addr,
+            request.method,
+            request.path,
+            response.status_code,
+            duration_ms,
+            user_id,
+        )
+        return response
 
     from app.models.activity import Activity  # noqa: F401 – Alembic autogenerate
     from app.models.bonus import BonusChallenge, BonusChallengeEntry  # noqa: F401
