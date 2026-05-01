@@ -87,6 +87,29 @@ def index():
     if active_challenge:
         is_participant = _user_is_accepted_participant(active_challenge.id)
 
+    # Wanderpokal: beste Zeit pro User über alle Bonus-Challenges dieser Challenge
+    overall_ranking = []
+    if active_challenge and bonus_challenges:
+        all_entries = db.session.execute(
+            db.select(BonusChallengeEntry)
+            .join(BonusChallenge, BonusChallengeEntry.bonus_challenge_id == BonusChallenge.id)
+            .where(BonusChallenge.challenge_id == active_challenge.id)
+        ).scalars().all()
+
+        best_per_user: dict[int, float] = {}
+        for entry in all_entries:
+            if entry.user_id not in best_per_user or entry.time_seconds < best_per_user[entry.user_id]:
+                best_per_user[entry.user_id] = entry.time_seconds
+
+        for user_id, best_time in sorted(best_per_user.items(), key=lambda x: x[1]):
+            user = db.session.get(User, user_id)
+            overall_ranking.append({
+                "user_id": user_id,
+                "display_name": user.display_name if user else "Unbekannt",
+                "time_seconds": best_time,
+                "time_formatted": format_time(best_time),
+            })
+
     return render_template(
         "bonus/index.html",
         active_challenge=active_challenge,
@@ -94,6 +117,8 @@ def index():
         rankings=rankings,
         user_entries=user_entries,
         is_participant=is_participant,
+        overall_ranking=overall_ranking,
+        today_date=date.today(),
     )
 
 
@@ -158,7 +183,11 @@ def delete_bonus_challenge(bonus_id: int):
     bonus = db.session.get(BonusChallenge, bonus_id)
     if bonus is None:
         abort(404)
-    # Cascade: Entries zuerst löschen (kein DB-ondelete CASCADE)
+    # Video-Dateien vom Disk löschen bevor Entries aus DB entfernt werden
+    entries = BonusChallengeEntry.query.filter_by(bonus_challenge_id=bonus.id).all()
+    for entry in entries:
+        if entry.video_path:
+            delete_upload(entry.video_path)
     BonusChallengeEntry.query.filter_by(bonus_challenge_id=bonus.id).delete()
     db.session.delete(bonus)
     db.session.commit()
