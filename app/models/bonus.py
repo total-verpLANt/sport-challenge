@@ -21,4 +21,5 @@ class BonusChallengeEntry(db.Model):
     bonus_challenge_id: Mapped[int] = mapped_column(ForeignKey("bonus_challenges.id"), nullable=False)
     time_seconds: Mapped[float] = mapped_column(Float, nullable=False)
     video_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
