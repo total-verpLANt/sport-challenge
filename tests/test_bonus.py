@@ -1,5 +1,6 @@
 """Integration tests for the Bonus Challenge routes."""
 import io
+import os
 from datetime import date, timedelta
 
 import pytest
@@ -219,7 +220,7 @@ def test_entry_requires_video(client, db):
     assert entry is None
 
 
-def test_entry_rejects_image_file(client, db):
+def test_entry_rejects_image_file(client, db, app):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
     participant = _make_participant(db, challenge.id)
@@ -235,6 +236,10 @@ def test_entry_rejects_image_file(client, db):
     client.post("/auth/logout")
     client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
 
+    upload_folder = app.config["UPLOAD_FOLDER"]
+    os.makedirs(upload_folder, exist_ok=True)
+    files_before = set(os.listdir(upload_folder))
+
     resp = client.post(
         f"/bonus/{bonus.id}/entry",
         data={"time": "2:35", "video": (io.BytesIO(b"fake image"), "photo.jpg")},
@@ -247,6 +252,10 @@ def test_entry_rejects_image_file(client, db):
         db.select(BonusChallengeEntry).where(BonusChallengeEntry.user_id == participant.id)
     ).scalar_one_or_none()
     assert entry is None
+
+    # Kein Orphan auf Disk – delete_upload() muss das .jpg wieder entfernt haben
+    files_after = set(os.listdir(upload_folder))
+    assert files_after == files_before
 
 
 def test_overall_ranking_best_time(client, db, app):

@@ -35,9 +35,11 @@ def save_upload(file) -> str | None:
 def delete_upload(relative_path: str) -> None:
     if not relative_path:
         return
-    static = Path(current_app.static_folder).resolve()
-    filepath = (static / relative_path).resolve()
-    if not filepath.is_relative_to(static):
+    upload_dir = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
+    # .name extrahiert nur den Dateinamen – verhindert Path-Traversal via "uploads/../.."
+    filename = Path(relative_path).name
+    filepath = (upload_dir / filename).resolve()
+    if not filepath.is_relative_to(upload_dir):
         current_app.logger.warning("delete_upload: path traversal blocked: %s", relative_path)
         return
     if filepath.exists():
