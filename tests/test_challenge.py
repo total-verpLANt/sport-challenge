@@ -99,6 +99,87 @@ def test_invite_user_to_challenge(client, db):
     assert participation.status == "invited"
 
 
+def test_invite_unapproved_user_rejected_detail(client, db):
+    """Inviting unapproved user via detail page should be rejected."""
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+
+    # Create an unapproved user
+    unapproved = User(email="unapproved@test.com", is_approved=False)
+    unapproved.set_password("pass123")
+    db.session.add(unapproved)
+    db.session.commit()
+
+    # Attempt to invite the unapproved user via detail page
+    resp = client.post(
+        f"/challenges/{challenge.public_id}/invite",
+        data={"user_ids": [unapproved.id]},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    # Verify the unapproved user was NOT invited
+    participation = db.session.execute(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.user_id == unapproved.id,
+            ChallengeParticipation.challenge_id == challenge.id,
+        )
+    ).scalar_one_or_none()
+    assert participation is None
+
+
+def test_create_challenge_with_unapproved_users_rejected(client, db):
+    """Creating challenge with unapproved users should skip them."""
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+
+    # Create one approved and one unapproved user
+    approved = User(email="approved@test.com", is_approved=True)
+    approved.set_password("pass123")
+    unapproved = User(email="unapproved@test.com", is_approved=False)
+    unapproved.set_password("pass123")
+    db.session.add_all([approved, unapproved])
+    db.session.commit()
+
+    today = date.today()
+    resp = client.post(
+        "/challenges/create",
+        data={
+            "name": "Challenge with Mixed Approval",
+            "start_date": (today + timedelta(days=1)).isoformat(),
+            "end_date": (today + timedelta(days=30)).isoformat(),
+            "penalty_per_miss": "5",
+            "bailout_fee": "25",
+            "invite_users": [approved.id, unapproved.id],
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    # Verify challenge was created
+    challenge = db.session.execute(
+        db.select(Challenge).order_by(Challenge.id.desc()).limit(1)
+    ).scalar_one()
+
+    # Verify only the approved user was invited
+    participations = db.session.execute(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.challenge_id == challenge.id
+        )
+    ).scalars().all()
+    assert len(participations) == 1
+    assert participations[0].user_id == approved.id
+    assert participations[0].status == "invited"
+
+    # Verify unapproved user was skipped
+    unapproved_participation = db.session.execute(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.user_id == unapproved.id,
+            ChallengeParticipation.challenge_id == challenge.id,
+        )
+    ).scalar_one_or_none()
+    assert unapproved_participation is None
+
+
 def test_accept_invitation(client, db):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)

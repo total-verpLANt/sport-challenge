@@ -241,6 +241,10 @@ def invite(public_id):
             skipped_users.append(f"User {user_id} nicht gefunden")
             continue
 
+        if not user.is_approved:
+            skipped_users.append(f"{user.display_name} (nicht freigeschaltet)")
+            continue
+
         existing = db.session.execute(
             db.select(ChallengeParticipation).where(
                 ChallengeParticipation.user_id == user_id,
