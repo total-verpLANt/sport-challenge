@@ -4,6 +4,7 @@ import os
 from datetime import date, timedelta
 
 import pytest
+from werkzeug.datastructures import MultiDict
 
 from app.models.bonus import BonusChallenge, BonusChallengeEntry
 from app.models.challenge import Challenge, ChallengeParticipation
@@ -60,22 +61,24 @@ def test_admin_can_create_bonus_challenge(client, db):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
 
-    scheduled_date = date.today() + timedelta(days=5)
+    d1 = date.today() + timedelta(days=5)
+    d2 = date.today() + timedelta(days=19)
     resp = client.post(
         "/bonus/create",
-        data={
-            "scheduled_date": scheduled_date.isoformat(),
-            "description": "50 Burpees",
-        },
+        data=MultiDict([
+            ("description", "50 Burpees"),
+            ("scheduled_date", d1.isoformat()),
+            ("scheduled_date", d2.isoformat()),
+        ]),
         follow_redirects=False,
     )
     assert resp.status_code == 302
 
-    bonus = db.session.execute(
+    bonuses = db.session.execute(
         db.select(BonusChallenge).where(BonusChallenge.challenge_id == challenge.id)
-    ).scalar_one_or_none()
-    assert bonus is not None
-    assert bonus.description == "50 Burpees"
+    ).scalars().all()
+    assert len(bonuses) == 2
+    assert all(b.description == "50 Burpees" for b in bonuses)
 
 
 def test_submit_bonus_entry(client, db, app):

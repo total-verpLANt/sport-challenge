@@ -141,21 +141,21 @@ def create_post():
         flash("Es gibt noch keine aktive Challenge.")
         return redirect(url_for("bonus.index"))
 
-    scheduled_date_str = request.form.get("scheduled_date", "").strip()
     description = request.form.get("description", "").strip()
+    date_strings = [s.strip() for s in request.form.getlist("scheduled_date") if s.strip()]
 
     errors = []
-    if not scheduled_date_str:
-        errors.append("Datum darf nicht leer sein.")
     if not description:
         errors.append("Beschreibung darf nicht leer sein.")
+    if not date_strings:
+        errors.append("Mindestens ein Datum muss angegeben werden.")
 
-    scheduled_date_val = None
-    if scheduled_date_str:
+    parsed_dates = []
+    for ds in date_strings:
         try:
-            scheduled_date_val = date.fromisoformat(scheduled_date_str)
+            parsed_dates.append(date.fromisoformat(ds))
         except ValueError:
-            errors.append("Ungültiges Datum.")
+            errors.append(f"Ungültiges Datum: {ds}")
 
     if errors:
         for error in errors:
@@ -166,15 +166,16 @@ def create_post():
             form_data=request.form,
         )
 
-    bonus_challenge = BonusChallenge(
-        challenge_id=active_challenge.id,
-        scheduled_date=scheduled_date_val,
-        description=description,
-    )
-    db.session.add(bonus_challenge)
+    for d in parsed_dates:
+        db.session.add(BonusChallenge(
+            challenge_id=active_challenge.id,
+            scheduled_date=d,
+            description=description,
+        ))
     db.session.commit()
 
-    flash(f"Bonus-Challenge '{description}' am {scheduled_date_val.strftime('%d.%m.%Y')} wurde erstellt.")
+    dates_str = ", ".join(d.strftime("%d.%m.%Y") for d in sorted(parsed_dates))
+    flash(f"Bonus-Challenge '{description}' wurde für {len(parsed_dates)} Datum/Daten erstellt: {dates_str}")
     return redirect(url_for("bonus.index"))
 
 
