@@ -12,5 +12,6 @@ class Config:
     DEBUG = os.environ.get("FLASK_DEBUG", "0") == "1"
     STRAVA_CLIENT_ID: str = os.environ.get("STRAVA_CLIENT_ID", "")
     STRAVA_CLIENT_SECRET: str = os.environ.get("STRAVA_CLIENT_SECRET", "")
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app", "static", "uploads")
+    _default_upload_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app", "static", "uploads")
+    UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", _default_upload_folder)
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50 MB

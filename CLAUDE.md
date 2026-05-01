@@ -89,7 +89,7 @@ bd ready                              # nächste Issues (aktuell: keine offen)
 ```bash
 # venv neu aufbauen (bei Pfadproblemen nach Projektumzug)
 uv venv .venv --python 3.14 --clear
-uv pip install -r requirements.txt
+uv pip install -r requirements-dev.txt
 
 # Dev-Server starten
 SECRET_KEY=<dein-key> FLASK_DEBUG=1 .venv/bin/python run.py  # PFLICHT: ohne SECRET_KEY RuntimeError

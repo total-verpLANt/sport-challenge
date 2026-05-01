@@ -1,0 +1,40 @@
+# Venv und Caches
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Secrets und lokale Daten
+.env
+instance/
+logs/
+*.db
+app.db
+
+# Uploads (Volume)
+app/static/uploads/
+
+# Dev-Tools und CI
+.git/
+.github/
+.beads/
+.dolt/
+.serena/
+.playwright-mcp/
+.schrammns_workflow/
+.claude/
+.beads-credential-key
+
+# Testdaten und Screenshots
+tests/
+*.png
+*.jpeg
+*.webm
+dashboard-*.md
+playwright-report/
+test-results/
+
+# Dokumentation (nicht fürs Image)
+docs/
+CHANGELOG.md
