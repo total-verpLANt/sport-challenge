@@ -4,6 +4,18 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] – 2026-05-01
+
+### Neu
+- Bonus-Challenge: Video-Beweis-Upload (MP4, MOV, WebM, max. 50 MB) beim Zeiteintragen verpflichtend
+- Bonus-Challenge: Aufnahmedatum wird automatisch aus Video-Metadaten (ffprobe `creation_time`) ausgelesen und in der Rangliste angezeigt
+- Bonus-Challenge: Wanderpokal-Gesamtwertung – beste Einzelzeit pro Nutzer über alle Datums-Runden
+- Bonus-Challenge: Admin kann beim Erstellen mehrere Termine auf einmal eingeben (dynamische Datumsfelder)
+- Bonus-Challenge: Einsendungen jederzeit möglich (kein Datum-Limit), Vertrauen auf Ehrlichkeit
+
+### Behoben
+- `delete_upload()` verwendete `static_folder` statt `UPLOAD_FOLDER` – Video-Orphans blieben in Tests und potenziell auch in Produktionsumgebungen mit abweichendem Upload-Pfad zurück
+
 ## [0.9.0] – 2026-04-30
 
 ### Neu
