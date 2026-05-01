@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -9,6 +9,7 @@ from app.models.bonus import BonusChallenge, BonusChallengeEntry
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.user import User
 from app.utils.decorators import admin_required
+from app.utils.uploads import delete_upload, get_media_type, save_upload
 
 bonus_bp = Blueprint("bonus", __name__, template_folder="../templates")
 
@@ -178,6 +179,14 @@ def add_entry(bonus_id):
         flash("Du bist kein akzeptierter Teilnehmer dieser Challenge.")
         return redirect(url_for("bonus.index"))
 
+    # Einsendungen nur am exakten Datum der Bonus-Challenge erlaubt
+    today = datetime.now(timezone.utc).date()
+    if today != bonus_challenge.scheduled_date:
+        flash(
+            f"Einsendungen sind nur am {bonus_challenge.scheduled_date.strftime('%d.%m.%Y')} möglich."
+        )
+        return redirect(url_for("bonus.index"))
+
     time_str = request.form.get("time", "").strip()
     if not time_str:
         flash("Bitte eine Zeit eingeben.")
@@ -197,16 +206,34 @@ def add_entry(bonus_id):
         flash("Die Zeit muss größer als 0 sein.")
         return redirect(url_for("bonus.index"))
 
+    # Beweisvideo ist Pflicht
+    video_file = request.files.get("video")
+    if not video_file or not video_file.filename:
+        flash("Bitte ein Beweisvideo hochladen.")
+        return redirect(url_for("bonus.index"))
+
+    video_path = save_upload(video_file)
+    if video_path is None:
+        flash("Ungültiges Videoformat (erlaubt: MP4, MOV, WebM, max. 50 MB).")
+        return redirect(url_for("bonus.index"))
+
+    if get_media_type(video_file.filename) != "video":
+        delete_upload(video_path)
+        flash("Nur Videodateien sind erlaubt (MP4, MOV, WebM).")
+        return redirect(url_for("bonus.index"))
+
     entry = BonusChallengeEntry(
         user_id=current_user.id,
         bonus_challenge_id=bonus_id,
         time_seconds=total_seconds,
+        video_path=video_path,
     )
     db.session.add(entry)
     try:
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
+        delete_upload(video_path)
         flash("Du hast bereits eine Zeit für diese Bonus-Challenge eingetragen.")
         return redirect(url_for("bonus.index"))
 
