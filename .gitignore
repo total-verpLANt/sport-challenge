@@ -6,6 +6,7 @@
 
 # Projekt
 .env
+logs/
 __pycache__/
 *.pyc
 *.pyo

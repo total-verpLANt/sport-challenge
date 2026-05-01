@@ -1,11 +1,16 @@
 import logging
 import time
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from flask import Flask, g, redirect, request, url_for
 from flask_login import current_user
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
+
+_LOG_FORMAT = "%(asctime)s %(levelname)-5s %(name)s %(message)s"
+_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def create_app(config_class=Config):
@@ -17,9 +22,22 @@ def create_app(config_class=Config):
     if not app.debug:
         logging.basicConfig(
             level=logging.INFO,
-            format="%(asctime)s %(levelname)-5s %(name)s %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+            format=_LOG_FORMAT,
+            datefmt=_LOG_DATE_FORMAT,
         )
+
+    log_dir = Path(app.root_path).parent / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    file_handler = RotatingFileHandler(
+        log_dir / "access.log",
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
+    )
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATE_FORMAT))
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
 
     from app.extensions import csrf, db, limiter, login_manager, migrate, talisman
     db.init_app(app)
