@@ -103,19 +103,26 @@
 <div class="card mb-4">
   <div class="card-header"><strong>Benutzer einladen</strong></div>
   <div class="card-body">
-    <form method="post" action="{{ url_for('challenges.invite', public_id=challenge.public_id) }}" class="row g-2">
+    <form method="post" action="{{ url_for('challenges.invite', public_id=challenge.public_id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="col-12 col-md-8">
-        <select name="user_id" class="form-select" required>
-          <option value="" disabled selected>Benutzer auswählen…</option>
-          {% for user in uninvited_users %}
-          <option value="{{ user.id }}">{{ user.display_name }}</option>
-          {% endfor %}
-        </select>
+      <div class="mb-2">
+        <div class="form-check">
+          <input type="checkbox" id="detail-invite-select-all" class="form-check-input">
+          <label for="detail-invite-select-all" class="form-check-label small text-muted">Alle auswählen</label>
+        </div>
       </div>
-      <div class="col-12 col-md-4">
-        <button type="submit" class="btn btn-primary w-100">Einladen</button>
+      <div class="border rounded p-2 mb-3" style="max-height:250px;overflow-y:auto;">
+        {% for user in uninvited_users %}
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input detail-invite-checkbox"
+                 name="user_ids" value="{{ user.id }}" id="detail_invite_user_{{ user.id }}">
+          <label class="form-check-label" for="detail_invite_user_{{ user.id }}">
+            {{ user.display_name }}
+          </label>
+        </div>
+        {% endfor %}
       </div>
+      <button type="submit" class="btn btn-primary">Ausgewählte einladen</button>
     </form>
   </div>
 </div>
@@ -192,5 +199,9 @@
     </div>
   </div>
 </div>
+{% endif %}
+
+{% if current_user.is_admin and uninvited_users %}
+<script src="{{ url_for('static', filename='js/challenge-invite.js') }}"></script>
 {% endif %}
 {% endblock %}

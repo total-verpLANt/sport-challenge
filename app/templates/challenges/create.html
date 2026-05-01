@@ -49,10 +49,37 @@
       </div>
     </div>
 
+    {% if all_users %}
+    <div class="col-12">
+      <label class="form-label fw-semibold">Benutzer einladen (optional)</label>
+      <div class="mb-2">
+        <div class="form-check">
+          <input type="checkbox" id="invite-select-all" class="form-check-input">
+          <label for="invite-select-all" class="form-check-label small text-muted">Alle auswählen</label>
+        </div>
+      </div>
+      <div class="border rounded p-2" style="max-height:250px;overflow-y:auto;">
+        {% for user in all_users %}
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input invite-checkbox"
+                 name="invite_users" value="{{ user.id }}" id="invite_user_{{ user.id }}">
+          <label class="form-check-label" for="invite_user_{{ user.id }}">
+            {{ user.display_name }}
+          </label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="col-12 mt-3">
       <button type="submit" class="btn btn-primary">Challenge erstellen</button>
       <a href="{{ url_for('challenges.index') }}" class="btn btn-outline-secondary ms-2">Abbrechen</a>
     </div>
   </div>
 </form>
+
+{% if all_users %}
+<script src="{{ url_for('static', filename='js/challenge-invite.js') }}"></script>
+{% endif %}
 {% endblock %}

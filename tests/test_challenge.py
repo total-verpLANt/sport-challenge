@@ -84,7 +84,7 @@ def test_invite_user_to_challenge(client, db):
 
     resp = client.post(
         f"/challenges/{challenge.public_id}/invite",
-        data={"user_id": invitee.id},
+        data={"user_ids": [invitee.id]},
         follow_redirects=False,
     )
     assert resp.status_code == 302
@@ -436,3 +436,85 @@ def test_sick_week_submit_von_bis_two_weeks(client, db):
     assert rows[0].sick_days == 4   # Do, Fr, Sa, So
     assert rows[1].week_start == monday
     assert rows[1].sick_days == 2   # Mo, Di
+
+
+def test_create_challenge_with_invites(client, db):
+    """Admin creates a challenge and invites multiple users at once."""
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+
+    # Create two users to invite
+    user1 = User(email="user1@test.com", is_approved=True)
+    user1.set_password("pass123")
+    user2 = User(email="user2@test.com", is_approved=True)
+    user2.set_password("pass123")
+    db.session.add_all([user1, user2])
+    db.session.commit()
+
+    today = date.today()
+    resp = client.post(
+        "/challenges/create",
+        data={
+            "name": "Challenge with Invites",
+            "start_date": (today + timedelta(days=1)).isoformat(),
+            "end_date": (today + timedelta(days=30)).isoformat(),
+            "penalty_per_miss": "5",
+            "bailout_fee": "25",
+            "invite_users": [user1.id, user2.id],
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    # Verify challenge was created
+    challenge = db.session.execute(
+        db.select(Challenge).order_by(Challenge.id.desc()).limit(1)
+    ).scalar_one()
+    assert challenge.name == "Challenge with Invites"
+
+    # Verify both users were invited
+    participations = db.session.execute(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.challenge_id == challenge.id
+        )
+    ).scalars().all()
+    assert len(participations) == 2
+    assert all(p.status == "invited" for p in participations)
+
+    user_ids = {p.user_id for p in participations}
+    assert user_ids == {user1.id, user2.id}
+
+
+def test_multi_invite_via_detail(client, db):
+    """Admin invites multiple users via detail page."""
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+
+    # Create three users to invite
+    user1 = User(email="user1@test.com", is_approved=True)
+    user1.set_password("pass123")
+    user2 = User(email="user2@test.com", is_approved=True)
+    user2.set_password("pass123")
+    user3 = User(email="user3@test.com", is_approved=True)
+    user3.set_password("pass123")
+    db.session.add_all([user1, user2, user3])
+    db.session.commit()
+
+    # Invite two of them via POST
+    resp = client.post(
+        f"/challenges/{challenge.public_id}/invite",
+        data={"user_ids": [user1.id, user2.id]},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    # Verify both were invited
+    participations = db.session.execute(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.challenge_id == challenge.id
+        )
+    ).scalars().all()
+    assert len(participations) == 2
+
+    user_ids = {p.user_id for p in participations}
+    assert user_ids == {user1.id, user2.id}
+    assert all(p.status == "invited" for p in participations)

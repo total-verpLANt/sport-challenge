@@ -96,7 +96,10 @@ def index():
 @challenges_bp.route("/create")
 @admin_required
 def create():
-    return render_template("challenges/create.html")
+    all_users = db.session.scalars(
+        db.select(User).where(User.is_approved == True).order_by(User.nickname, User.email)  # noqa: E712
+    ).all()
+    return render_template("challenges/create.html", all_users=all_users)
 
 
 @challenges_bp.route("/create", methods=["POST"])
@@ -161,7 +164,25 @@ def create_post():
     db.session.add(challenge)
     db.session.commit()
 
+    # Mehrere User einladen (optional)
+    invite_user_ids = request.form.getlist("invite_users", type=int)
+    invited_count = 0
+    for uid in invite_user_ids:
+        user = db.session.get(User, uid)
+        if user and user.is_approved:
+            participation = ChallengeParticipation(
+                user_id=user.id,
+                challenge_id=challenge.id,
+                status="invited",
+            )
+            db.session.add(participation)
+            invited_count += 1
+    if invited_count:
+        db.session.commit()
+
     flash(f"Challenge '{challenge.name}' wurde erfolgreich erstellt.")
+    if invited_count:
+        flash(f"{invited_count} Person(en) eingeladen.", "success")
     return redirect(url_for("challenges.detail", public_id=str(challenge.public_id)))
 
 
@@ -206,36 +227,47 @@ def detail(public_id):
 def invite(public_id):
     challenge = _get_challenge_by_public_id(public_id)
 
-    user_id = request.form.get("user_id", type=int)
-    if not user_id:
-        flash("Bitte einen Benutzer auswählen.")
+    user_ids = request.form.getlist("user_ids", type=int)
+    if not user_ids:
+        flash("Bitte mindestens einen Benutzer auswählen.")
         return redirect(url_for("challenges.detail", public_id=public_id))
 
-    user = db.session.get(User, user_id)
-    if user is None:
-        flash("Benutzer nicht gefunden.")
-        return redirect(url_for("challenges.detail", public_id=public_id))
+    invited_count = 0
+    skipped_users = []
 
-    existing = db.session.execute(
-        db.select(ChallengeParticipation).where(
-            ChallengeParticipation.user_id == user_id,
-            ChallengeParticipation.challenge_id == challenge.id,
+    for user_id in user_ids:
+        user = db.session.get(User, user_id)
+        if user is None:
+            skipped_users.append(f"User {user_id} nicht gefunden")
+            continue
+
+        existing = db.session.execute(
+            db.select(ChallengeParticipation).where(
+                ChallengeParticipation.user_id == user_id,
+                ChallengeParticipation.challenge_id == challenge.id,
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            skipped_users.append(f"{user.display_name} (bereits in Challenge)")
+            continue
+
+        participation = ChallengeParticipation(
+            user_id=user_id,
+            challenge_id=challenge.id,
+            status="invited",
         )
-    ).scalar_one_or_none()
+        db.session.add(participation)
+        invited_count += 1
 
-    if existing:
-        flash(f"{user.display_name} ist bereits in dieser Challenge.")
-        return redirect(url_for("challenges.detail", public_id=public_id))
+    if invited_count:
+        db.session.commit()
+        flash(f"{invited_count} Person(en) eingeladen.", "success")
 
-    participation = ChallengeParticipation(
-        user_id=user_id,
-        challenge_id=challenge.id,
-        status="invited",
-    )
-    db.session.add(participation)
-    db.session.commit()
+    if skipped_users:
+        for msg in skipped_users:
+            flash(f"Übersprungen: {msg}")
 
-    flash(f"{user.display_name} wurde zur Challenge eingeladen.")
     return redirect(url_for("challenges.detail", public_id=public_id))
 
 
