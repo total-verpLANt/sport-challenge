@@ -3,7 +3,7 @@ services:
     image: ${DOCKERHUB_USERNAME:-changeme}/sport-challenge:${IMAGE_TAG:-latest}
     build: .
     restart: unless-stopped
-    env_file: .env.prod
+    env_file: .env
     environment:
       FLASK_APP: run.py
       GUNICORN_WORKERS: "1"

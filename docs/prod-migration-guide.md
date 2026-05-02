@@ -49,7 +49,7 @@ git tag | grep pre-docker
 
 ---
 
-## Kapitel 3: .env.prod erstellen
+## Kapitel 3: .env erstellen
 
 > ⚠️ **KRITISCH: `SECRET_KEY` MUSS identisch zum aktuell laufenden System sein!**
 >
@@ -57,12 +57,7 @@ git tag | grep pre-docker
 > da die Connector-Credentials mit Fernet (HKDF-abgeleitet vom SECRET_KEY) verschlüsselt sind.
 > Alle Nutzer müssten ihre Garmin/Strava-Verbindung neu einrichten.
 
-**Aktuellen Key aus der laufenden .env auslesen:**
-```bash
-grep SECRET_KEY .env
-```
-
-**`.env.prod` Vorlage:**
+**`.env` Vorlage:**
 ```
 SECRET_KEY=<identisch zum laufenden System!>
 DATABASE_URL=sqlite:///sport-challenge.db
@@ -72,7 +67,7 @@ FLASK_APP=run.py
 GUNICORN_WORKERS=1
 ```
 
-`.env.prod` darf **nicht** ins Git-Repository eingecheckt werden (ist bereits in `.gitignore`).
+`.env` darf **nicht** ins Git-Repository eingecheckt werden (ist bereits in `.gitignore`).
 
 ---
 
