@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "epic_id": "sport-challenge-g1x",
+  "wave_count": 1,
+  "fix_cycles": 0,
+  "issues_completed": 2,
+  "issues_total": 9,
+  "last_wave_summary": "Wave 1 complete: I-01 (UPLOAD_FOLDER ENV-konfigurierbar, config.py), I-02 (requirements.txt split, requirements-dev.txt neu). 158 Tests grün.",
+  "wave_1_summary_length": 130,
+  "files_read_early": ["config.py", "requirements.txt", "requirements-dev.txt", "CLAUDE.md"],
+  "plan_file": ".schrammns_workflow/plans/2026-05-01-dockerisierung-sport-challenge.md",
+  "decisions_made": [],
+  "last_updated": "2026-05-01T00:00:00Z"
+}
