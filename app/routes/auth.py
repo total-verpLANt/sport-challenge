@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
@@ -8,6 +9,9 @@ from email_validator import validate_email, EmailNotValidError
 
 from app.extensions import db, limiter
 from app.models.user import User
+from app.services.mailer import MailgunError, get_mailer
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint("auth", __name__, template_folder="../templates")
 
@@ -105,6 +109,7 @@ def register():
                         login_user(user)
                         flash("Willkommen! Gib dir einen Spitznamen – er wird überall angezeigt.")
                         return redirect(url_for("settings.profile"))
+                    _notify_admins_new_user(user)
                     flash("Registrierung erfolgreich – warte auf Admin-Freigabe.")
                     return redirect(url_for("auth.login"))
 
@@ -116,3 +121,33 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for("auth.login"))
+
+
+def _notify_admins_new_user(new_user: User) -> None:
+    """Sendet Admin-Benachrichtigung bei Neuregistrierung. Fehler werden nur geloggt."""
+    admins = db.session.execute(
+        db.select(User).filter_by(role="admin")
+    ).scalars().all()
+    if not admins:
+        return
+
+    admin_url = url_for("admin.users", _external=True)
+    registered_at = new_user.created_at.strftime("%d.%m.%Y %H:%M UTC") if new_user.created_at else "unbekannt"
+
+    body = render_template(
+        "email/new_user_notification.txt",
+        user_email=new_user.email,
+        registered_at=registered_at,
+        admin_url=admin_url,
+    )
+    try:
+        mailer = get_mailer()
+        for admin in admins:
+            mailer.send(
+                to=admin.email,
+                subject="[Sport Challenge] Neuer Benutzer wartet auf Freigabe",
+                text=body,
+                tags=["admin-notification"],
+            )
+    except MailgunError as exc:
+        logger.error("Admin-Benachrichtigung fehlgeschlagen: %s", exc)

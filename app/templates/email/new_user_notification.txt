@@ -1,0 +1,11 @@
+Hallo Admin,
+
+ein neuer Benutzer hat sich bei Sport Challenge registriert und wartet auf Freigabe.
+
+E-Mail: {{ user_email }}
+Registriert am: {{ registered_at }}
+
+Zur Admin-Übersicht: {{ admin_url }}
+
+Viele Grüße,
+Sport Challenge
