@@ -1,6 +1,6 @@
 services:
   web:
-    image: ${DOCKERHUB_USERNAME:-changeme}/sport-challenge:${IMAGE_TAG:-latest}
+    image: ${DOCKERHUB_USERNAME:-stoertebeker2k}/sport-challenge:${IMAGE_TAG:-latest}
     build: .
     restart: unless-stopped
     env_file: .env
