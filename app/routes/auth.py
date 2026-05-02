@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import func
 
 from email_validator import validate_email, EmailNotValidError
@@ -121,6 +122,93 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for("auth.login"))
+
+
+_RESET_TOKEN_MAX_AGE = 3600  # 1 Stunde
+_RESET_SALT = "password-reset"
+
+
+@auth_bp.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("3 per minute")
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("activities.week_view"))
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        # Timing-sicheres Verhalten: gleiche Antwort ob E-Mail bekannt oder nicht
+        user = None
+        try:
+            result = validate_email(email, check_deliverability=False)
+            user = db.session.execute(
+                db.select(User).filter_by(email=result.normalized)
+            ).scalar_one_or_none()
+        except EmailNotValidError:
+            pass
+
+        if user is not None:
+            _send_password_reset_mail(user)
+
+        flash("Falls ein Konto mit dieser E-Mail existiert, wurde ein Reset-Link versendet.", "info")
+        return redirect(url_for("auth.forgot_password"))
+
+    return render_template("auth/forgot_password.html")
+
+
+@auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token: str):
+    from flask import current_app
+
+    s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+    try:
+        user_id = s.loads(token, salt=_RESET_SALT, max_age=_RESET_TOKEN_MAX_AGE)
+    except SignatureExpired:
+        flash("Der Reset-Link ist abgelaufen. Bitte fordere einen neuen an.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+    except BadSignature:
+        flash("Ungültiger Reset-Link.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+
+    user = db.session.get(User, user_id)
+    if user is None:
+        flash("Benutzer nicht gefunden.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+
+    error = None
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        password2 = request.form.get("password2", "")
+        if len(password) < _MIN_PASSWORD_LENGTH:
+            error = f"Passwort muss mindestens {_MIN_PASSWORD_LENGTH} Zeichen lang sein."
+        elif password != password2:
+            error = "Passwörter stimmen nicht überein."
+        else:
+            user.set_password(password)
+            db.session.commit()
+            flash("Passwort erfolgreich geändert. Du kannst dich jetzt einloggen.", "success")
+            return redirect(url_for("auth.login"))
+
+    return render_template("auth/reset_password.html", token=token, error=error)
+
+
+def _send_password_reset_mail(user: User) -> None:
+    """Sendet Reset-Mail. Fehler werden nur geloggt – kein Hinweis an den Client."""
+    from flask import current_app
+
+    s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+    token = s.dumps(user.id, salt=_RESET_SALT)
+    reset_url = url_for("auth.reset_password", token=token, _external=True)
+
+    body = render_template("email/password_reset.txt", reset_url=reset_url)
+    try:
+        get_mailer().send(
+            to=user.email,
+            subject="[Sport Challenge] Passwort zurücksetzen",
+            text=body,
+            tags=["password-reset"],
+        )
+    except MailgunError as exc:
+        logger.error("Password-Reset-Mail an %s fehlgeschlagen: %s", user.email, exc)
 
 
 def _notify_admins_new_user(new_user: User) -> None:
