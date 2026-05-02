@@ -43,13 +43,34 @@
         {% endif %}
       </dd>
 
-      {% if activity.notes %}
+      {% if activity.notes and not is_owner %}
       <dt class="col-sm-4">Trainingsnotiz</dt>
       <dd class="col-sm-8" style="white-space:pre-wrap">{{ activity.notes }}</dd>
       {% endif %}
     </dl>
   </div>
 </div>
+
+{% if is_owner %}
+<div class="card mb-4">
+  <div class="card-header">Trainingsnotiz</div>
+  <div class="card-body">
+    <form method="post"
+          action="{{ url_for('challenge_activities.edit_notes', activity_id=activity.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <textarea id="notes" name="notes" class="form-control" rows="4"
+                  maxlength="2000"
+                  placeholder="Optionale Notiz …">{{ activity.notes or "" }}</textarea>
+        <div class="form-text text-end">
+          <span id="notes-count">{{ (activity.notes or "")|length }}</span>/2000
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Notiz speichern</button>
+    </form>
+  </div>
+</div>
+{% endif %}
 
 {% if activity.media %}
 <div class="card mb-4">
@@ -120,5 +141,10 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce() }}">
   GLightbox({ selector: '.glightbox', touchNavigation: true });
+  (function () {
+    const ta  = document.getElementById('notes');
+    const cnt = document.getElementById('notes-count');
+    if (ta && cnt) ta.addEventListener('input', () => cnt.textContent = ta.value.length);
+  })();
 </script>
 {% endblock %}
