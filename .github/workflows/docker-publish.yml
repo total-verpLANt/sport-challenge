@@ -37,7 +37,7 @@ jobs:
 
       - name: Read version
         id: version
-        run: echo "version=$(python -c 'from app.version import __version__; print(__version__)')" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(python -c "exec(open('app/version.py').read()); print(__version__)")" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
