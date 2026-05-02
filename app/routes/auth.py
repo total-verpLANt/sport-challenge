@@ -129,7 +129,7 @@ _RESET_SALT = "password-reset"
 
 
 @auth_bp.route("/forgot-password", methods=["GET", "POST"])
-@limiter.limit("3 per minute")
+@limiter.limit("5 per minute", methods=["POST"])
 def forgot_password():
     if current_user.is_authenticated:
         return redirect(url_for("activities.week_view"))
