@@ -15,3 +15,8 @@ class Config:
     _default_upload_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app", "static", "uploads")
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", _default_upload_folder)
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50 MB
+    MAILGUN_API_KEY: str = os.environ.get("MAILGUN_API_KEY", "")
+    MAILGUN_DOMAIN: str = os.environ.get("MAILGUN_DOMAIN", "")
+    MAILGUN_SENDER: str = os.environ.get("MAILGUN_SENDER", "")
+    # EU-Region: https://api.eu.mailgun.net/v3
+    MAILGUN_BASE_URL: str = os.environ.get("MAILGUN_BASE_URL", "https://api.mailgun.net/v3")
