@@ -4,6 +4,19 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] – 2026-05-02
+
+### Neu
+- E-Mail-Integration via Mailgun REST API (`app/services/mailer.py`)
+- Passwort-vergessen-Flow: Link im Login, Route `/auth/forgot-password`, Reset-Link per E-Mail mit signiertem Token (itsdangerous, 1h TTL, timing-sicher)
+- Admin-Benachrichtigung per E-Mail bei jeder Neuregistrierung
+- Bestätigungsmail an User bei Admin-Freischaltung
+- 24 neue Tests (Mailer-Unit-Tests + Password-Reset-Integrationstests)
+
+### Konfiguration
+- Neue Env-Variablen: `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_SENDER`, `MAILGUN_BASE_URL` (EU-Region: `https://api.eu.mailgun.net/v3`)
+- App startet ohne Mailgun-Config, Mailversand schlägt dann erst beim Senden fehl (kein Crash beim Start)
+
 ## [0.11.0] – 2026-05-02
 
 ### Neu
