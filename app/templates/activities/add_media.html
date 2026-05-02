@@ -19,6 +19,14 @@
     <form method="post" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-4">
+        <label for="notes" class="form-label fw-semibold">Trainingsnotiz</label>
+        <textarea id="notes" name="notes" class="form-control" rows="4"
+                  maxlength="2000" placeholder="Optionale Notiz …">{{ activity.notes or "" }}</textarea>
+        <div class="form-text text-end">
+          <span id="notes-count">{{ (activity.notes or "")|length }}</span>/2000
+        </div>
+      </div>
+      <div class="mb-4">
         <label class="form-label fw-semibold">Fotos / Videos</label>
         <div id="drop-zone"
              class="border border-2 rounded p-4 text-center text-muted"
@@ -43,6 +51,10 @@
 
 <script nonce="{{ csp_nonce() }}">
 (function () {
+  const ta  = document.getElementById('notes');
+  const cnt = document.getElementById('notes-count');
+  ta.addEventListener('input', () => cnt.textContent = ta.value.length);
+
   const zone  = document.getElementById('drop-zone');
   const input = document.getElementById('media-input');
   const list  = document.getElementById('file-list');

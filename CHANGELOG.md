@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.12.1] – 2026-05-02
+
+### Neu
+- Trainingsnotiz nachträglich bearbeitbar: Die "Medien hinzufügen"-Seite enthält jetzt eine Textarea, über die Notizen auch nach dem initialen Erfassen gesetzt, geändert oder gelöscht werden können
+
 ## [0.12.0] – 2026-05-02
 
 ### Neu

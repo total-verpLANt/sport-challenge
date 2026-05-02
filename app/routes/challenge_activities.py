@@ -645,6 +645,11 @@ def add_media(activity_id: int):
         flash("Keine Berechtigung.", "danger")
         return redirect(url_for("challenge_activities.my_week"))
     if request.method == "POST":
+        notes_raw = request.form.get("notes", "").strip()
+        if len(notes_raw) > 2000:
+            flash("Die Trainingsnotiz darf maximal 2000 Zeichen lang sein.", "danger")
+            return redirect(request.url)
+        activity.notes = notes_raw or None
         media_files = request.files.getlist("media")
         any_saved = False
         for f in media_files:
@@ -661,9 +666,11 @@ def add_media(activity_id: int):
                     file_size_bytes=0,
                 ))
                 any_saved = True
+        db.session.commit()
         if any_saved:
-            db.session.commit()
             flash("Medien erfolgreich hinzugefügt.", "success")
+        else:
+            flash("Notiz gespeichert.", "success")
         return redirect(url_for("challenge_activities.activity_detail", activity_id=activity_id))
     return render_template("activities/add_media.html", activity=activity)
 

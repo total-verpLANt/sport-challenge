@@ -638,3 +638,57 @@ def test_admin_deletes_others_activity(client, db):
                        follow_redirects=False)
     assert resp.status_code == 302
     assert db.session.get(Activity, activity_id) is None  # Gelöscht!
+
+
+def test_add_media_saves_notes(client, db):
+    """Notiz wird über add_media nachträglich gespeichert."""
+    user = _create_and_login(client, db, email="notes_save@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    activity = Activity(
+        user_id=user.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=30,
+        sport_type="Joggen",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    activity_id = activity.id
+
+    resp = client.post(
+        f"/challenge-activities/{activity_id}/media/add",
+        data={"notes": "Toller Lauf heute"},
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    db.session.expire_all()
+    assert db.session.get(Activity, activity_id).notes == "Toller Lauf heute"
+
+
+def test_add_media_notes_too_long(client, db):
+    """Notiz mit mehr als 2000 Zeichen wird abgelehnt."""
+    user = _create_and_login(client, db, email="notes_long@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    activity = Activity(
+        user_id=user.id,
+        challenge_id=challenge.id,
+        activity_date=date.today(),
+        duration_minutes=30,
+        sport_type="Joggen",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    activity_id = activity.id
+
+    resp = client.post(
+        f"/challenge-activities/{activity_id}/media/add",
+        data={"notes": "x" * 2001},
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    db.session.expire_all()
+    assert db.session.get(Activity, activity_id).notes is None
