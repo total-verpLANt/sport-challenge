@@ -4,6 +4,18 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] – 2026-05-02
+
+### Neu
+- Containerisierung: Docker-Image mit Gunicorn, Docker Compose für Prod-Deployment
+- CI/CD: GitHub Actions-Pipeline baut und pusht Docker-Image automatisch zu Docker Hub (`stoertebeker2k/sport-challenge`)
+- Access-Log: HTTP-Zugriffe werden in `logs/access.log` geschrieben (RotatingFileHandler, 10 MB, 5 Backups)
+- ProxyFix-Middleware für echte Client-IP hinter cloudflared-Tunnel (Rate-Limiting + Logging korrekt)
+
+### Behoben
+- Docker Hub Username in CI-Pipeline von `changeme` auf `stoertebeker2k` korrigiert
+- CI: Version wird direkt aus `app/version.py` per `grep` ausgelesen statt per App-Import (verhindert Import-Fehler ohne DB)
+
 ## [0.10.0] – 2026-05-01
 
 ### Neu
