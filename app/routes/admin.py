@@ -1,8 +1,11 @@
+import logging
 from datetime import datetime, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy import func
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import or_
 
@@ -14,6 +17,7 @@ from app.models.connector import ConnectorCredential
 from app.models.penalty import PenaltyOverride
 from app.models.sick_week import SickWeek
 from app.models.user import User
+from app.services.mailer import MailgunError, get_mailer
 from app.utils.decorators import admin_required
 from app.utils.uploads import delete_media_files, delete_upload
 
@@ -62,6 +66,7 @@ def approve_user(user_id):
     user.approved_at = datetime.now(timezone.utc)
     user.approved_by_id = current_user.id
     db.session.commit()
+    _send_approval_mail(user)
     flash(f"Benutzer {user.display_name} ({user.email}) wurde freigeschaltet.")
     return redirect(url_for("admin.users"))
 
@@ -199,3 +204,22 @@ def delete_user(user_id):
     db.session.commit()
     flash(f"Konto {display} wurde gelöscht.", "success")
     return redirect(url_for("admin.users"))
+
+
+def _send_approval_mail(user: User) -> None:
+    """Sendet Freischaltungs-Bestätigung an den User. Fehler werden nur geloggt."""
+    login_url = url_for("auth.login", _external=True)
+    body = render_template(
+        "email/user_approved.txt",
+        display_name=user.display_name,
+        login_url=login_url,
+    )
+    try:
+        get_mailer().send(
+            to=user.email,
+            subject="[Sport Challenge] Dein Konto wurde freigeschaltet",
+            text=body,
+            tags=["user-approved"],
+        )
+    except MailgunError as exc:
+        logger.error("Approval-Mail an %s fehlgeschlagen: %s", user.email, exc)

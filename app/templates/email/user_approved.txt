@@ -1,0 +1,8 @@
+Hallo {{ display_name }},
+
+dein Konto bei Sport Challenge wurde freigeschaltet.
+
+Du kannst dich jetzt einloggen: {{ login_url }}
+
+Viele Grüße,
+Sport Challenge
