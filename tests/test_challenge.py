@@ -23,7 +23,7 @@ def _create_challenge(db, creator_id, name="Test Challenge"):
     today = date.today()
     challenge = Challenge(
         name=name,
-        start_date=today + timedelta(days=1),
+        start_date=today - timedelta(days=1),
         end_date=today + timedelta(days=30),
         penalty_per_miss=5.0,
         bailout_fee=25.0,
