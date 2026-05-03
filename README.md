@@ -62,7 +62,7 @@ STRAVA_CLIENT_SECRET=
 
 ### CI/CD
 
-Jeder Push auf `main` baut automatisch ein neues Image via GitHub Actions und pusht es zu Docker Hub. Auf dem Server dann:
+Pull Requests und Pushes auf `main` laufen durch Tests, Dependency-Audit (`pip-audit`) und statische Security-Prüfung (`bandit`). Jeder Push auf `main` baut danach automatisch ein neues Image via GitHub Actions und pusht es zu Docker Hub. Auf dem Server dann:
 
 ```bash
 docker compose pull && docker compose up -d
