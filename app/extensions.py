@@ -1,3 +1,4 @@
+from flask import request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
@@ -12,10 +13,15 @@ class Base(DeclarativeBase):
     pass
 
 
+def _get_real_ip() -> str:
+    """Liest die echte Client-IP – CF-Connecting-IP hat Vorrang (Cloudflare-Tunnel)."""
+    return request.headers.get("CF-Connecting-IP") or get_remote_address()
+
+
 db = SQLAlchemy(model_class=Base)
 migrate = Migrate()
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 csrf = CSRFProtect()
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=_get_real_ip)
 talisman = Talisman()
