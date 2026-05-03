@@ -8,6 +8,11 @@ Versionierung nach [Semantic Versioning](https://semver.org/).
 
 ### Neu
 - Trainingsnotiz nachträglich bearbeitbar: Die "Medien hinzufügen"-Seite enthält jetzt eine Textarea, über die Notizen auch nach dem initialen Erfassen gesetzt, geändert oder gelöscht werden können
+- Trainingsnotiz direkt auf der Aktivitäts-Detailseite bearbeitbar (kein Umweg über "Medien hinzufügen")
+
+### Behoben
+- Passwort-vergessen: Rate-Limit greift jetzt nur auf POST-Anfragen, nicht mehr auf die GET-Seite
+- Rate-Limiter liest echte Client-IP aus dem `CF-Connecting-IP`-Header (korrekte Sperrung hinter Cloudflare-Tunnel)
 
 ## [0.12.0] – 2026-05-02
 
