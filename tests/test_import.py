@@ -9,9 +9,12 @@ from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.connector import ConnectorCredential
 from app.models.user import User
 
+_ACTIVITY_DATE = date.today() - timedelta(days=7)
+_ACTIVITY_DATE_STR = f"{_ACTIVITY_DATE} 08:30:00"
+
 MOCK_ACTIVITIES = [
     {
-        "startTimeLocal": "2026-04-21 08:30:00",
+        "startTimeLocal": _ACTIVITY_DATE_STR,
         "activityName": "Morgenrunde",
         "activityType": {"typeKey": "running"},
         "duration": 3600.0,
@@ -19,7 +22,7 @@ MOCK_ACTIVITIES = [
     }
 ]
 
-MOCK_EXT_ID = "garmin:2026-04-21 08:30:00"
+MOCK_EXT_ID = f"garmin:{_ACTIVITY_DATE_STR}"
 
 
 # ---------------------------------------------------------------------------
