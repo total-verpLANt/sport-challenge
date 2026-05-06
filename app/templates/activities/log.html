@@ -76,23 +76,23 @@
 
     {# Tab 2: Krankmeldung #}
     <div class="tab-pane fade" id="sick-panel" role="tabpanel">
-      <form method="post" action="{{ url_for('challenge_activities.sick_week_submit') }}">
+      <form method="post" action="{{ url_for('challenge_activities.sick_period_submit') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="row g-3 mb-3">
           <div class="col-6">
             <label for="sick_from" class="form-label">Von</label>
             <input type="date" class="form-control" id="sick_from" name="sick_from"
-                   value="{{ today }}" max="{{ today }}" required>
+                   value="{{ today }}" required>
           </div>
           <div class="col-6">
             <label for="sick_to" class="form-label">Bis</label>
             <input type="date" class="form-control" id="sick_to" name="sick_to"
-                   value="{{ today }}" max="{{ today }}" required>
+                   value="{{ today }}" required>
           </div>
         </div>
         <div class="form-text mb-3">
           Pro 2 Krankentage wird eine benötigte Aktivität abgezogen.
-          Zeiträume über Wochengrenzen werden automatisch aufgeteilt.
+          Auch zukünftige Krankheitszeiträume können eingetragen werden.
         </div>
         <button type="submit" class="btn btn-outline-warning w-100">Krankmeldung eintragen</button>
       </form>

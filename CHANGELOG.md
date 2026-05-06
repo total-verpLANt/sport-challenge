@@ -4,6 +4,20 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] – 2026-05-06
+
+### Neu
+- Krankmeldungen nutzen jetzt ein Von/Bis-Datumsmodell (`SickPeriod`) statt dem wochenbasierten `SickWeek`-Modell
+- Zukunftsdaten erlaubt: Krankmeldungen für bevorstehende Zeiträume können vorab eingetragen werden
+- Krankmeldung kürzen: Enddatum nachträglich anpassbar (Frühgenesungs-Flow)
+- Krankmeldungen werden auf Challenge-Grenzen geclampt
+- Overlap-Prüfung: Überschneidende Perioden pro Teilnehmer werden abgelehnt
+
+### Geändert
+- Datenbankschema: `sick_weeks`-Tabelle durch `sick_periods` ersetzt (Migration `a3f7e2b9c1d5`)
+- Route `/challenge-activities/sick-period` (POST) ersetzt `/challenge-activities/sick-week`
+- Penalty-Berechnung nutzt Tage-Überschneidung statt Wochenstartdatum
+
 ## [0.12.1] – 2026-05-02
 
 ### Neu

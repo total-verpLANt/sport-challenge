@@ -75,10 +75,8 @@
         Du nimmst aktiv teil. Wochenziel: <strong>{{ my_participation.weekly_goal }} Einheiten</strong>
       </p>
       <div class="d-flex gap-2 flex-wrap">
-        <form method="post" action="{{ url_for('challenges.sick', public_id=challenge.public_id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-outline-warning">Krank melden (diese Woche)</button>
-        </form>
+        <a href="{{ url_for('challenge_activities.log_form') }}#sick-panel"
+           class="btn btn-outline-warning">Krankmeldung eintragen</a>
         <form method="post" action="{{ url_for('challenges.bailout', public_id=challenge.public_id) }}"
               data-confirm="Wirklich aus der Challenge austreten? Bailout-Gebühr: {{ '%.2f'|format(challenge.bailout_fee) }} €">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

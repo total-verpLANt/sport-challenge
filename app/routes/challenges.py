@@ -9,7 +9,7 @@ from app.models.activity import Activity
 from app.models.bonus import BonusChallenge, BonusChallengeEntry
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.penalty import PenaltyOverride
-from app.models.sick_week import SickWeek
+from app.models.sick_period import SickPeriod
 from app.models.user import User
 from app.utils.decorators import admin_required
 from app.utils.uploads import delete_media_files, delete_upload
@@ -361,46 +361,7 @@ def bailout(public_id):
 @challenges_bp.route("/<string:public_id>/sick", methods=["POST"])
 @login_required
 def sick(public_id):
-    challenge = _get_challenge_by_public_id(public_id)
-
-    participation = db.session.execute(
-        db.select(ChallengeParticipation).where(
-            ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.challenge_id == challenge.id,
-            ChallengeParticipation.status == "accepted",
-        )
-    ).scalar_one_or_none()
-
-    if participation is None:
-        flash("Du bist kein aktiver Teilnehmer dieser Challenge.")
-        return redirect(url_for("challenges.detail", public_id=public_id))
-
-    today = date.today()
-    week_start = today - __import__("datetime").timedelta(days=today.weekday())
-
-    existing = db.session.execute(
-        db.select(SickWeek).where(
-            SickWeek.user_id == current_user.id,
-            SickWeek.challenge_id == challenge.id,
-            SickWeek.week_start == week_start,
-        )
-    ).scalar_one_or_none()
-
-    if existing:
-        flash("Du hast dich für diese Woche bereits krank gemeldet.")
-        return redirect(url_for("challenges.detail", public_id=public_id))
-
-    sick_week = SickWeek(
-        user_id=current_user.id,
-        challenge_id=challenge.id,
-        week_start=week_start,
-        sick_days=7,
-    )
-    db.session.add(sick_week)
-    db.session.commit()
-
-    flash(f"Krankmeldung für die Woche ab {week_start.strftime('%d.%m.%Y')} eingetragen.")
-    return redirect(url_for("challenges.detail", public_id=public_id))
+    return redirect(url_for("challenge_activities.log_form"))
 
 
 @challenges_bp.route("/<string:public_id>/delete", methods=["POST"])
@@ -422,8 +383,8 @@ def delete_challenge(public_id: str):
     BonusChallenge.query.filter_by(challenge_id=challenge.id).delete()
     # 3. PenaltyOverride
     PenaltyOverride.query.filter_by(challenge_id=challenge.id).delete()
-    # 4. SickWeek
-    SickWeek.query.filter_by(challenge_id=challenge.id).delete()
+    # 4. SickPeriod
+    SickPeriod.query.filter_by(challenge_id=challenge.id).delete()
     # 5. Activity – ORM-Iteration wegen ActivityMedia-Dateisystem-Cleanup!
     for _act in Activity.query.filter_by(challenge_id=challenge.id).all():
         delete_media_files(_act.media)

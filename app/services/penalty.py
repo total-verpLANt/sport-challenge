@@ -3,7 +3,7 @@ from sqlalchemy import func
 from app.extensions import db
 from app.models.activity import Activity
 from app.models.challenge import Challenge, ChallengeParticipation
-from app.models.sick_week import SickWeek
+from app.models.sick_period import SickPeriod
 from app.models.penalty import PenaltyOverride
 
 
@@ -36,6 +36,25 @@ def count_fulfilled_days(user_id: int, challenge_id: int, week_start: date) -> i
     return len(result)
 
 
+def _sick_days_in_week(user_id: int, challenge_id: int, week_start: date) -> int:
+    """Count sick days that fall within the given week from SickPeriod records."""
+    week_end = week_start + timedelta(days=6)
+    periods = db.session.scalars(
+        db.select(SickPeriod).where(
+            SickPeriod.user_id == user_id,
+            SickPeriod.challenge_id == challenge_id,
+            SickPeriod.start_date <= week_end,
+            SickPeriod.end_date >= week_start,
+        )
+    ).all()
+    total = 0
+    for p in periods:
+        eff_start = max(p.start_date, week_start)
+        eff_end = min(p.end_date, week_end)
+        total += (eff_end - eff_start).days + 1
+    return min(total, 7)
+
+
 def calculate_weekly_penalty(
     user_id: int,
     challenge_id: int,
@@ -44,16 +63,10 @@ def calculate_weekly_penalty(
     penalty_per_miss: float,
 ) -> float:
     """Calculate penalty for a single week."""
-    # 1. Check SickWeek
-    sick_week = db.session.execute(
-        db.select(SickWeek).where(
-            SickWeek.user_id == user_id,
-            SickWeek.challenge_id == challenge_id,
-            SickWeek.week_start == week_start,
-        )
-    ).scalar_one_or_none()
-    if sick_week is not None:
-        deductions = sick_week.sick_days // 2
+    # 1. Check SickPeriod overlap
+    sick_days = _sick_days_in_week(user_id, challenge_id, week_start)
+    if sick_days > 0:
+        deductions = sick_days // 2
         effective_goal = max(0, weekly_goal - deductions)
         if effective_goal <= 0:
             return 0.0

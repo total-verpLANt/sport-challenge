@@ -1,14 +1,27 @@
-from datetime import date
+from collections import defaultdict
+from datetime import date, timedelta
 
 from app.extensions import db
 from app.models.challenge import Challenge, ChallengeParticipation
-from app.models.sick_week import SickWeek
+from app.models.sick_period import SickPeriod
 from app.services.penalty import (
     get_week_mondays,
     count_fulfilled_days,
     calculate_weekly_penalty,
     calculate_total_penalty,
 )
+
+
+def _sick_days_from_periods(periods: list, week_start: date) -> int:
+    """Count sick days overlapping with the given week."""
+    week_end = week_start + timedelta(days=6)
+    total = 0
+    for p in periods:
+        if p.start_date <= week_end and p.end_date >= week_start:
+            eff_start = max(p.start_date, week_start)
+            eff_end = min(p.end_date, week_end)
+            total += (eff_end - eff_start).days + 1
+    return min(total, 7)
 
 
 def get_challenge_summary(challenge: Challenge) -> dict:
@@ -57,14 +70,14 @@ def get_challenge_summary(challenge: Challenge) -> dict:
         .all()
     )
 
-    # 3. Pre-fetch all SickWeeks for this challenge in one query
-    sick_weeks_rows = db.session.execute(
-        db.select(SickWeek).where(SickWeek.challenge_id == challenge.id)
-    ).scalars().all()
-    # Index: (user_id, week_start) -> sick_days
-    sick_index: dict[tuple[int, date], int] = {
-        (sw.user_id, sw.week_start): sw.sick_days for sw in sick_weeks_rows
-    }
+    # 3. Pre-fetch all SickPeriods for this challenge in one query
+    all_sick_periods = db.session.scalars(
+        db.select(SickPeriod).where(SickPeriod.challenge_id == challenge.id)
+    ).all()
+    # Group by user_id for O(1) lookup per user
+    sick_by_user: dict[int, list] = defaultdict(list)
+    for sp in all_sick_periods:
+        sick_by_user[sp.user_id].append(sp)
 
     # 4. Build per-participant data
     participants_data = []
@@ -75,8 +88,8 @@ def get_challenge_summary(challenge: Challenge) -> dict:
         weeks_data: dict[date, dict] = {}
         for week_start in weeks:
             fulfilled_days = count_fulfilled_days(user.id, challenge.id, week_start)
-            sick_days_val = sick_index.get((user.id, week_start))
-            is_sick = sick_days_val is not None
+            sick_days_val = _sick_days_from_periods(sick_by_user[user.id], week_start)
+            is_sick = sick_days_val > 0
 
             penalty = calculate_weekly_penalty(
                 user_id=user.id,

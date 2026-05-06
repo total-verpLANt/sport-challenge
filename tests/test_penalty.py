@@ -6,9 +6,10 @@ import pytest
 from app.models.activity import Activity
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.penalty import PenaltyOverride
-from app.models.sick_week import SickWeek
+from app.models.sick_period import SickPeriod
 from app.models.user import User
 from app.services.penalty import (
+    _sick_days_in_week,
     calculate_weekly_penalty,
     calculate_total_penalty,
     count_fulfilled_days,
@@ -16,8 +17,12 @@ from app.services.penalty import (
 )
 
 
-def _make_challenge(db, start_date, end_date, penalty_per_miss=5.0):
+def _make_challenge(db, start_date=None, end_date=None, penalty_per_miss=5.0):
     """Create a minimal challenge in the DB."""
+    if start_date is None:
+        start_date = date(2026, 5, 4)
+    if end_date is None:
+        end_date = start_date + timedelta(days=13)
     user = User(email=f"creator_{start_date}@test.com", is_approved=True)
     user.set_password("pass")
     db.session.add(user)
@@ -36,7 +41,8 @@ def _make_challenge(db, start_date, end_date, penalty_per_miss=5.0):
     return challenge
 
 
-def _make_participant(db, challenge_id, weekly_goal=3):
+def _make_participant(db, challenge_or_id, weekly_goal=3):
+    challenge_id = challenge_or_id.id if isinstance(challenge_or_id, Challenge) else challenge_or_id
     user = User(email=f"participant_{challenge_id}_{weekly_goal}@test.com", is_approved=True)
     user.set_password("pass")
     db.session.add(user)
@@ -138,18 +144,19 @@ def test_max_penalty_capped(app, db):
         assert penalty == 15.0
 
 
-def test_sick_week_no_penalty(app, db):
+def test_sick_period_no_penalty(app, db):
     with app.app_context():
         week_start = date(2026, 5, 4)
         challenge = _make_challenge(db, week_start, week_start + timedelta(days=13))
         user, participation = _make_participant(db, challenge.id, weekly_goal=3)
 
-        sick_week = SickWeek(
+        sick_period = SickPeriod(
             user_id=user.id,
             challenge_id=challenge.id,
-            week_start=week_start,
+            start_date=week_start,
+            end_date=week_start + timedelta(days=6),
         )
-        db.session.add(sick_week)
+        db.session.add(sick_period)
         db.session.commit()
 
         penalty = calculate_weekly_penalty(
@@ -260,13 +267,13 @@ def test_sick_days_deduction_table(app, db, sick_days, expected_penalty):
         challenge = _make_challenge(db, week_start, week_start + timedelta(days=13))
         user, participation = _make_participant(db, challenge.id, weekly_goal=3)
 
-        sw = SickWeek(
+        sp = SickPeriod(
             user_id=user.id,
             challenge_id=challenge.id,
-            week_start=week_start,
-            sick_days=sick_days,
+            start_date=week_start,
+            end_date=week_start + timedelta(days=sick_days - 1),
         )
-        db.session.add(sw)
+        db.session.add(sp)
         db.session.commit()
 
         penalty = calculate_weekly_penalty(
@@ -279,20 +286,20 @@ def test_sick_days_deduction_table(app, db, sick_days, expected_penalty):
         assert penalty == expected_penalty
 
 
-def test_partial_sick_week_goal_met(app, db):
+def test_partial_sick_period_goal_met(app, db):
     """2 Krankentage + 1 Aktivität → effective_goal=2, fulfilled=1 → 1×5=5€."""
     with app.app_context():
         week_start = date(2026, 5, 4)
         challenge = _make_challenge(db, week_start, week_start + timedelta(days=13))
         user, participation = _make_participant(db, challenge.id, weekly_goal=3)
 
-        sw = SickWeek(
+        sp = SickPeriod(
             user_id=user.id,
             challenge_id=challenge.id,
-            week_start=week_start,
-            sick_days=2,
+            start_date=week_start,
+            end_date=week_start + timedelta(days=1),
         )
-        db.session.add(sw)
+        db.session.add(sp)
         activity = Activity(
             user_id=user.id,
             challenge_id=challenge.id,
@@ -312,3 +319,62 @@ def test_partial_sick_week_goal_met(app, db):
             penalty_per_miss=5.0,
         )
         assert penalty == 5.0
+
+
+def test_sick_period_spanning_two_weeks(db, app):
+    """Period crossing week boundary only counts overlap days per week."""
+    with app.app_context():
+        challenge = _make_challenge(db)
+        user, participation = _make_participant(db, challenge)
+        week_start = challenge.start_date - timedelta(days=challenge.start_date.weekday())
+
+        # Period: Friday of week1 to Tuesday of week2 (Fri-Mon-Tue = 2 days in week2)
+        friday = week_start + timedelta(days=4)
+        tuesday_next = week_start + timedelta(days=8)
+        period = SickPeriod(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            start_date=friday,
+            end_date=tuesday_next,
+        )
+        db.session.add(period)
+        db.session.commit()
+
+        # Week1: only Fri+Sat+Sun = 3 sick days → deduction = 1
+        sick_in_week1 = _sick_days_in_week(user.id, challenge.id, week_start)
+        assert sick_in_week1 == 3
+
+        # Week2 (next Monday):
+        next_monday = week_start + timedelta(weeks=1)
+        sick_in_week2 = _sick_days_in_week(user.id, challenge.id, next_monday)
+        assert sick_in_week2 == 2  # Mon+Tue
+
+
+def test_sick_period_future_no_effect_on_penalty(db, app):
+    """A future SickPeriod does not reduce penalty for past weeks."""
+    with app.app_context():
+        challenge = _make_challenge(db)
+        user, participation = _make_participant(db, challenge)
+        week_start = challenge.start_date - timedelta(days=challenge.start_date.weekday())
+
+        # Future period (5 weeks from now)
+        future_start = date.today() + timedelta(weeks=5)
+        future_end = future_start + timedelta(days=6)
+        period = SickPeriod(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            start_date=future_start,
+            end_date=future_end,
+        )
+        db.session.add(period)
+        db.session.commit()
+
+        # Past week penalty should be unaffected
+        penalty = calculate_weekly_penalty(
+            user_id=user.id,
+            challenge_id=challenge.id,
+            week_start=week_start,
+            weekly_goal=3,
+            penalty_per_miss=5.0,
+        )
+        assert penalty == 15.0  # 3 missed * 5.0, no sick deduction

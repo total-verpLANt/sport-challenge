@@ -3,7 +3,7 @@ import pytest
 from datetime import date
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.activity import Activity
-from app.models.sick_week import SickWeek
+from app.models.sick_period import SickPeriod
 from app.models.bonus import BonusChallenge, BonusChallengeEntry
 from app.models.user import User
 
@@ -57,8 +57,9 @@ def test_admin_deletes_challenge_cascade(client, db):
     )
     db.session.add(activity)
 
-    # SickWeek anlegen
-    sw = SickWeek(user_id=admin.id, challenge_id=challenge.id, week_start=date(2024, 1, 1))
+    # SickPeriod anlegen
+    sw = SickPeriod(user_id=admin.id, challenge_id=challenge.id,
+                    start_date=date(2024, 1, 1), end_date=date(2024, 1, 7))
     db.session.add(sw)
 
     # BonusChallenge + Entry anlegen
@@ -86,7 +87,7 @@ def test_admin_deletes_challenge_cascade(client, db):
     assert db.session.get(Challenge, challenge_id) is None
     assert db.session.get(ChallengeParticipation, participation_id) is None
     assert db.session.get(Activity, activity_id) is None
-    assert db.session.get(SickWeek, sw_id) is None
+    assert db.session.get(SickPeriod, sw_id) is None
     assert db.session.get(BonusChallenge, bonus_id) is None
     assert db.session.get(BonusChallengeEntry, entry_id) is None
 

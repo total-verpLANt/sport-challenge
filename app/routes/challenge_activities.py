@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
@@ -9,7 +9,7 @@ from app.connectors import PROVIDER_REGISTRY
 from app.extensions import db
 from app.models.activity import Activity, ActivityMedia
 from app.models.challenge import Challenge, ChallengeParticipation
-from app.models.sick_week import SickWeek
+from app.models.sick_period import SickPeriod
 from app.models.connector import ConnectorCredential
 from app.models.user import User
 from app.utils.uploads import delete_media_files, delete_upload, get_media_type, save_upload
@@ -195,15 +195,21 @@ def my_week():
         ConnectorCredential.query.filter_by(user_id=current_user.id).first() is not None
     )
 
-    sick_week = None
+    sick_period = None
+    sick_days_val = 0
     if participation:
-        sick_week = db.session.execute(
-            db.select(SickWeek).where(
-                SickWeek.user_id == current_user.id,
-                SickWeek.challenge_id == participation.challenge_id,
-                SickWeek.week_start == monday,
+        sick_period = db.session.execute(
+            db.select(SickPeriod).where(
+                SickPeriod.user_id == current_user.id,
+                SickPeriod.challenge_id == participation.challenge_id,
+                SickPeriod.start_date <= sunday,
+                SickPeriod.end_date >= monday,
             )
         ).scalar_one_or_none()
+        if sick_period is not None:
+            eff_start = max(sick_period.start_date, monday)
+            eff_end = min(sick_period.end_date, sunday)
+            sick_days_val = min((eff_end - eff_start).days + 1, 7)
 
     return render_template(
         "activities/my_week.html",
@@ -215,126 +221,82 @@ def my_week():
         weekly_goal=weekly_goal,
         participation=participation,
         has_connector=has_connector,
-        sick_week=sick_week,
+        sick_period=sick_period,
+        sick_days_val=sick_days_val,
     )
 
 
-def _sick_days_per_week(sick_from: date, sick_to: date) -> dict[date, int]:
-    """Return {monday: sick_day_count} for each calendar week in the range."""
-    result: dict[date, int] = {}
-    current = sick_from
-    while current <= sick_to:
-        monday = current - timedelta(days=current.weekday())
-        result[monday] = result.get(monday, 0) + 1
-        current += timedelta(days=1)
-    return result
-
-
-@challenge_activities_bp.route("/sick-week", methods=["POST"])
+@challenge_activities_bp.route("/sick-period", methods=["POST"])
 @login_required
-def sick_week_submit():
+def sick_period_submit():
     participation = _active_participation()
     if participation is None:
         flash("Du nimmst aktuell an keiner Challenge teil.")
         return redirect(url_for("challenges.index"))
 
-    # Path A: von/bis from log form
+    challenge = participation.challenge
+
     sick_from_raw = request.form.get("sick_from", "").strip()
-    if sick_from_raw:
-        sick_to_raw = request.form.get("sick_to", "").strip()
-        try:
-            sick_from = date.fromisoformat(sick_from_raw)
-            sick_to = date.fromisoformat(sick_to_raw)
-        except ValueError:
-            flash("Ungültige Datumsangabe.")
-            return redirect(url_for("challenge_activities.log_form"))
+    sick_to_raw = request.form.get("sick_to", "").strip()
+    sick_period_id = request.form.get("sick_period_id", type=int)
 
-        today = date.today()
-        if sick_from > sick_to:
-            flash("Das Von-Datum muss vor oder gleich dem Bis-Datum liegen.")
-            return redirect(url_for("challenge_activities.log_form"))
-        if sick_to > today:
-            flash("Krankmeldungen für zukünftige Tage sind nicht möglich.")
-            return redirect(url_for("challenge_activities.log_form"))
-
-        challenge = participation.challenge
-        weeks = _sick_days_per_week(sick_from, sick_to)
-        saved = []
-        for monday, days_count in weeks.items():
-            days_count = min(days_count, 7)
-            if monday > challenge.end_date or (monday + timedelta(days=6)) < challenge.start_date:
-                continue
-            existing = db.session.execute(
-                db.select(SickWeek).where(
-                    SickWeek.user_id == current_user.id,
-                    SickWeek.challenge_id == participation.challenge_id,
-                    SickWeek.week_start == monday,
-                )
-            ).scalar_one_or_none()
-            if existing:
-                existing.sick_days = days_count
-            else:
-                db.session.add(SickWeek(
-                    user_id=current_user.id,
-                    challenge_id=participation.challenge_id,
-                    week_start=monday,
-                    sick_days=days_count,
-                ))
-            saved.append(f"KW ab {monday.strftime('%d.%m.')} ({days_count} Tag(e))")
-
-        db.session.commit()
-        if saved:
-            flash("Krankmeldung eingetragen: " + ", ".join(saved) + ".")
-        else:
-            flash("Keine Woche innerhalb der Challenge-Periode gefunden.")
+    try:
+        sick_from = date.fromisoformat(sick_from_raw)
+        sick_to = date.fromisoformat(sick_to_raw)
+    except ValueError:
+        flash("Ungültige Datumsangabe.")
         return redirect(url_for("challenge_activities.log_form"))
 
-    # Path B: offset + sick_days from my_week
-    try:
-        offset = int(request.form.get("offset", 0))
-    except (TypeError, ValueError):
-        offset = 0
-    if offset > 0:
-        flash("Krankmeldungen für zukünftige Wochen sind nicht möglich.")
-        return redirect(url_for("challenge_activities.my_week", offset=offset))
-    monday, _ = _get_week_bounds(offset)
+    if sick_from > sick_to:
+        flash("Das Von-Datum muss vor oder gleich dem Bis-Datum liegen.")
+        return redirect(url_for("challenge_activities.log_form"))
 
-    try:
-        sick_days = int(request.form.get("sick_days", 0))
-        if not (1 <= sick_days <= 7):
-            raise ValueError
-    except (TypeError, ValueError):
-        flash("Bitte 1–7 Krankentage angeben.")
-        return redirect(url_for("challenge_activities.my_week", offset=offset))
+    # Clampen auf Challenge-Grenzen
+    clamped_start = max(sick_from, challenge.start_date)
+    clamped_end = min(sick_to, challenge.end_date)
 
-    challenge = participation.challenge
-    if monday > challenge.end_date or (monday + timedelta(days=6)) < challenge.start_date:
-        flash("Diese Woche liegt außerhalb der Challenge-Periode.")
-        return redirect(url_for("challenge_activities.my_week", offset=offset))
+    if clamped_start > clamped_end:
+        flash("Der Zeitraum liegt außerhalb der Challenge-Periode.")
+        return redirect(url_for("challenge_activities.log_form"))
 
-    existing = db.session.execute(
-        db.select(SickWeek).where(
-            SickWeek.user_id == current_user.id,
-            SickWeek.challenge_id == participation.challenge_id,
-            SickWeek.week_start == monday,
-        )
-    ).scalar_one_or_none()
+    # Overlap-Check: keine überlappenden Perioden (eigene ausschließen bei Update)
+    overlap_query = db.select(SickPeriod).where(
+        SickPeriod.user_id == current_user.id,
+        SickPeriod.challenge_id == challenge.id,
+        SickPeriod.start_date <= clamped_end,
+        SickPeriod.end_date >= clamped_start,
+    )
+    if sick_period_id:
+        overlap_query = overlap_query.where(SickPeriod.id != sick_period_id)
 
-    if existing:
-        existing.sick_days = sick_days
+    if db.session.scalar(overlap_query) is not None:
+        flash("Dieser Zeitraum überschneidet sich mit einer bestehenden Krankmeldung.")
+        return redirect(url_for("challenge_activities.log_form"))
+
+    if sick_period_id:
+        period = db.session.get(SickPeriod, sick_period_id)
+        if period is None or period.user_id != current_user.id:
+            flash("Krankmeldung nicht gefunden.")
+            return redirect(url_for("challenge_activities.log_form"))
+        period.start_date = clamped_start
+        period.end_date = clamped_end
         db.session.commit()
-        flash(f"Krankmeldung aktualisiert: {sick_days} Tag(e) für KW ab {monday.strftime('%d.%m.%Y')}.")
+        flash(f"Krankmeldung aktualisiert: {clamped_start.strftime('%d.%m.%Y')} – {clamped_end.strftime('%d.%m.%Y')}.")
     else:
-        db.session.add(SickWeek(
+        db.session.add(SickPeriod(
             user_id=current_user.id,
-            challenge_id=participation.challenge_id,
-            week_start=monday,
-            sick_days=sick_days,
+            challenge_id=challenge.id,
+            start_date=clamped_start,
+            end_date=clamped_end,
         ))
         db.session.commit()
-        flash(f"Krankmeldung eingetragen: {sick_days} Tag(e) für KW ab {monday.strftime('%d.%m.%Y')}.")
+        flash(f"Krankmeldung eingetragen: {clamped_start.strftime('%d.%m.%Y')} – {clamped_end.strftime('%d.%m.%Y')}.")
 
-    return redirect(url_for("challenge_activities.my_week", offset=offset))
+    # Redirect: wenn aus my_week (offset im Form), dorthin zurück; sonst log_form
+    offset = request.form.get("offset", type=int)
+    if offset is not None:
+        return redirect(url_for("challenge_activities.my_week", offset=offset))
+    return redirect(url_for("challenge_activities.log_form"))
 
 
 @challenge_activities_bp.route("/import", methods=["GET"])
@@ -546,24 +508,22 @@ def delete_activity(activity_id):
     return redirect(url_for("challenge_activities.my_week"))
 
 
-@challenge_activities_bp.route("/sick-week/<int:sick_week_id>/delete", methods=["POST"])
+@challenge_activities_bp.route("/sick-period/<int:sick_period_id>/delete", methods=["POST"])
 @login_required
-def delete_sick_week(sick_week_id: int):
-    sick_week = db.session.get(SickWeek, sick_week_id)
-    if sick_week is None or (
-        sick_week.user_id != current_user.id and not current_user.is_admin
+def delete_sick_period(sick_period_id: int):
+    period = db.session.get(SickPeriod, sick_period_id)
+    if period is None or (
+        period.user_id != current_user.id and not current_user.is_admin
     ):
-        flash("Krankmeldung nicht gefunden.", "warning")
-        return redirect(url_for("challenge_activities.my_week"))
-    user_id = sick_week.user_id
-    challenge_id = sick_week.challenge_id
-    db.session.delete(sick_week)
+        abort(403)
+    user_id = period.user_id
+    challenge_id = period.challenge_id
+    db.session.delete(period)
     db.session.commit()
-    flash("Krankmeldung wurde gelöscht.", "success")
-    if current_user.is_admin and user_id != current_user.id:
+    flash("Krankmeldung gelöscht.")
+    if current_user.is_admin and current_user.id != user_id:
         return redirect(url_for("challenge_activities.user_activities",
-                                user_id=user_id,
-                                challenge_id=challenge_id))
+                                 challenge_id=challenge_id, user_id=user_id))
     return redirect(url_for("challenge_activities.my_week"))
 
 

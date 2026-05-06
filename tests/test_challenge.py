@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import pytest
 
 from app.models.challenge import Challenge, ChallengeParticipation
-from app.models.sick_week import SickWeek
+from app.models.sick_period import SickPeriod
 from app.models.user import User
 
 
@@ -277,7 +277,7 @@ def test_bailout_from_challenge(client, db):
     assert participation.bailed_out_at is not None
 
 
-def test_sick_week_creation(client, db):
+def test_sick_period_creation(client, db):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
 
@@ -297,25 +297,29 @@ def test_sick_week_creation(client, db):
     client.post("/auth/logout")
     client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
 
+    today = date.today()
+    # Daten innerhalb der Challenge-Grenzen (start=today-1, end=today+30)
+    sick_from = today - timedelta(days=1)
+    sick_to = today
     resp = client.post(
-        f"/challenges/{challenge.public_id}/sick",
+        "/challenge-activities/sick-period",
+        data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
         follow_redirects=False,
     )
     assert resp.status_code == 302
 
-    today = date.today()
-    expected_monday = today - timedelta(days=today.weekday())
-    sick_week = db.session.execute(
-        db.select(SickWeek).where(
-            SickWeek.user_id == participant.id,
-            SickWeek.challenge_id == challenge.id,
+    sick_period = db.session.execute(
+        db.select(SickPeriod).where(
+            SickPeriod.user_id == participant.id,
+            SickPeriod.challenge_id == challenge.id,
         )
     ).scalar_one_or_none()
-    assert sick_week is not None
-    assert sick_week.week_start == expected_monday
+    assert sick_period is not None
+    assert sick_period.start_date == sick_from
+    assert sick_period.end_date == sick_to
 
 
-def test_duplicate_sick_week_rejected(client, db):
+def test_overlapping_sick_period_rejected(client, db):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
 
@@ -335,15 +339,25 @@ def test_duplicate_sick_week_rejected(client, db):
     client.post("/auth/logout")
     client.post("/auth/login", data={"email": "participant@test.com", "password": "pass123"})
 
-    # First sick report
-    client.post(f"/challenges/{challenge.public_id}/sick")
-    # Second sick report (duplicate)
-    client.post(f"/challenges/{challenge.public_id}/sick")
+    today = date.today()
+    sick_from = today - timedelta(days=3)
+    sick_to = today
+
+    # First sick period
+    client.post(
+        "/challenge-activities/sick-period",
+        data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
+    )
+    # Second overlapping period – should be rejected
+    client.post(
+        "/challenge-activities/sick-period",
+        data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
+    )
 
     count = db.session.execute(
-        db.select(SickWeek).where(
-            SickWeek.user_id == participant.id,
-            SickWeek.challenge_id == challenge.id,
+        db.select(SickPeriod).where(
+            SickPeriod.user_id == participant.id,
+            SickPeriod.challenge_id == challenge.id,
         )
     ).scalars().all()
     assert len(count) == 1
@@ -364,8 +378,8 @@ def _create_participant(db, challenge_id, email="p@test.com"):
     return user
 
 
-def test_sick_week_submit_partial(client, db):
-    """POST /sick-week mit sick_days=3 legt partiellen Eintrag an."""
+def test_sick_period_submit_partial(client, db):
+    """POST /sick-period mit Von/Bis legt partiellen Eintrag an."""
     admin = _create_and_login(client, db, email="admin_sw@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
     client.post("/auth/logout")
@@ -373,28 +387,31 @@ def test_sick_week_submit_partial(client, db):
     participant = _create_participant(db, challenge.id, email="p_sw@test.com")
     client.post("/auth/login", data={"email": "p_sw@test.com", "password": "pass123"})
 
+    today = date.today()
+    # Daten innerhalb der Challenge-Grenzen (start=today-1, end=today+30)
+    sick_from = today - timedelta(days=1)
+    sick_to = today + timedelta(days=1)
+
     resp = client.post(
-        "/challenge-activities/sick-week",
-        data={"sick_days": "3", "offset": "0"},
+        "/challenge-activities/sick-period",
+        data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
         follow_redirects=False,
     )
     assert resp.status_code == 302
 
-    today = date.today()
-    monday = today - timedelta(days=today.weekday())
-    sw = db.session.execute(
-        db.select(SickWeek).where(
-            SickWeek.user_id == participant.id,
-            SickWeek.challenge_id == challenge.id,
-            SickWeek.week_start == monday,
+    sp = db.session.execute(
+        db.select(SickPeriod).where(
+            SickPeriod.user_id == participant.id,
+            SickPeriod.challenge_id == challenge.id,
         )
     ).scalar_one_or_none()
-    assert sw is not None
-    assert sw.sick_days == 3
+    assert sp is not None
+    assert sp.start_date == sick_from
+    assert sp.end_date == sick_to
 
 
-def test_sick_week_submit_update(client, db):
-    """Zweiter POST aktualisiert sick_days statt Duplikat anzulegen."""
+def test_sick_period_update(client, db):
+    """POST mit sick_period_id aktualisiert end_date statt Duplikat anzulegen."""
     admin = _create_and_login(client, db, email="admin_upd@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
     client.post("/auth/logout")
@@ -402,23 +419,44 @@ def test_sick_week_submit_update(client, db):
     participant = _create_participant(db, challenge.id, email="p_upd@test.com")
     client.post("/auth/login", data={"email": "p_upd@test.com", "password": "pass123"})
 
-    client.post("/challenge-activities/sick-week", data={"sick_days": "2", "offset": "0"})
-    client.post("/challenge-activities/sick-week", data={"sick_days": "5", "offset": "0"})
-
     today = date.today()
     monday = today - timedelta(days=today.weekday())
+    sick_from = monday
+    sick_to_initial = monday + timedelta(days=6)
+
+    # Create initial period
+    client.post(
+        "/challenge-activities/sick-period",
+        data={"sick_from": sick_from.isoformat(), "sick_to": sick_to_initial.isoformat()},
+    )
+
+    sp = db.session.execute(
+        db.select(SickPeriod).where(SickPeriod.user_id == participant.id)
+    ).scalar_one()
+
+    # Update end_date (recovering early)
+    sick_to_updated = monday + timedelta(days=3)
+    client.post(
+        "/challenge-activities/sick-period",
+        data={
+            "sick_period_id": str(sp.id),
+            "sick_from": sick_from.isoformat(),
+            "sick_to": sick_to_updated.isoformat(),
+        },
+    )
+
     rows = db.session.execute(
-        db.select(SickWeek).where(
-            SickWeek.user_id == participant.id,
-            SickWeek.challenge_id == challenge.id,
+        db.select(SickPeriod).where(
+            SickPeriod.user_id == participant.id,
+            SickPeriod.challenge_id == challenge.id,
         )
     ).scalars().all()
     assert len(rows) == 1
-    assert rows[0].sick_days == 5
+    assert rows[0].end_date == sick_to_updated
 
 
-def test_sick_week_submit_future_rejected(client, db):
-    """offset=1 (zukünftige Woche) wird abgelehnt – kein Eintrag."""
+def test_sick_period_future_allowed(client, db):
+    """Zukünftiger Zeitraum wird jetzt akzeptiert – Eintrag wird gespeichert."""
     admin = _create_and_login(client, db, email="admin_fut@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
     client.post("/auth/logout")
@@ -426,21 +464,25 @@ def test_sick_week_submit_future_rejected(client, db):
     participant = _create_participant(db, challenge.id, email="p_fut@test.com")
     client.post("/auth/login", data={"email": "p_fut@test.com", "password": "pass123"})
 
+    today = date.today()
+    sick_from = today + timedelta(weeks=2)
+    sick_to = today + timedelta(weeks=2, days=4)
+
     resp = client.post(
-        "/challenge-activities/sick-week",
-        data={"sick_days": "3", "offset": "1"},
+        "/challenge-activities/sick-period",
+        data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
         follow_redirects=False,
     )
     assert resp.status_code == 302
 
     count = db.session.execute(
-        db.select(SickWeek).where(SickWeek.user_id == participant.id)
+        db.select(SickPeriod).where(SickPeriod.user_id == participant.id)
     ).scalars().all()
-    assert len(count) == 0
+    assert len(count) == 1
 
 
-def test_sick_week_submit_von_bis_single_week(client, db):
-    """von/bis innerhalb einer Woche: ein SickWeek-Eintrag mit korrektem sick_days."""
+def test_sick_period_von_bis_single_week(client, db):
+    """von/bis innerhalb einer Woche: eine SickPeriod, start/end korrekt."""
     admin = _create_and_login(client, db, email="admin_vb1@test.com", is_admin=True)
     today = date.today()
     monday = today - timedelta(days=today.weekday())
@@ -459,26 +501,26 @@ def test_sick_week_submit_von_bis_single_week(client, db):
     participant = _create_participant(db, challenge.id, email="p_vb1@test.com")
     client.post("/auth/login", data={"email": "p_vb1@test.com", "password": "pass123"})
 
-    # Di bis Do der aktuellen Woche = 3 Tage
+    # Di bis Do der aktuellen Woche
     sick_from = monday + timedelta(days=1)
     sick_to = monday + timedelta(days=3)
     resp = client.post(
-        "/challenge-activities/sick-week",
+        "/challenge-activities/sick-period",
         data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
         follow_redirects=False,
     )
     assert resp.status_code == 302
 
     rows = db.session.execute(
-        db.select(SickWeek).where(SickWeek.user_id == participant.id)
+        db.select(SickPeriod).where(SickPeriod.user_id == participant.id)
     ).scalars().all()
     assert len(rows) == 1
-    assert rows[0].week_start == monday
-    assert rows[0].sick_days == 3
+    assert rows[0].start_date == sick_from
+    assert rows[0].end_date == sick_to
 
 
-def test_sick_week_submit_von_bis_two_weeks(client, db):
-    """von/bis über Wochengrenze: zwei separate SickWeek-Einträge."""
+def test_sick_period_von_bis_two_weeks(client, db):
+    """von/bis über Wochengrenze: eine SickPeriod (kein Split), start/end korrekt."""
     admin = _create_and_login(client, db, email="admin_vb2@test.com", is_admin=True)
     today = date.today()
     monday = today - timedelta(days=today.weekday())
@@ -498,25 +540,60 @@ def test_sick_week_submit_von_bis_two_weeks(client, db):
     participant = _create_participant(db, challenge.id, email="p_vb2@test.com")
     client.post("/auth/login", data={"email": "p_vb2@test.com", "password": "pass123"})
 
-    # Do der Vorwoche bis Di dieser Woche = 3 + 2 = 5 Tage über 2 Wochen
+    # Do der Vorwoche bis Di dieser Woche
     sick_from = prev_monday + timedelta(days=3)  # Donnerstag Vorwoche
     sick_to = monday + timedelta(days=1)         # Dienstag diese Woche
     client.post(
-        "/challenge-activities/sick-week",
+        "/challenge-activities/sick-period",
         data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
     )
 
     rows = db.session.execute(
-        db.select(SickWeek).where(
-            SickWeek.user_id == participant.id,
-            SickWeek.challenge_id == challenge.id,
-        ).order_by(SickWeek.week_start)
+        db.select(SickPeriod).where(
+            SickPeriod.user_id == participant.id,
+            SickPeriod.challenge_id == challenge.id,
+        )
     ).scalars().all()
-    assert len(rows) == 2
-    assert rows[0].week_start == prev_monday
-    assert rows[0].sick_days == 4   # Do, Fr, Sa, So
-    assert rows[1].week_start == monday
-    assert rows[1].sick_days == 2   # Mo, Di
+    assert len(rows) == 1
+    assert rows[0].start_date == sick_from
+    assert rows[0].end_date == sick_to
+
+
+def test_sick_period_clamped_to_challenge_bounds(client, db):
+    """Zeitraum außerhalb Challenge wird auf Challenge-Grenzen geclampt."""
+    admin = _create_and_login(client, db, email="admin_clamp@test.com", is_admin=True)
+    today = date.today()
+    challenge = Challenge(
+        name="Clamp Test",
+        start_date=today,
+        end_date=today + timedelta(days=27),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=admin.id,
+    )
+    db.session.add(challenge)
+    db.session.commit()
+    client.post("/auth/logout")
+
+    participant = _create_participant(db, challenge.id, email="p_clamp@test.com")
+    client.post("/auth/login", data={"email": "p_clamp@test.com", "password": "pass123"})
+
+    # Sende Zeitraum der vor Challenge-Start beginnt
+    sick_from = today - timedelta(days=7)
+    sick_to = today + timedelta(days=3)
+    resp = client.post(
+        "/challenge-activities/sick-period",
+        data={"sick_from": sick_from.isoformat(), "sick_to": sick_to.isoformat()},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    sp = db.session.execute(
+        db.select(SickPeriod).where(SickPeriod.user_id == participant.id)
+    ).scalar_one_or_none()
+    assert sp is not None
+    assert sp.start_date == challenge.start_date  # auf Challenge-Start geclampt
+    assert sp.end_date == sick_to
 
 
 def test_create_challenge_with_invites(client, db):
