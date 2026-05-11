@@ -99,7 +99,10 @@ class TestResetPasswordRoute:
                 _db.select(User).filter_by(email="test@example.com")
             ).scalar_one()
             s = URLSafeTimedSerializer(app.config["SECRET_KEY"])
-            return s.dumps(user.id, salt="password-reset")
+            return s.dumps(
+                {"uid": user.id, "pv": user.password_hash[-16:]},
+                salt="password-reset",
+            )
 
     def test_get_with_valid_token_renders_form(self, client):
         from app import create_app
@@ -171,6 +174,47 @@ class TestResetPasswordRoute:
             )
         assert resp.status_code == 200
         assert b"stimmen nicht" in resp.data
+
+    def test_token_is_one_time_use(self, client):
+        """Nach erfolgreichem Passwort-Reset darf der Token nicht erneut funktionieren."""
+        from app import create_app
+
+        app = create_app(TestConfig)
+        with app.app_context():
+            _db.create_all()
+            user = User(email="test@example.com")
+            user.set_password("oldpassword123")
+            user.is_approved = True
+            _db.session.add(user)
+            _db.session.commit()
+
+            token = self._get_valid_token(app)
+            test_client = app.test_client()
+
+            # Erste Nutzung: erfolgreich
+            resp1 = test_client.post(
+                f"/auth/reset-password/{token}",
+                data={"password": "neupass456", "password2": "neupass456"},
+                follow_redirects=True,
+            )
+            assert resp1.status_code == 200
+            assert b"erfolgreich" in resp1.data
+
+            # Zweite Nutzung desselben Tokens: muss abgewiesen werden
+            resp2 = test_client.post(
+                f"/auth/reset-password/{token}",
+                data={"password": "andererpass789", "password2": "andererpass789"},
+                follow_redirects=True,
+            )
+            assert resp2.status_code == 200
+            assert b"bereits verwendet" in resp2.data
+
+            # Passwort darf nicht erneut geändert worden sein
+            updated = _db.session.execute(
+                _db.select(User).filter_by(email="test@example.com")
+            ).scalar_one()
+            assert updated.check_password("neupass456")
+            assert not updated.check_password("andererpass789")
 
     def test_post_password_too_short_shows_error(self, client):
         from app import create_app

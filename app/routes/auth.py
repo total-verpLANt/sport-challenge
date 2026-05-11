@@ -161,7 +161,7 @@ def reset_password(token: str):
 
     s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
     try:
-        user_id = s.loads(token, salt=_RESET_SALT, max_age=_RESET_TOKEN_MAX_AGE)
+        payload = s.loads(token, salt=_RESET_SALT, max_age=_RESET_TOKEN_MAX_AGE)
     except SignatureExpired:
         flash("Der Reset-Link ist abgelaufen. Bitte fordere einen neuen an.", "danger")
         return redirect(url_for("auth.forgot_password"))
@@ -169,9 +169,19 @@ def reset_password(token: str):
         flash("Ungültiger Reset-Link.", "danger")
         return redirect(url_for("auth.forgot_password"))
 
-    user = db.session.get(User, user_id)
+    if not isinstance(payload, dict) or "uid" not in payload or "pv" not in payload:
+        flash("Ungültiger Reset-Link.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+
+    user = db.session.get(User, payload["uid"])
     if user is None:
         flash("Benutzer nicht gefunden.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+
+    # One-Time-Use: Token enthält Suffix des damaligen Passwort-Hashes; nach Reset
+    # ändert sich der Hash → alte Tokens werden ungültig.
+    if payload["pv"] != user.password_hash[-16:]:
+        flash("Dieser Reset-Link wurde bereits verwendet oder ist ungültig.", "danger")
         return redirect(url_for("auth.forgot_password"))
 
     error = None
@@ -196,7 +206,7 @@ def _send_password_reset_mail(user: User) -> None:
     from flask import current_app
 
     s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
-    token = s.dumps(user.id, salt=_RESET_SALT)
+    token = s.dumps({"uid": user.id, "pv": user.password_hash[-16:]}, salt=_RESET_SALT)
     reset_url = url_for("auth.reset_password", token=token, _external=True)
 
     body = render_template("email/password_reset.txt", reset_url=reset_url)

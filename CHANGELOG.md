@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.13.1] – 2026-05-11
+
+### Sicherheit
+- Passwort-Reset-Token sind jetzt **One-Time-Use**: Nach erfolgreichem Passwort-Wechsel wird der Link automatisch ungültig (stateless via Hash-Suffix im Token-Payload, keine Migration nötig)
+
 ## [0.13.0] – 2026-05-06
 
 ### Neu
