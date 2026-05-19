@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.13.2] – 2026-05-19
+
+### Behoben
+- "Meine Woche": Krankgemeldete Tage werden jetzt pro Tag mit Badge (🤒 Krank) und farbiger Karten-Markierung sichtbar gemacht — Aktivitäten an Krank-Tagen werden weiterhin korrekt angezeigt
+- "Meine Woche" stürzt nicht mehr ab, wenn mehrere Krankmeldungen in dieselbe Woche fallen (`scalar_one_or_none` → Liste)
+
 ## [0.13.1] – 2026-05-11
 
 ### Sicherheit

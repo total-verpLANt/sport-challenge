@@ -170,6 +170,30 @@ def my_week():
 
     activities = db.session.execute(query.order_by(Activity.activity_date)).scalars().all()
 
+    # Collect all SickPeriod days that overlap the current week (Set of dates)
+    sick_dates: set[date] = set()
+    sick_period = None
+    sick_days_val = 0
+    if participation:
+        overlapping_periods = db.session.scalars(
+            db.select(SickPeriod).where(
+                SickPeriod.user_id == current_user.id,
+                SickPeriod.challenge_id == participation.challenge_id,
+                SickPeriod.start_date <= sunday,
+                SickPeriod.end_date >= monday,
+            )
+        ).all()
+        for p in overlapping_periods:
+            eff_start = max(p.start_date, monday)
+            eff_end = min(p.end_date, sunday)
+            d = eff_start
+            while d <= eff_end:
+                sick_dates.add(d)
+                d += timedelta(days=1)
+        sick_days_val = min(len(sick_dates), 7)
+        # Form-Card zeigt weiterhin eine Periode (erste überlappende) — Multi-Period-UI folgt in Fix B
+        sick_period = overlapping_periods[0] if overlapping_periods else None
+
     # Build per-day structure
     days = []
     for i in range(7):
@@ -184,6 +208,7 @@ def my_week():
                 "short": total_minutes < 30 and total_minutes > 0,
                 "missing": total_minutes == 0,
                 "remaining": max(0, 30 - total_minutes),
+                "is_sick": day_date in sick_dates,
             }
         )
 
@@ -194,22 +219,6 @@ def my_week():
     has_connector = (
         ConnectorCredential.query.filter_by(user_id=current_user.id).first() is not None
     )
-
-    sick_period = None
-    sick_days_val = 0
-    if participation:
-        sick_period = db.session.execute(
-            db.select(SickPeriod).where(
-                SickPeriod.user_id == current_user.id,
-                SickPeriod.challenge_id == participation.challenge_id,
-                SickPeriod.start_date <= sunday,
-                SickPeriod.end_date >= monday,
-            )
-        ).scalar_one_or_none()
-        if sick_period is not None:
-            eff_start = max(sick_period.start_date, monday)
-            eff_end = min(sick_period.end_date, sunday)
-            sick_days_val = min((eff_end - eff_start).days + 1, 7)
 
     return render_template(
         "activities/my_week.html",
