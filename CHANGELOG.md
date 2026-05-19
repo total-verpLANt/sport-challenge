@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] – 2026-05-19
+
+### Neu
+- "Meine Woche" zeigt jetzt **mehrere Krankmeldungen** derselben Woche gleichzeitig: jede Periode hat eine eigene Edit-Form und einen eigenen Löschen-Button; ein separates Eingabefeld erlaubt das Anlegen einer weiteren Krankmeldung
+- Karten-Header zeigt bei mehreren Perioden eine Kompakt-Übersicht aller Zeiträume
+
 ## [0.13.2] – 2026-05-19
 
 ### Behoben

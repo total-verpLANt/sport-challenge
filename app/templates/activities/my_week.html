@@ -32,7 +32,7 @@
   <div class="card-body">
     <h5 class="card-title">Fortschritt diese Woche</h5>
     <p class="card-text mb-2">
-      {% if sick_period %}
+      {% if sick_periods %}
         {% set eff_goal = [0, weekly_goal - (sick_days_val // 2)]|max %}
         <strong>{{ fulfilled_days }} von {{ eff_goal }} Tagen</strong> mit mindestens 30 Minuten
         <small class="text-muted">({{ sick_days_val }} Krankentag(e) diese Woche, effektives Ziel)</small>
@@ -53,50 +53,77 @@
 
 {# Sick-Entry-Section #}
 {% if participation and participation.status == "accepted" %}
-<div class="card mb-4 {% if sick_period %}border-warning{% endif %}">
-  <div class="card-header {% if sick_period %}bg-warning text-dark{% endif %}">
-    <strong>Krankmeldung</strong>
-    {% if sick_period %}
-      <span class="ms-2 small">– {{ sick_period.start_date.strftime('%d.%m.%Y') }} bis {{ sick_period.end_date.strftime('%d.%m.%Y') }}</span>
+<div class="card mb-4 {% if sick_periods %}border-warning{% endif %}">
+  <div class="card-header {% if sick_periods %}bg-warning text-dark{% endif %}">
+    <strong>Krankmeldung{% if sick_periods|length > 1 %}en{% endif %}</strong>
+    {% if sick_periods %}
+      <span class="ms-2 small">
+        {% for p in sick_periods %}
+          {{ p.start_date.strftime('%d.%m.%Y') }} – {{ p.end_date.strftime('%d.%m.%Y') }}{% if not loop.last %} · {% endif %}
+        {% endfor %}
+      </span>
     {% endif %}
   </div>
   <div class="card-body">
-    <form method="post"
-          action="{{ url_for('challenge_activities.sick_period_submit') }}"
-          class="row g-2 align-items-end">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="offset" value="{{ offset }}">
-      {% if sick_period %}
-      <input type="hidden" name="sick_period_id" value="{{ sick_period.id }}">
-      {% endif %}
-      <div class="col-12 col-sm-5">
-        <label for="sick_from" class="form-label">Von</label>
-        <input type="date" class="form-control" id="sick_from" name="sick_from"
-               value="{{ sick_period.start_date.isoformat() if sick_period else '' }}" required>
-      </div>
-      <div class="col-12 col-sm-5">
-        <label for="sick_to" class="form-label">Bis</label>
-        <input type="date" class="form-control" id="sick_to" name="sick_to"
-               value="{{ sick_period.end_date.isoformat() if sick_period else '' }}" required>
-      </div>
-      <div class="col-12 col-sm-2">
-        <button type="submit" class="btn btn-outline-warning w-100">
-          {% if sick_period %}Aktualisieren{% else %}Eintragen{% endif %}
-        </button>
-      </div>
-    </form>
-    <div class="form-text mt-1">Pro 2 Krankentage wird eine benötigte Aktivität abgezogen.</div>
-    {% if sick_period %}
-    <div class="mt-3">
+
+    {# Bestehende Perioden: jeweils eigene Edit-Form + Lösch-Button #}
+    {% for p in sick_periods %}
+    <div class="border rounded p-2 mb-2 bg-light-subtle">
       <form method="post"
-            action="{{ url_for('challenge_activities.delete_sick_period', sick_period_id=sick_period.id) }}"
-            data-confirm="Krankmeldung wirklich löschen?"
-            class="d-inline">
+            action="{{ url_for('challenge_activities.sick_period_submit') }}"
+            class="row g-2 align-items-end">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-outline-danger btn-sm">Krankmeldung löschen</button>
+        <input type="hidden" name="offset" value="{{ offset }}">
+        <input type="hidden" name="sick_period_id" value="{{ p.id }}">
+        <div class="col-12 col-sm-5">
+          <label for="sick_from_{{ p.id }}" class="form-label">Von</label>
+          <input type="date" class="form-control" id="sick_from_{{ p.id }}" name="sick_from"
+                 value="{{ p.start_date.isoformat() }}" required>
+        </div>
+        <div class="col-12 col-sm-5">
+          <label for="sick_to_{{ p.id }}" class="form-label">Bis</label>
+          <input type="date" class="form-control" id="sick_to_{{ p.id }}" name="sick_to"
+                 value="{{ p.end_date.isoformat() }}" required>
+        </div>
+        <div class="col-12 col-sm-2">
+          <button type="submit" class="btn btn-outline-warning w-100">Aktualisieren</button>
+        </div>
+      </form>
+      <div class="mt-2">
+        <form method="post"
+              action="{{ url_for('challenge_activities.delete_sick_period', sick_period_id=p.id) }}"
+              data-confirm="Krankmeldung vom {{ p.start_date.strftime('%d.%m.%Y') }} bis {{ p.end_date.strftime('%d.%m.%Y') }} wirklich löschen?"
+              class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-danger btn-sm">Löschen</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+
+    {# Neue Krankmeldung anlegen (immer sichtbar) #}
+    <div class="{% if sick_periods %}mt-3 pt-3 border-top{% endif %}">
+      {% if sick_periods %}<div class="small text-muted mb-2">Weitere Krankmeldung anlegen:</div>{% endif %}
+      <form method="post"
+            action="{{ url_for('challenge_activities.sick_period_submit') }}"
+            class="row g-2 align-items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="offset" value="{{ offset }}">
+        <div class="col-12 col-sm-5">
+          <label for="sick_from_new" class="form-label">Von</label>
+          <input type="date" class="form-control" id="sick_from_new" name="sick_from" required>
+        </div>
+        <div class="col-12 col-sm-5">
+          <label for="sick_to_new" class="form-label">Bis</label>
+          <input type="date" class="form-control" id="sick_to_new" name="sick_to" required>
+        </div>
+        <div class="col-12 col-sm-2">
+          <button type="submit" class="btn btn-outline-warning w-100">Eintragen</button>
+        </div>
       </form>
     </div>
-    {% endif %}
+
+    <div class="form-text mt-2">Pro 2 Krankentage wird eine benötigte Aktivität abgezogen.</div>
   </div>
 </div>
 {% endif %}

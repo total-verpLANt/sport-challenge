@@ -172,18 +172,20 @@ def my_week():
 
     # Collect all SickPeriod days that overlap the current week (Set of dates)
     sick_dates: set[date] = set()
-    sick_period = None
+    sick_periods: list[SickPeriod] = []
     sick_days_val = 0
     if participation:
-        overlapping_periods = db.session.scalars(
-            db.select(SickPeriod).where(
+        sick_periods = list(db.session.scalars(
+            db.select(SickPeriod)
+            .where(
                 SickPeriod.user_id == current_user.id,
                 SickPeriod.challenge_id == participation.challenge_id,
                 SickPeriod.start_date <= sunday,
                 SickPeriod.end_date >= monday,
             )
-        ).all()
-        for p in overlapping_periods:
+            .order_by(SickPeriod.start_date)
+        ).all())
+        for p in sick_periods:
             eff_start = max(p.start_date, monday)
             eff_end = min(p.end_date, sunday)
             d = eff_start
@@ -191,8 +193,6 @@ def my_week():
                 sick_dates.add(d)
                 d += timedelta(days=1)
         sick_days_val = min(len(sick_dates), 7)
-        # Form-Card zeigt weiterhin eine Periode (erste überlappende) — Multi-Period-UI folgt in Fix B
-        sick_period = overlapping_periods[0] if overlapping_periods else None
 
     # Build per-day structure
     days = []
@@ -230,7 +230,7 @@ def my_week():
         weekly_goal=weekly_goal,
         participation=participation,
         has_connector=has_connector,
-        sick_period=sick_period,
+        sick_periods=sick_periods,
         sick_days_val=sick_days_val,
     )
 
