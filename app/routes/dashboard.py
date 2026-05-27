@@ -66,7 +66,10 @@ def index():
         )
         .order_by(Activity.activity_date.desc(), func.coalesce(Activity.started_at, Activity.created_at).desc())
         .limit(10)
-        .options(selectinload(Activity.media), selectinload(Activity.likes))
+        .options(
+            selectinload(Activity.media),
+            selectinload(Activity.likes).selectinload(ActivityLike.user),
+        )
     ).all()
 
     # Motivationssprüche pro Activity
@@ -75,6 +78,12 @@ def index():
     # Like-Status des aktuellen Users pro Activity
     liked_ids = {
         a.id: {like.user_id for like in a.likes}
+        for a in feed_activities
+    }
+
+    # Liker-Spitznamen pro Activity
+    liked_names = {
+        a.id: [like.user.display_name for like in a.likes]
         for a in feed_activities
     }
 
@@ -90,6 +99,7 @@ def index():
         feed_activities=feed_activities,
         feed_quotes=feed_quotes,
         liked_ids=liked_ids,
+        liked_names=liked_names,
         feed_user_names=feed_user_names,
         challenge=challenge,
     )
@@ -165,9 +175,23 @@ def feed():
         if a.user_id not in user_map:
             user_map[a.user_id] = db.session.get(User, a.user_id)
 
+    # Liker-User laden für display_name
+    all_liker_ids = {like.user_id for a in activities for like in a.likes}
+    liker_users = {}
+    if all_liker_ids:
+        liker_users = {
+            u.id: u for u in db.session.scalars(
+                db.select(User).where(User.id.in_(all_liker_ids))
+            ).all()
+        }
+
     result = []
     for a in activities:
         user = user_map.get(a.user_id)
+        liked_by = [
+            liker_users[like.user_id].display_name
+            for like in a.likes if like.user_id in liker_users
+        ]
         result.append({
             "id": a.id,
             "user_display_name": user.display_name if user else "Unbekannt",
@@ -179,6 +203,7 @@ def feed():
             "quote": get_random_quote(),
             "liked_by_me": current_user.id in {like.user_id for like in a.likes},
             "like_count": len(a.likes),
+            "liked_by": liked_by,
             "media": [
                 {
                     "url": url_for('static', filename=m.file_path),
@@ -230,10 +255,12 @@ def like_activity(activity_id: int):
         db.session.commit()
         liked = True
 
-    count = db.session.scalar(
-        db.select(db.func.count(ActivityLike.id)).where(
-            ActivityLike.activity_id == activity_id
-        )
-    )
+    likes = db.session.scalars(
+        db.select(ActivityLike)
+        .where(ActivityLike.activity_id == activity_id)
+        .options(selectinload(ActivityLike.user))
+    ).all()
 
-    return jsonify({"liked": liked, "count": count})
+    liked_by = [like.user.display_name for like in likes]
+
+    return jsonify({"liked": liked, "count": len(likes), "liked_by": liked_by})

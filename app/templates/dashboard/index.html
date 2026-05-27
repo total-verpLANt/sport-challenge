@@ -153,6 +153,20 @@
         data-csrf="{{ csrf_token() }}">
         ❤️ <span class="like-count">{{ activity.likes | length }}</span>
       </button>
+      {% set names = liked_names.get(activity.id, []) %}
+      {% if names %}
+      <span class="like-names text-muted small ms-2">
+        {% if names | length == 1 %}
+          {{ names[0] }} gefällt das
+        {% elif names | length == 2 %}
+          {{ names[0] }} und {{ names[1] }} gefällt das
+        {% elif names | length <= 5 %}
+          {{ names[:-1] | join(', ') }} und {{ names[-1] }} gefällt das
+        {% else %}
+          {{ names[:4] | join(', ') }} und {{ names | length - 4 }} weitere{{ 'n' if names | length - 4 > 1 else 'm' }}
+        {% endif %}
+      </span>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
@@ -184,6 +198,29 @@
     ? GLightbox({ selector: '.glightbox', touchNavigation: true })
     : null;
 
+  function formatLikeNames(names) {
+    if (!names || names.length === 0) return '';
+    if (names.length === 1) return esc(names[0]) + ' gefällt das';
+    if (names.length === 2) return esc(names[0]) + ' und ' + esc(names[1]) + ' gefällt das';
+    if (names.length <= 5) return names.slice(0, -1).map(esc).join(', ') + ' und ' + esc(names[names.length - 1]) + ' gefällt das';
+    return names.slice(0, 4).map(esc).join(', ') + ' und ' + (names.length - 4) + ' weitere';
+  }
+
+  function updateLikeNames(btn, names) {
+    let span = btn.nextElementSibling;
+    if (span && !span.classList.contains('like-names')) span = null;
+    if (!names || names.length === 0) {
+      if (span) span.remove();
+      return;
+    }
+    if (!span) {
+      span = document.createElement('span');
+      span.className = 'like-names text-muted small ms-2';
+      btn.insertAdjacentElement('afterend', span);
+    }
+    span.innerHTML = formatLikeNames(names);
+  }
+
   function attachLikeHandler(btn) {
     btn.addEventListener('click', function() {
       if (this.disabled) return;
@@ -209,6 +246,7 @@
           self.classList.add('btn-outline-danger');
           self.dataset.liked = 'false';
         }
+        updateLikeNames(self, data.liked_by);
       })
       .catch(console.error)
       .finally(() => { self.disabled = false; });
@@ -245,6 +283,9 @@
             : '';
 
           const likedClass = a.liked_by_me ? 'btn-danger' : 'btn-outline-danger';
+          const likeNamesHtml = (a.liked_by && a.liked_by.length > 0)
+            ? '<span class="like-names text-muted small ms-2">' + formatLikeNames(a.liked_by) + '</span>'
+            : '';
 
           card.innerHTML =
             '<div class="card-body">' +
@@ -259,6 +300,7 @@
               'data-activity-id="' + esc(a.id) + '" ' +
               'data-liked="' + (a.liked_by_me ? 'true' : 'false') + '" ' +
               'data-csrf="' + esc(csrf) + '">❤️ <span class="like-count">' + esc(a.like_count) + '</span></button>' +
+              likeNamesHtml +
             '</div>';
 
           if (a.media && a.media.length > 0) {
