@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] – 2026-05-27
+
+### Neu
+- Dashboard zeigt neben dem Like-Herz die Spitznamen der Liker an (z.B. „Tick, Trick und Track gefällt das"); ab 6 Likern wird abgekürzt
+
 ## [0.14.0] – 2026-05-19
 
 ### Neu
