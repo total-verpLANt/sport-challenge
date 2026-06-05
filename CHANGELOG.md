@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.15.2] – 2026-06-05
+
+### Geändert
+- Admin-Benachrichtigung bei Neuregistrierung wird jetzt als **ein einziger BCC-Request** an alle Admins versendet (statt N Einzel-Requests): spart Mailgun-Requests/Rate-Limit und verbirgt die Admin-Adressen voreinander (kein PII-Leak im To-Feld). `MailgunService.send()` unterstützt dafür einen neuen `bcc`-Parameter
+
 ## [0.15.1] – 2026-06-05
 
 ### Behoben

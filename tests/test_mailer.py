@@ -105,3 +105,17 @@ class TestMailgunServiceSend:
 
         data = mock_post.call_args.kwargs["data"]
         assert data["o:tag"] == ["test-tag"]
+
+    def test_raises_without_to_and_bcc(self, svc):
+        with pytest.raises(ValueError, match="to oder bcc"):
+            svc.send(subject="s", text="t")
+
+    def test_bcc_only_sets_sender_as_to(self, svc):
+        with patch.object(svc._session, "post", return_value=self._mock_response()) as mock_post:
+            svc.send(bcc=["a@b.com", "c@d.com"], subject="s", text="t")
+
+        data = mock_post.call_args.kwargs["data"]
+        # Empfänger landen im BCC, nicht im To
+        assert data["bcc"] == ["a@b.com", "c@d.com"]
+        # To fällt auf den Absender zurück (valider Header, kein PII-Leak)
+        assert data["to"] == ["Sport Challenge <noreply@mg.example.com>"]

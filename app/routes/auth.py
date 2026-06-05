@@ -238,22 +238,15 @@ def _notify_admins_new_user(new_user: User) -> None:
         registered_at=registered_at,
         admin_url=admin_url,
     )
+    # Ein einziger Request an alle Admins via BCC: spart Requests/Rate-Limit
+    # und verbirgt die Admin-Adressen voreinander (kein PII-Leak im To-Feld).
+    admin_emails = [admin.email for admin in admins]
     try:
-        mailer = get_mailer()
+        get_mailer().send(
+            bcc=admin_emails,
+            subject="[Sport Challenge] Neuer Benutzer wartet auf Freigabe",
+            text=body,
+            tags=["admin-notification"],
+        )
     except MailgunError as exc:
-        # Mailgun gar nicht konfiguriert → betrifft alle Admins, einmal loggen
-        logger.error("Admin-Benachrichtigung nicht möglich (Mailer-Init): %s", exc)
-        return
-
-    for admin in admins:
-        # Pro Admin isoliert: ein Fehler (z.B. Rate-Limit) darf die
-        # Benachrichtigung der übrigen Admins nicht verhindern.
-        try:
-            mailer.send(
-                to=admin.email,
-                subject="[Sport Challenge] Neuer Benutzer wartet auf Freigabe",
-                text=body,
-                tags=["admin-notification"],
-            )
-        except MailgunError as exc:
-            logger.error("Admin-Benachrichtigung an %s fehlgeschlagen: %s", admin.email, exc)
+        logger.error("Admin-Benachrichtigung fehlgeschlagen: %s", exc)

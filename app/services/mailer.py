@@ -36,24 +36,37 @@ class MailgunService:
 
     def send(
         self,
-        to: str | Iterable[str],
-        subject: str,
+        to: str | Iterable[str] | None = None,
+        subject: str = "",
         text: str | None = None,
         html: str | None = None,
         reply_to: str | None = None,
         tags: list[str] | None = None,
+        bcc: str | Iterable[str] | None = None,
     ) -> str:
-        """Sendet eine E-Mail. Gibt die Mailgun-Message-ID zurück."""
+        """Sendet eine E-Mail. Gibt die Mailgun-Message-ID zurück.
+
+        Mindestens ``to`` oder ``bcc`` muss gesetzt sein. Wird nur ``bcc``
+        angegeben (z.B. um Empfänger-Adressen voreinander zu verbergen),
+        wandert der Absender selbst ins ``To``-Feld, damit der Header valide
+        bleibt.
+        """
         if not text and not html:
             raise ValueError("text oder html muss angegeben werden")
-
-        recipients = [to] if isinstance(to, str) else list(to)
+        if not to and not bcc:
+            raise ValueError("to oder bcc muss angegeben werden")
 
         data: dict = {
             "from": self._sender,
-            "to": recipients,
             "subject": subject,
         }
+        if to:
+            data["to"] = [to] if isinstance(to, str) else list(to)
+        else:
+            # Nur BCC: To auf den Absender setzen, damit der Header valide ist
+            data["to"] = [self._sender]
+        if bcc:
+            data["bcc"] = [bcc] if isinstance(bcc, str) else list(bcc)
         if text:
             data["text"] = text
         if html:

@@ -270,11 +270,10 @@ def test_register_accepts_password_with_8_chars(client, db):
 
 
 # ---------------------------------------------------------------------------
-# Test 13 – Admin-Benachrichtigung: Fehler bei einem Admin blockiert nicht
-#           die Benachrichtigung der übrigen Admins (Teilausfall-Härtung)
+# Test 13 – Admin-Benachrichtigung: ein BCC-Bündel-Request an alle Admins
 # ---------------------------------------------------------------------------
 
-def test_register_notifies_all_admins_despite_send_error(client, db):
+def test_register_notifies_admins_via_bcc(client, db):
     # Zwei bestehende Admins → neuer User ist NICHT der erste, daher läuft
     # der _notify_admins_new_user-Pfad.
     for i in (1, 2):
@@ -283,10 +282,8 @@ def test_register_notifies_all_admins_despite_send_error(client, db):
         db.session.add(admin)
     db.session.commit()
 
-    # Erster send() wirft MailgunError, zweiter läuft durch.
     with patch("app.routes.auth.get_mailer") as mock_get_mailer:
         mock_mailer = mock_get_mailer.return_value
-        mock_mailer.send.side_effect = [MailgunError("rate limit"), None]
 
         resp = client.post(
             "/auth/register",
@@ -294,14 +291,40 @@ def test_register_notifies_all_admins_despite_send_error(client, db):
             follow_redirects=False,
         )
 
-    # Registrierung darf trotz Mail-Fehler nicht crashen → Redirect zu Login
+    # Registrierung erfolgreich → Redirect zu Login
     assert resp.status_code == 302
-    # Beide Admins wurden angeschrieben, obwohl der erste Versand fehlschlug
-    assert mock_mailer.send.call_count == 2
-    notified = {call.kwargs["to"] for call in mock_mailer.send.call_args_list}
-    assert notified == {"admin1@example.com", "admin2@example.com"}
+    # Genau EIN Request für alle Admins (BCC), nicht N Einzel-Requests
+    assert mock_mailer.send.call_count == 1
+    call_kwargs = mock_mailer.send.call_args.kwargs
+    # Adressen stehen im BCC (verborgen), nicht im To-Feld → kein PII-Leak
+    assert set(call_kwargs["bcc"]) == {"admin1@example.com", "admin2@example.com"}
+    assert "to" not in call_kwargs or not call_kwargs.get("to")
 
     # Neuer User landet im pending-Status (nicht freigeschaltet)
+    new_user = db.session.execute(
+        db.select(User).filter_by(email="neuling@example.com")
+    ).scalar_one_or_none()
+    assert new_user is not None
+    assert new_user.is_approved is False
+
+
+def test_register_survives_mailer_error(client, db):
+    """Schlägt der Bündel-Versand fehl, darf die Registrierung nicht crashen."""
+    admin = User(email="admin@example.com", role="admin", is_approved=True)
+    admin.set_password("admin_passwort")
+    db.session.add(admin)
+    db.session.commit()
+
+    with patch("app.routes.auth.get_mailer") as mock_get_mailer:
+        mock_get_mailer.return_value.send.side_effect = MailgunError("rate limit")
+
+        resp = client.post(
+            "/auth/register",
+            data={"email": "neuling@example.com", "password": "sicheresPasswort1!"},
+            follow_redirects=False,
+        )
+
+    assert resp.status_code == 302
     new_user = db.session.execute(
         db.select(User).filter_by(email="neuling@example.com")
     ).scalar_one_or_none()
