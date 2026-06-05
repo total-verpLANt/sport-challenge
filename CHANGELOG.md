@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.15.1] – 2026-06-05
+
+### Behoben
+- Admin-Benachrichtigung bei Neuregistrierung: Schlägt der Mailversand an einen Admin fehl (z.B. Rate-Limit), werden die übrigen Admins jetzt trotzdem benachrichtigt (Teilausfall-Härtung — Versand pro Admin isoliert)
+
 ## [0.15.0] – 2026-05-27
 
 ### Neu

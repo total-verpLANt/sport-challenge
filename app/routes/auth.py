@@ -240,12 +240,20 @@ def _notify_admins_new_user(new_user: User) -> None:
     )
     try:
         mailer = get_mailer()
-        for admin in admins:
+    except MailgunError as exc:
+        # Mailgun gar nicht konfiguriert → betrifft alle Admins, einmal loggen
+        logger.error("Admin-Benachrichtigung nicht möglich (Mailer-Init): %s", exc)
+        return
+
+    for admin in admins:
+        # Pro Admin isoliert: ein Fehler (z.B. Rate-Limit) darf die
+        # Benachrichtigung der übrigen Admins nicht verhindern.
+        try:
             mailer.send(
                 to=admin.email,
                 subject="[Sport Challenge] Neuer Benutzer wartet auf Freigabe",
                 text=body,
                 tags=["admin-notification"],
             )
-    except MailgunError as exc:
-        logger.error("Admin-Benachrichtigung fehlgeschlagen: %s", exc)
+        except MailgunError as exc:
+            logger.error("Admin-Benachrichtigung an %s fehlgeschlagen: %s", admin.email, exc)
