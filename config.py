@@ -20,3 +20,13 @@ class Config:
     MAILGUN_SENDER: str = os.environ.get("MAILGUN_SENDER", "")
     # EU-Region: https://api.eu.mailgun.net/v3
     MAILGUN_BASE_URL: str = os.environ.get("MAILGUN_BASE_URL", "https://api.mailgun.net/v3")
+
+    # Host-Header-Härtung (siehe haf): externe Links nicht aus dem Request-Host ableiten.
+    # PUBLIC_BASE_URL: kanonische Basis für Mail-/OAuth-URLs, z. B. https://sport.example.com
+    PUBLIC_BASE_URL: str | None = os.environ.get("PUBLIC_BASE_URL") or None
+    # TRUSTED_HOSTS: komma-getrennte Allowlist; Flask weist fremde Host-Header mit 400 ab.
+    TRUSTED_HOSTS: list[str] | None = [
+        h.strip() for h in os.environ.get("TRUSTED_HOSTS", "").split(",") if h.strip()
+    ] or None
+    # ProxyFix darf X-Forwarded-Host nur vertrauen, wenn die Proxy-Kette ihn garantiert setzt.
+    PROXY_X_HOST: int = int(os.environ.get("PROXY_X_HOST", "0"))

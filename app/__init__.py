@@ -17,7 +17,11 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    # x_host nur vertrauen, wenn die Proxy-Kette X-Forwarded-Host garantiert setzt (siehe haf).
+    # TRUSTED_HOSTS aus der Config wird von Flask 3.1 automatisch zur Host-Validierung genutzt.
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app, x_for=1, x_proto=1, x_host=app.config.get("PROXY_X_HOST", 0)
+    )
 
     if not app.debug:
         logging.basicConfig(

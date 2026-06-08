@@ -16,6 +16,7 @@ from stravalib.client import Client
 
 from app.extensions import db
 from app.models.connector import ConnectorCredential
+from app.utils.urls import external_url_for
 
 strava_oauth_bp = Blueprint("strava_oauth", __name__)
 
@@ -28,7 +29,7 @@ def oauth_start():
     session["strava_oauth_state"] = {"state": state, "ts": time.time()}
 
     client = Client()
-    redirect_uri = url_for("strava_oauth.oauth_callback", _external=True)
+    redirect_uri = external_url_for("strava_oauth.oauth_callback")
     authorize_url = client.authorization_url(
         client_id=current_app.config["STRAVA_CLIENT_ID"],
         redirect_uri=redirect_uri,

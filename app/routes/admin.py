@@ -20,6 +20,7 @@ from app.models.user import User
 from app.services.mailer import MailgunError, get_mailer
 from app.utils.decorators import admin_required
 from app.utils.uploads import delete_media_files, delete_upload
+from app.utils.urls import external_url_for
 
 _MIN_PASSWORD_LENGTH = 8
 
@@ -215,7 +216,7 @@ def delete_user(user_id):
 
 def _send_approval_mail(user: User) -> None:
     """Sendet Freischaltungs-Bestätigung an den User. Fehler werden nur geloggt."""
-    login_url = url_for("auth.login", _external=True)
+    login_url = external_url_for("auth.login")
     body = render_template(
         "email/user_approved.txt",
         display_name=user.display_name,

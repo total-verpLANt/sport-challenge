@@ -11,6 +11,7 @@ from email_validator import validate_email, EmailNotValidError
 from app.extensions import db, limiter
 from app.models.user import User
 from app.services.mailer import MailgunError, get_mailer
+from app.utils.urls import external_url_for
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +208,7 @@ def _send_password_reset_mail(user: User) -> None:
 
     s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
     token = s.dumps({"uid": user.id, "pv": user.password_hash[-16:]}, salt=_RESET_SALT)
-    reset_url = url_for("auth.reset_password", token=token, _external=True)
+    reset_url = external_url_for("auth.reset_password", token=token)
 
     body = render_template("email/password_reset.txt", reset_url=reset_url)
     try:
@@ -229,7 +230,7 @@ def _notify_admins_new_user(new_user: User) -> None:
     if not admins:
         return
 
-    admin_url = url_for("admin.users", _external=True)
+    admin_url = external_url_for("admin.users")
     registered_at = new_user.created_at.strftime("%d.%m.%Y %H:%M UTC") if new_user.created_at else "unbekannt"
 
     body = render_template(

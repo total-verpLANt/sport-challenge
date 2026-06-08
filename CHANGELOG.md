@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.16.1] – 2026-06-08
+
+### Sicherheit
+- **Host-Header-Poisoning gehärtet** (Issue `haf`): Externe Links in Passwort-Reset-, Admin-/Approval-Mails und der Strava-OAuth-`redirect_uri` werden nicht mehr aus dem (fälschbaren) Request-Host abgeleitet, sondern aus einer kontrolliert konfigurierten `PUBLIC_BASE_URL`. Damit kann ein Angreifer keinen Reset-Link mehr auf eine Fremddomain umlenken
+- Neue, konfigurierbare Host-Policy (keine hartkodierte Domain): `PUBLIC_BASE_URL` (kanonische Basis externer Links), `TRUSTED_HOSTS` (Allowlist — Flask weist fremde Host-Header mit HTTP 400 ab) und `PROXY_X_HOST` (ProxyFix vertraut `X-Forwarded-Host` nur noch, wenn explizit aktiviert; Default `0`)
+
 ## [0.16.0] – 2026-06-08
 
 ### Geändert
