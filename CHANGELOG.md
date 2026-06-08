@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.16.7] – 2026-06-08
+
+### Geändert
+- **Dashboard-Leaderboard entlastet** (Issue `5gh`): `get_challenge_summary` löste die Strafberechnung bisher über pro-Zelle-Queries (~`Teilnehmer × Wochen × 7` SQL-Abfragen je Dashboard-Aufruf). Die benötigten Daten werden jetzt über drei Bulk-Queries (erfüllte Tage via `GROUP BY`, Krankheitszeiträume, Strafüberschreibungen) vorgeladen und rein im Speicher verrechnet; die Teilnehmer-User werden via `joinedload` eager geladen. Der Query-Aufwand ist dadurch **konstant** (≈3–4 Abfragen, unabhängig von Teilnehmer- und Wochenzahl) statt quadratisch zu wachsen. **Verhalten unverändert** – die berechneten Zellen- und Gesamtstrafen sind byte-genau identisch (durch Regressionstest gegen die kanonischen `penalty.py`-Funktionen abgesichert)
+
+### Hinzugefügt
+- Regressionstests `tests/test_weekly_summary.py`: Bulk-Pfad == `penalty.py`-Pfad über ein gemischtes Szenario (Aktivitäten, Krankheit, Override, Bailout) sowie ein Query-Count-Wächter gegen erneute N+1-Regressionen
+
 ## [0.16.6] – 2026-06-08
 
 ### Sicherheit
