@@ -85,7 +85,12 @@
           <input type="date" class="form-control" id="sick_to_{{ p.id }}" name="sick_to"
                  value="{{ p.end_date.isoformat() }}" required>
         </div>
-        <div class="col-12 col-sm-2">
+        <div class="col-12">
+          <label for="reason_{{ p.id }}" class="form-label">Grund <span class="text-muted">(optional)</span></label>
+          <input type="text" class="form-control" id="reason_{{ p.id }}" name="reason"
+                 maxlength="500" value="{{ p.reason or '' }}" placeholder="z.B. Urlaub, krank …">
+        </div>
+        <div class="col-12 col-sm-3">
           <button type="submit" class="btn btn-outline-warning w-100">Aktualisieren</button>
         </div>
       </form>
@@ -117,7 +122,12 @@
           <label for="sick_to_new" class="form-label">Bis</label>
           <input type="date" class="form-control" id="sick_to_new" name="sick_to" required>
         </div>
-        <div class="col-12 col-sm-2">
+        <div class="col-12">
+          <label for="reason_new" class="form-label">Grund <span class="text-muted">(optional)</span></label>
+          <input type="text" class="form-control" id="reason_new" name="reason"
+                 maxlength="500" placeholder="z.B. Urlaub, krank …">
+        </div>
+        <div class="col-12 col-sm-3">
           <button type="submit" class="btn btn-outline-warning w-100">Eintragen</button>
         </div>
       </form>

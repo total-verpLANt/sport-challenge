@@ -248,6 +248,10 @@ def sick_period_submit():
     sick_from_raw = request.form.get("sick_from", "").strip()
     sick_to_raw = request.form.get("sick_to", "").strip()
     sick_period_id = request.form.get("sick_period_id", type=int)
+    # Optionaler Grund (Längenlimit als Misuse-Schutz)
+    reason = (request.form.get("reason", "").strip() or None)
+    if reason:
+        reason = reason[:500]
 
     try:
         sick_from = date.fromisoformat(sick_from_raw)
@@ -289,6 +293,7 @@ def sick_period_submit():
             return redirect(url_for("challenge_activities.log_form"))
         period.start_date = clamped_start
         period.end_date = clamped_end
+        period.reason = reason
         db.session.commit()
         flash(f"Krankmeldung aktualisiert: {clamped_start.strftime('%d.%m.%Y')} – {clamped_end.strftime('%d.%m.%Y')}.")
     else:
@@ -297,6 +302,7 @@ def sick_period_submit():
             challenge_id=challenge.id,
             start_date=clamped_start,
             end_date=clamped_end,
+            reason=reason,
         ))
         db.session.commit()
         flash(f"Krankmeldung eingetragen: {clamped_start.strftime('%d.%m.%Y')} – {clamped_end.strftime('%d.%m.%Y')}.")
