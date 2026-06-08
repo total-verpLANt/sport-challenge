@@ -90,7 +90,7 @@
            data-title="{{ m.original_filename }}">
           <img src="{{ url_for('media.activity_media', media_id=m.id) }}"
                alt="{{ m.original_filename }}"
-               class="img-fluid rounded w-100" style="max-height:200px;object-fit:cover">
+               class="img-fluid rounded w-100" style="max-height:200px;object-fit:contain">
         </a>
         {% endif %}
         {% if is_owner %}
