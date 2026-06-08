@@ -15,7 +15,7 @@ from app.models.bonus import BonusChallengeEntry
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.connector import ConnectorCredential
 from app.models.penalty import PenaltyOverride
-from app.models.sick_period import SickPeriod
+from app.models.sick_period import SickPeriod, SickPeriodLike
 from app.models.user import User
 from app.services.mailer import MailgunError, get_mailer
 from app.utils.decorators import admin_required
@@ -190,6 +190,13 @@ def delete_user(user_id):
     PenaltyOverride.query.filter(
         or_(PenaltyOverride.user_id == user.id, PenaltyOverride.set_by_id == user.id)
     ).delete()
+    # Likes auf eigene Abwesenheiten + Likes des Users auf fremde Abwesenheiten
+    _own_sp_ids = [sp.id for sp in SickPeriod.query.filter_by(user_id=user.id).all()]
+    if _own_sp_ids:
+        SickPeriodLike.query.filter(
+            SickPeriodLike.sick_period_id.in_(_own_sp_ids)
+        ).delete(synchronize_session="fetch")
+    SickPeriodLike.query.filter_by(user_id=user.id).delete()
     SickPeriod.query.filter_by(user_id=user.id).delete()
     for _act in Activity.query.filter_by(user_id=user.id).all():
         delete_media_files(_act.media)
