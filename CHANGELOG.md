@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.16.3] – 2026-06-08
+
+### Behoben
+- **Medien-Lightbox** zeigte nach der Zugriffsschutz-Umstellung (v0.16.2) statt des Bildes ein leeres Scroll-Fenster mit Dateiname: Die geschützten Medien-URLs (`/media/activity/<id>`) haben keine Datei-Endung mehr, an der GLightbox den Typ erkennt. Behoben durch explizites `data-type="image"` an den Bild-Anchors (Dashboard-Feed + Activity-Details)
+- **Bild-Vorschau in den Activity-Details** wurde durch `object-fit:cover` in der breiten Box mittig zugeschnitten (Großteil unsichtbar); jetzt `object-fit:contain` – das ganze Bild ist sichtbar, konsistent zur Video-Vorschau
+
 ## [0.16.2] – 2026-06-08
 
 ### Sicherheit
