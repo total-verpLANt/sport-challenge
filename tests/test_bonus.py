@@ -53,8 +53,9 @@ def _make_participant(db, challenge_id, email="participant@test.com", password="
     return user
 
 
-def _fake_video(filename="proof.mp4"):
-    return (io.BytesIO(b"fake video content"), filename)
+def _video(video_bytes, filename="proof.mp4"):
+    # Echte MP4-Bytes (Issue 43k: save_upload validiert den Inhalt via ffprobe).
+    return (io.BytesIO(video_bytes), filename)
 
 
 def test_admin_can_create_bonus_challenge(client, db):
@@ -81,7 +82,7 @@ def test_admin_can_create_bonus_challenge(client, db):
     assert all(b.description == "50 Burpees" for b in bonuses)
 
 
-def test_submit_bonus_entry(client, db, app):
+def test_submit_bonus_entry(client, db, app, sample_mp4_bytes):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
     participant = _make_participant(db, challenge.id)
@@ -99,7 +100,7 @@ def test_submit_bonus_entry(client, db, app):
 
     resp = client.post(
         f"/bonus/{bonus.id}/entry",
-        data={"time": "2:35", "video": _fake_video()},
+        data={"time": "2:35", "video": _video(sample_mp4_bytes)},
         content_type="multipart/form-data",
         follow_redirects=False,
     )
@@ -116,7 +117,7 @@ def test_submit_bonus_entry(client, db, app):
     assert entry.video_path is not None
 
 
-def test_duplicate_entry_rejected(client, db, app):
+def test_duplicate_entry_rejected(client, db, app, sample_mp4_bytes):
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
     participant = _make_participant(db, challenge.id)
@@ -135,13 +136,13 @@ def test_duplicate_entry_rejected(client, db, app):
     # First entry
     client.post(
         f"/bonus/{bonus.id}/entry",
-        data={"time": "3:00", "video": _fake_video("first.mp4")},
+        data={"time": "3:00", "video": _video(sample_mp4_bytes, "first.mp4")},
         content_type="multipart/form-data",
     )
     # Second entry (duplicate) — should be handled gracefully
     resp = client.post(
         f"/bonus/{bonus.id}/entry",
-        data={"time": "2:50", "video": _fake_video("second.mp4")},
+        data={"time": "2:50", "video": _video(sample_mp4_bytes, "second.mp4")},
         content_type="multipart/form-data",
         follow_redirects=False,
     )
@@ -162,7 +163,7 @@ def test_bonus_requires_login(client, db):
     assert "/auth/login" in resp.headers["Location"]
 
 
-def test_entry_accepted_for_past_date(client, db):
+def test_entry_accepted_for_past_date(client, db, sample_mp4_bytes):
     """Einsendungen sind auch nach dem scheduled_date erlaubt (kein Datum-Limit)."""
     admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
     challenge = _create_challenge(db, admin.id)
@@ -181,7 +182,7 @@ def test_entry_accepted_for_past_date(client, db):
 
     resp = client.post(
         f"/bonus/{bonus.id}/entry",
-        data={"time": "2:35", "video": _fake_video()},
+        data={"time": "2:35", "video": _video(sample_mp4_bytes)},
         content_type="multipart/form-data",
         follow_redirects=False,
     )

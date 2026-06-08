@@ -232,7 +232,7 @@ def test_activity_detail_non_participant(client, db):
 
 # --- Upload-Tests ---
 
-def test_log_activity_with_image(client, db):
+def test_log_activity_with_image(client, db, sample_jpeg_bytes):
     user = _create_and_login(client, db, email="upload_img@test.com")
     challenge, _ = _create_challenge_with_participation(db, user.id)
 
@@ -242,7 +242,7 @@ def test_log_activity_with_image(client, db):
             "activity_date": date.today().isoformat(),
             "duration_minutes": "30",
             "sport_type": "Laufen",
-            "media": (BytesIO(b"fake jpeg content"), "foto.jpg"),
+            "media": (BytesIO(sample_jpeg_bytes), "foto.jpg"),
         },
         content_type="multipart/form-data",
         follow_redirects=False,
@@ -261,7 +261,7 @@ def test_log_activity_with_image(client, db):
     assert media[0].original_filename == "foto.jpg"
 
 
-def test_log_activity_with_video(client, db):
+def test_log_activity_with_video(client, db, sample_mp4_bytes):
     user = _create_and_login(client, db, email="upload_vid@test.com")
     challenge, _ = _create_challenge_with_participation(db, user.id)
 
@@ -271,7 +271,7 @@ def test_log_activity_with_video(client, db):
             "activity_date": date.today().isoformat(),
             "duration_minutes": "30",
             "sport_type": "Radfahren",
-            "media": (BytesIO(b"fake mp4 content"), "clip.mp4"),
+            "media": (BytesIO(sample_mp4_bytes), "clip.mp4"),
         },
         content_type="multipart/form-data",
         follow_redirects=False,
@@ -355,7 +355,7 @@ def test_add_media_get(client, db):
     assert b"Medien hinzuf" in resp.data
 
 
-def test_add_media_post(client, db):
+def test_add_media_post(client, db, sample_png_bytes):
     user = _create_and_login(client, db, email="addmedia_post@test.com")
     challenge, _ = _create_challenge_with_participation(db, user.id)
 
@@ -373,7 +373,7 @@ def test_add_media_post(client, db):
 
     resp = client.post(
         f"/challenge-activities/{activity_id}/media/add",
-        data={"media": (BytesIO(b"fake png"), "bild.png")},
+        data={"media": (BytesIO(sample_png_bytes), "bild.png")},
         content_type="multipart/form-data",
         follow_redirects=False,
     )

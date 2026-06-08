@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.16.6] – 2026-06-08
+
+### Sicherheit
+- **Upload-Inhalte serverseitig validieren** (Issue `43k`): Hochgeladene Medien werden nicht mehr allein anhand der Dateiendung akzeptiert, sondern ihr **Inhalt** wird geprüft. **Bilder** müssen via Pillow als gültiges JPEG/PNG/WEBP dekodierbar sein (inkl. Schutz vor Decompression-Bombs über `MAX_IMAGE_PIXELS`); **Videos** müssen via ffprobe einen echten Video-Stream in einem erlaubten Container (mp4/mov/webm) enthalten. Eine Datei mit erlaubter Endung aber gefälschtem Inhalt (z. B. HTML als `.jpg`, Text als `.mp4`, oder ein Bild mit `.mp4`-Endung) wird abgelehnt und hinterlässt **keine Orphan-Datei**. Der vom Client gelieferte Content-Type wird nicht als Wahrheit verwendet. Validierung zentral in `save_upload()` – alle Aufrufstellen (Activity-Medien, Bonus-Beweisvideo) profitieren ohne Routenänderung
+
+### Hinzugefügt
+- Neue Laufzeit-Abhängigkeit **Pillow** (`requirements.txt`) für die Bild-Inhaltsvalidierung. ffmpeg/ffprobe ist im Docker-Image bereits vorhanden
+
 ## [0.16.5] – 2026-06-08
 
 ### Sicherheit

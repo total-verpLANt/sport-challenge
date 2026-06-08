@@ -5,14 +5,75 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import current_app
+from PIL import Image
 
 IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 VIDEO_EXTENSIONS = {"mp4", "mov", "webm"}
 ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 
+# Pillow-Format-Namen, die zu den erlaubten Bild-Endungen passen (Inhalts-Allowlist).
+ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
+# ffprobe-Container-Tokens echter Video-Container. Wichtig: ffprobe meldet auch für
+# Einzelbilder (z. B. PNG → "png_pipe") einen codec_type=video-Stream. Erst der
+# Container-Abgleich verhindert, dass ein Bild mit .mp4-Endung als Video durchrutscht.
+ALLOWED_VIDEO_CONTAINERS = {"mov", "mp4", "matroska", "webm"}
+# Schutz gegen Decompression-Bombs: winzige Datei, riesige Pixelfläche. Pillow wirft
+# darüber eine DecompressionBombError, die wir als ungültig behandeln.
+Image.MAX_IMAGE_PIXELS = 50_000_000
+
 
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _is_valid_image(stream) -> bool:
+    """Prüft via Pillow, ob der Stream ein dekodierbares Bild eines erlaubten Formats ist.
+
+    Spult den Stream danach wieder auf 0 zurück, damit der anschließende file.save()
+    die vollständige Datei schreibt. Verlässt sich NICHT auf die Dateiendung oder den
+    vom Client gelieferten Content-Type.
+    """
+    try:
+        img = Image.open(stream)
+        fmt = img.format
+        img.verify()  # Integritätsprüfung (Header/CRC), ohne vollständiges Rendern
+    except Exception:
+        return False
+    finally:
+        try:
+            stream.seek(0)
+        except (OSError, ValueError):
+            pass
+    return fmt in ALLOWED_IMAGE_FORMATS
+
+
+def _is_valid_video(filepath: Path) -> bool:
+    """Prüft via ffprobe, ob die Datei ein echtes Video eines erlaubten Containers ist.
+
+    Zwei Bedingungen müssen erfüllt sein: (1) der Container gehört zu einem erlaubten
+    Video-Format und (2) es existiert ein Video-Stream. (1) ist nötig, weil ffprobe
+    Einzelbilder ebenfalls als codec_type=video meldet.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=format_name:stream=codec_type",
+                "-of", "json",
+                str(filepath),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        data = json.loads(result.stdout or "{}")
+        format_name = data.get("format", {}).get("format_name", "")
+        containers = {token.strip() for token in format_name.split(",") if token.strip()}
+        if not (containers & ALLOWED_VIDEO_CONTAINERS):
+            return False
+        return any(s.get("codec_type") == "video" for s in data.get("streams", []))
+    except Exception:
+        return False
 
 
 def get_media_type(filename: str) -> str:
@@ -26,12 +87,28 @@ def get_media_type(filename: str) -> str:
 def save_upload(file) -> str | None:
     if not file or not file.filename or not allowed_file(file.filename):
         return None
+    media_type = get_media_type(file.filename)
+
+    # Bilder VOR dem Speichern aus dem Stream validieren → eine abgelehnte Datei
+    # landet gar nicht erst auf der Disk (kein Orphan möglich).
+    if media_type == "image" and not _is_valid_image(file.stream):
+        current_app.logger.warning("save_upload: Bild-Inhalt ungültig, abgelehnt: %s", file.filename)
+        return None
+
     ext = file.filename.rsplit(".", 1)[1].lower()
     filename = f"{uuid.uuid4().hex}.{ext}"
     upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
     upload_dir.mkdir(parents=True, exist_ok=True)
     filepath = upload_dir / filename
     file.save(filepath)
+
+    # Videos braucht ffprobe als Datei auf der Disk. Bei ungültigem Inhalt die
+    # bereits gespeicherte Datei sofort wieder entfernen (kein Orphan).
+    if media_type == "video" and not _is_valid_video(filepath):
+        filepath.unlink(missing_ok=True)
+        current_app.logger.warning("save_upload: Video-Inhalt ungültig, abgelehnt: %s", file.filename)
+        return None
+
     return f"uploads/{filename}"
 
 
