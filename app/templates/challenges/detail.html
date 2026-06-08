@@ -76,7 +76,7 @@
       </p>
       <div class="d-flex gap-2 flex-wrap">
         <a href="{{ url_for('challenge_activities.log_form') }}#sick-panel"
-           class="btn btn-outline-warning">Krankmeldung eintragen</a>
+           class="btn btn-outline-warning">Abwesenheit eintragen</a>
         <form method="post" action="{{ url_for('challenges.bailout', public_id=challenge.public_id) }}"
               data-confirm="Wirklich aus der Challenge austreten? Bailout-Gebühr: {{ '%.2f'|format(challenge.bailout_fee) }} €">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -185,10 +185,10 @@
     <div class="card border-danger">
       <div class="card-body">
         <h6 class="card-title text-danger">Gefahrenzone</h6>
-        <p class="card-text text-muted small">Diese Aktion löscht die Challenge unwiderruflich mit allen Aktivitäten, Krankmeldungen, Bonus-Challenges und Teilnahmen.</p>
+        <p class="card-text text-muted small">Diese Aktion löscht die Challenge unwiderruflich mit allen Aktivitäten, Abwesenheiten, Bonus-Challenges und Teilnahmen.</p>
         <form method="post"
               action="{{ url_for('challenges.delete_challenge', public_id=challenge.public_id) }}"
-              data-confirm="Challenge '{{ challenge.name }}' wirklich löschen? Alle Aktivitäten, Krankmeldungen, Bonus-Challenges und Teilnahmen werden entfernt. Diese Aktion kann NICHT rückgängig gemacht werden."
+              data-confirm="Challenge '{{ challenge.name }}' wirklich löschen? Alle Aktivitäten, Abwesenheiten, Bonus-Challenges und Teilnahmen werden entfernt. Diese Aktion kann NICHT rückgängig gemacht werden."
               class="d-inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-danger">Challenge löschen</button>

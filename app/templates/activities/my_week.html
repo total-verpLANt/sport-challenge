@@ -35,7 +35,7 @@
       {% if sick_periods %}
         {% set eff_goal = [0, weekly_goal - (sick_days_val // 2)]|max %}
         <strong>{{ fulfilled_days }} von {{ eff_goal }} Tagen</strong> mit mindestens 30 Minuten
-        <small class="text-muted">({{ sick_days_val }} Krankentag(e) diese Woche, effektives Ziel)</small>
+        <small class="text-muted">({{ sick_days_val }} Abwesenheitstag(e) diese Woche, effektives Ziel)</small>
       {% else %}
         {% set eff_goal = weekly_goal %}
         <strong>{{ fulfilled_days }} von {{ weekly_goal }} Tagen</strong> mit mindestens 30 Minuten
@@ -55,7 +55,7 @@
 {% if participation and participation.status == "accepted" %}
 <div class="card mb-4 {% if sick_periods %}border-warning{% endif %}">
   <div class="card-header {% if sick_periods %}bg-warning text-dark{% endif %}">
-    <strong>Krankmeldung{% if sick_periods|length > 1 %}en{% endif %}</strong>
+    <strong>Abwesenheit{% if sick_periods|length > 1 %}en{% endif %}</strong>
     {% if sick_periods %}
       <span class="ms-2 small">
         {% for p in sick_periods %}
@@ -97,7 +97,7 @@
       <div class="mt-2">
         <form method="post"
               action="{{ url_for('challenge_activities.delete_sick_period', sick_period_id=p.id) }}"
-              data-confirm="Krankmeldung vom {{ p.start_date.strftime('%d.%m.%Y') }} bis {{ p.end_date.strftime('%d.%m.%Y') }} wirklich löschen?"
+              data-confirm="Abwesenheit vom {{ p.start_date.strftime('%d.%m.%Y') }} bis {{ p.end_date.strftime('%d.%m.%Y') }} wirklich löschen?"
               class="d-inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-outline-danger btn-sm">Löschen</button>
@@ -106,9 +106,9 @@
     </div>
     {% endfor %}
 
-    {# Neue Krankmeldung anlegen (immer sichtbar) #}
+    {# Neue Abwesenheit anlegen (immer sichtbar) #}
     <div class="{% if sick_periods %}mt-3 pt-3 border-top{% endif %}">
-      {% if sick_periods %}<div class="small text-muted mb-2">Weitere Krankmeldung anlegen:</div>{% endif %}
+      {% if sick_periods %}<div class="small text-muted mb-2">Weitere Abwesenheit anlegen:</div>{% endif %}
       <form method="post"
             action="{{ url_for('challenge_activities.sick_period_submit') }}"
             class="row g-2 align-items-end">
@@ -133,7 +133,7 @@
       </form>
     </div>
 
-    <div class="form-text mt-2">Pro 2 Krankentage wird eine benötigte Aktivität abgezogen.</div>
+    <div class="form-text mt-2">Pro 2 Abwesenheitstage wird eine benötigte Aktivität abgezogen.</div>
   </div>
 </div>
 {% endif %}
@@ -147,7 +147,7 @@
     </span>
     <span>
       {% if day.is_sick %}
-        <span class="badge bg-info text-dark me-1" title="Als krank gemeldet">🤒 Krank</span>
+        <span class="badge bg-secondary me-1" title="Als abwesend gemeldet">🚫 Abwesend</span>
       {% endif %}
       {% if day.total_minutes >= 30 %}
         <span class="badge bg-success">{{ day.total_minutes }} Min ✓</span>
