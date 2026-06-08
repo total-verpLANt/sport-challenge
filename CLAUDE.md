@@ -52,11 +52,11 @@ bd close <id>         # Complete work
 
 ## Aktueller Stand (2026-06-08, Wachwechsel #11)
 
-**Aktive Arbeit:** Keine offenen Issues – Security-Welle abgeschlossen, Queue leer.
+**Aktive Arbeit:** Keine offenen Issues – Security-Welle + eine Performance-Optimierung (`5gh`) abgeschlossen, Queue leer.
 
 - **Epic:** Kein aktiver Epic
 - **Lessons Learned:** `docs/lessons-learned.md`
-- **Version:** 0.16.6 (live in Prod – vom Kapitän am 2026-06-08 ausgerollt)
+- **Version:** 0.16.7 (gepusht auf `origin/main`, **noch nicht in Prod ausgerollt** – live läuft v0.16.6). v0.16.7 ist reine Code-Optimierung: **kein** `.env`-/Migrations-/Dependency-Eingriff, nur `git pull && docker compose pull && docker compose up -d` auf `stonbgsport01`.
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
@@ -70,11 +70,15 @@ bd close <id>         # Complete work
 - `q4d` – Passwort-Reset One-Time-Use + Ablauf waren bereits korrekt implementiert; nur fehlende Test-Coverage für abgelaufene Tokens ergänzt (kein Produktivcode-Change)
 - 226 Tests
 
+**Performance-Optimierung nach der Security-Welle (gepusht, Prod-Deploy ausstehend):**
+- `5gh` → v0.16.7 – Dashboard-Leaderboard: N+1 in `get_challenge_summary` eliminiert. Strafberechnung lädt jetzt 3 Bulk-Queries (erfüllte Tage via `GROUP BY`, Krankheit, Overrides) + `joinedload` für Teilnehmer-User und rechnet rein im Speicher (vorher ~`P×W×7` Queries → jetzt konstant ~3–4). `penalty.py` unangetastet als Goldstandard; Verhalten byte-genau identisch, abgesichert durch Regressionstest (`tests/test_weekly_summary.py`) + Query-Count-Wächter gegen N+1-Rückfall.
+- 228 Tests (226 + 2 neue)
+
 **Prod-relevante Neuerungen dieser Wache (bereits ausgerollt):**
 - **Neue Pflicht-`.env`-Vars:** `PUBLIC_BASE_URL`, `TRUSTED_HOSTS`, `SECURE_COOKIES=1` (vom Kapitän gesetzt). Default `SECURE_COOKIES=0` für lokale HTTP-Dev.
 - **Neue Dependency Pillow** (`requirements.txt`) → Image-Rebuild beim Deploy nötig. ffprobe ist im Docker-Image bereits vorhanden.
 
-**Nächste Queue:** leer (`bd ready` → keine offenen Issues). Nächste Arbeit kommt per neuem Plan/Epic.
+**Nächste Queue:** leer (`bd ready` → keine offenen Issues). Möglicher nächster Fisch (noch kein bd-Issue): **`F-B` – N+1 im Bonus-Index** (`app/routes/bonus.py` `index()`: `db.session.get(User, …)` je Entry/Ranking-User → Bulk-Load via `User.id.in_(...)`). Ansonsten kommt Arbeit per neuem Plan/Epic.
 
 ### Nachricht vom scheidenden Wachoffizier (2026-06-08)
 
