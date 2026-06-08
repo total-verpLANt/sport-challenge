@@ -5,9 +5,9 @@ Flask-Webanwendung für Fitness-Challenges mit Leaderboard, Strafberechnung und 
 ## Was macht dieses Projekt?
 
 - **Challenge-System:** Admin erstellt Challenges mit Start-/Enddatum, lädt Teilnehmer ein, die individuell 2x oder 3x pro Woche ≥30 Min Sport als Ziel setzen
-- **Leaderboard/Dashboard:** Wochenweise Übersicht aller Teilnehmer mit Farbcodierung (grün/gelb/rot), Krankmeldungen (🤒) und Spendentopf
+- **Leaderboard/Dashboard:** Wochenweise Übersicht aller Teilnehmer mit Farbcodierung (grün/gelb/rot), Abwesenheiten (🚫) und Spendentopf; Social-Feed mit Aktivitäten und Abwesenheiten (likebar)
 - **Aktivitäts-Tracking:** Manuelles Eintragen (mit Foto-/Video-Upload) oder Import aus Garmin/Strava
-- **Automatische Strafberechnung:** 5 €/verpasster Tag, Admin-Override möglich, Krankmeldung befreit wochenweise
+- **Automatische Strafberechnung:** 5 €/verpasster Tag, Admin-Override möglich; Abwesenheit (mit optionalem Grund) reduziert das Wochenziel anteilig (pro 2 Tage −1 Aktivität)
 - **Bonus-Challenges:** Admin-definierte Termine (z.B. 50 Squat Jumps), Zeiterfassung mit Ranking und Video-Beweis
 - **Bailout-Option:** Teilnehmer können aussteigen (+25 € Gebühr), werden im Leaderboard ausgegraut
 - **Connector-Architektur:** Garmin (Credentials-Form) und Strava (OAuth2) integriert; weitere Provider erweiterbar
@@ -104,7 +104,7 @@ SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 .venv/bin/pytest -v
 ```
 
-158 Tests (Auth, Connector, Challenge, Aktivitäten, Penalty, Dashboard, Bonus) – kein externer Service nötig.
+199 Tests (Auth, Connector, Challenge, Aktivitäten, Penalty, Dashboard, Bonus) – kein externer Service nötig.
 
 ---
 
@@ -119,7 +119,7 @@ app/
 │   ├── connector.py     # ConnectorCredential mit Fernet-Encryption
 │   ├── challenge.py     # Challenge + ChallengeParticipation
 │   ├── activity.py      # Activity + ActivityMedia (Foto/Video)
-│   ├── sick_week.py     # SickWeek (wochenweise Krankmeldung)
+│   ├── sick_period.py   # SickPeriod (Abwesenheit Von/Bis) + SickPeriodLike
 │   ├── penalty.py       # PenaltyOverride (Admin-Korrektur)
 │   └── bonus.py         # BonusChallenge + BonusChallengeEntry
 ├── connectors/
@@ -136,9 +136,9 @@ app/
 │   ├── connectors.py    # /connectors/ – Verbinden + Status
 │   ├── strava_oauth.py  # /strava/oauth/ – OAuth2-Start + Callback
 │   ├── admin.py         # /admin/ – Nutzerverwaltung
-│   ├── challenges.py    # /challenges/ – Erstellen, Einladen, Annehmen, Bailout, Krankmeldung
-│   ├── challenge_activities.py  # /challenge-activities/ – Eintragen, Meine Woche, Import, Medien
-│   ├── dashboard.py     # /dashboard/ – Leaderboard
+│   ├── challenges.py    # /challenges/ – Erstellen, Einladen, Annehmen, Bailout
+│   ├── challenge_activities.py  # /challenge-activities/ – Eintragen, Meine Woche, Import, Medien, Abwesenheit
+│   ├── dashboard.py     # /dashboard/ – Leaderboard + Social-Feed (Aktivitäten & Abwesenheiten, Likes)
 │   └── bonus.py         # /bonus/ – Bonus-Challenges + Einträge
 ├── utils/
 │   ├── crypto.py        # HKDF-Key-Derivation + FernetField TypeDecorator
@@ -152,8 +152,8 @@ app/
     ├── challenges/       # Erstellen, Detail, Übersicht
     ├── dashboard/        # Leaderboard-Tabelle
     └── bonus/            # Bonus-Challenges + Ranking
-migrations/              # Alembic-Migrationen (16 Versionen, 9 Tabellen)
-tests/                   # 158 pytest-Tests, In-Memory-SQLite
+migrations/              # Alembic-Migrationen (17 Versionen, 10 Tabellen)
+tests/                   # 199 pytest-Tests, In-Memory-SQLite
 ```
 
 **Datenfluss Challenge-System:**

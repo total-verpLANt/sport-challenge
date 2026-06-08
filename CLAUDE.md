@@ -50,38 +50,43 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-04-27, Wachwechsel #9)
+## Aktueller Stand (2026-06-08, Wachwechsel #10)
 
 **Aktive Arbeit:** Keine offenen Issues
 
 - **Epic:** Kein aktiver Epic
 - **Lessons Learned:** `docs/lessons-learned.md`
+- **Version:** 0.16.0 (live in Prod)
 
-**Änderungen seit Wachwechsel #8 (Multimedia-Upload):**
-- `58b0cf3` – feat(multimedia): Multi-File Upload (Fotos + Videos) für Aktivitäten
-- `c3b6f70` – fix(security): Path-Traversal-Guard in delete_upload()
-- `970e97e` – fix(security): media-src 'self' explizit in CSP setzen
+**Änderungen seit Wachwechsel #9 (Multimedia-Upload):**
+- `501ddfd` – Merge: Krankmeldung → allgemeine Abwesenheit (v0.16.0)
+- 5 atomare Commits `f285310..bbe169e` (Modell, Grund-Feld, Wording, Feed, Tests)
 
-**Multimedia-Feature umfasst:**
-- `ActivityMedia`-Model (1:n zu Activity, ON DELETE CASCADE), Migration `149d8863712f`
-- `uploads.py`: `VIDEO_EXTENSIONS = {mp4,mov,webm}`, `get_media_type()`, `delete_media_files()`, 50 MB Limit (`MAX_CONTENT_LENGTH`)
-- Multi-File-Upload via `request.files.getlist("media")`, bis zu mehreren Dateien pro Aktivität
-- Retroaktiver Upload via neue Route `add_media(activity_id)` (Owner-Guard)
-- Drag-n-Drop-Interface (Vanilla JS, HTML5 dragover/drop) in `log.html` + `add_media.html`
-- Media-Galerie in `detail.html` (`<video controls>` für Videos, `<img>` für Bilder, Bootstrap-Grid)
-- Thumbnails in Listenansichten (`my_week.html`, `user_activities.html`)
-- Legacy `screenshot_path`-Fallback überall erhalten (kein Datenverlust)
-- Security: Path-Traversal-Guard (`is_relative_to`) + explizites `media-src 'self'` in CSP
-- **ACHTUNG:** `flask db migrate` erzeugt falschen Uuid-Diff für `challenges.public_id` → vor Upgrade aus Migration entfernen (siehe Lessons Learned)
-- 94 Tests
+**Abwesenheits-Feature umfasst (Krankmeldung → allgemeine Abwesenheit):**
+- **Bewusst NUR UI umbenannt** – Modell/Tabelle/Routen bleiben `sick_*` (`SickPeriod`, `sick_periods`, `sick_period_submit`, `/sick-period`). Variablen `sick_periods`, `sick_days_val` unverändert.
+- `SickPeriod.reason` (Text, nullable) – optionaler Grund, serverseitig auf 500 Zeichen begrenzt
+- `SickPeriodLike` (analog `ActivityLike`) macht Abwesenheiten im Feed likebar; Migration `aab58a149773` (rein additiv: Spalte + Tabelle)
+- Cascade-Härtung: `SickPeriodLike` wird bei User-/Challenge-Löschung explizit mitgelöscht (`admin.py`, `challenges.py`) – SQLite-PRAGMA foreign_keys nicht garantiert
+- Dashboard-Feed (`dashboard.py`) mischt jetzt Aktivitäten + Abwesenheiten zu einer nach Zeit sortierten Liste (naive/aware datetimes normalisiert via `_feed_sort_key`); vereinheitlichte Item-Struktur (`type` activity|absence) für Server-Render UND `/feed`-JSON
+- Neue Route `like_sick_period` (Teilnehmer-Check + Rate-Limit `30/min` wie `like_activity`); Like-Button via `data-like-url` generalisiert
+- Abwesenheits-Karte: Zeitraum + Grund (falls vorhanden), **kein** Motivationsspruch; Feed ist reine Anzeige (kein Löschen/Bearbeiten – das geht nur über „Meine Woche")
+- UI: 🤒 → 🚫, „Krankmeldung" → „Abwesenheit" in allen Templates + Flash-Messages
+- Strafberechnung **unverändert** (`penalty.py`/`weekly_summary.py` nicht angefasst)
+- Nebenfix: fehlender `url_for`-Import in `dashboard.py` (latenter `/feed`-Crash bei Medien)
+- Feed-JSON-Key: `activities` → `items`
+- **ACHTUNG:** `flask db migrate` erzeugt weiterhin falschen Uuid-Diff für `challenges.public_id` → vor Upgrade aus Migration entfernen (siehe Lessons Learned)
+- 199 Tests
+
+**Nächste Queue (5 offene Security-Bugs, unabhängig vom Abwesenheits-Feature):**
+`haf` (Host-Header-Poisoning), `znn` (Login-Lockout-DoS), `1ye` (Medien ohne Login abrufbar), `43k` (Upload-Inhalt validieren), `q4d` (Passwort-Reset-Links invalidieren)
 
 ### Einstieg für neue Sessions
 
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories multimedia-upload         # Pointer für diesen Wachwechsel
-bd ready                              # nächste Issues (aktuell: keine offen)
+bd memories absence-feature           # Pointer für diesen Wachwechsel
+bd ready                              # nächste Issues (5 Security-Bugs)
 ```
 
 ## Build & Test

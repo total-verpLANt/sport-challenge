@@ -273,3 +273,19 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wie vermeiden:** Nach Erstellen neuer Blueprint-Routes: `grep -r "url_for.*blueprint_name" app/templates/` gegen tatsächliche Funktionsnamen abgleichen.
 
 **Quelle:** Wave 2, 2026-04-26. Fix in Commit `e8fb45f`.
+
+---
+
+## Tooling: Manuelle Ad-hoc-Tests
+
+### 2026-06-08: `config.update()` nach `create_app()` ändert die DB nicht – Engine ist schon gebunden
+
+**Erkenntnis:** Bei einem manuellen Ad-hoc-Test wurde `app.config.update(SQLALCHEMY_DATABASE_URI="sqlite:///:memory:")` **nach** `create_app()` gesetzt – wirkungslos. Flask-SQLAlchemy bindet die Engine beim `db.init_app()` innerhalb der Factory; eine spätere Config-Änderung greift nicht mehr. Folge: Der Test schrieb in die echte Dev-DB und legte dort Test-User/-Challenges an.
+
+**Warum relevant:** Verwandt mit der Playwright-Prod-DB-Lesson (2026-04-26), aber subtiler: Hier sieht der Code so aus, als würde er eine isolierte DB nutzen – tut es aber nicht. Verfälschte Testergebnisse (eine vermeintliche `reason: None`-Beobachtung war in Wahrheit eine alte Dev-DB-Zeile) und Daten-Kontamination sind die Folge.
+
+**Wie vermeiden:** Die DB-URL **vor** `create_app()` über die Umgebungsvariable setzen (`export DATABASE_URL="sqlite:///$TMPDIR/test.db"`), oder gleich pytest mit der `conftest.py`-Fixture (In-Memory) verwenden statt Ad-hoc-Skripten. Für Integrationsverhalten (Login, 403) sind echte pytest-Tests verlässlicher als `session_transaction`-Bastellösungen.
+
+**Wo sichtbar:** Methodik – betrifft alle manuellen `python -c`-Verifikationen gegen die App-Factory.
+
+**Quelle:** Wachwechsel #10 (Abwesenheits-Feature), 2026-06-08.
