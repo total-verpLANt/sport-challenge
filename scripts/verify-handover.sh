@@ -112,7 +112,7 @@ if [ "$CHECKS_FAILED" -gt 0 ]; then
 else
     echo ""
     echo "🏴‍☠️  Alles klar. Erster Einstieg:"
-    echo "    bd memories multi-user   # Pointer mit allen Issue-IDs"
-    echo "    bd ready                 # nächste Issues"
+    echo "    bd memories security-hardening   # Pointer zum letzten Wachwechsel"
+    echo "    bd ready                         # nächste Issues"
     exit 0
 fi
