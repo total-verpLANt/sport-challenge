@@ -248,6 +248,10 @@ def sick_period_submit():
     sick_from_raw = request.form.get("sick_from", "").strip()
     sick_to_raw = request.form.get("sick_to", "").strip()
     sick_period_id = request.form.get("sick_period_id", type=int)
+    # Optionaler Grund (Längenlimit als Misuse-Schutz)
+    reason = (request.form.get("reason", "").strip() or None)
+    if reason:
+        reason = reason[:500]
 
     try:
         sick_from = date.fromisoformat(sick_from_raw)
@@ -279,27 +283,29 @@ def sick_period_submit():
         overlap_query = overlap_query.where(SickPeriod.id != sick_period_id)
 
     if db.session.scalar(overlap_query) is not None:
-        flash("Dieser Zeitraum überschneidet sich mit einer bestehenden Krankmeldung.")
+        flash("Dieser Zeitraum überschneidet sich mit einer bestehenden Abwesenheit.")
         return redirect(url_for("challenge_activities.log_form"))
 
     if sick_period_id:
         period = db.session.get(SickPeriod, sick_period_id)
         if period is None or period.user_id != current_user.id:
-            flash("Krankmeldung nicht gefunden.")
+            flash("Abwesenheit nicht gefunden.")
             return redirect(url_for("challenge_activities.log_form"))
         period.start_date = clamped_start
         period.end_date = clamped_end
+        period.reason = reason
         db.session.commit()
-        flash(f"Krankmeldung aktualisiert: {clamped_start.strftime('%d.%m.%Y')} – {clamped_end.strftime('%d.%m.%Y')}.")
+        flash(f"Abwesenheit aktualisiert: {clamped_start.strftime('%d.%m.%Y')} – {clamped_end.strftime('%d.%m.%Y')}.")
     else:
         db.session.add(SickPeriod(
             user_id=current_user.id,
             challenge_id=challenge.id,
             start_date=clamped_start,
             end_date=clamped_end,
+            reason=reason,
         ))
         db.session.commit()
-        flash(f"Krankmeldung eingetragen: {clamped_start.strftime('%d.%m.%Y')} – {clamped_end.strftime('%d.%m.%Y')}.")
+        flash(f"Abwesenheit eingetragen: {clamped_start.strftime('%d.%m.%Y')} – {clamped_end.strftime('%d.%m.%Y')}.")
 
     # Redirect: wenn aus my_week (offset im Form), dorthin zurück; sonst log_form
     offset = request.form.get("offset", type=int)
@@ -529,7 +535,7 @@ def delete_sick_period(sick_period_id: int):
     challenge_id = period.challenge_id
     db.session.delete(period)
     db.session.commit()
-    flash("Krankmeldung gelöscht.")
+    flash("Abwesenheit gelöscht.")
     if current_user.is_admin and current_user.id != user_id:
         return redirect(url_for("challenge_activities.user_activities",
                                  challenge_id=challenge_id, user_id=user_id))

@@ -192,3 +192,49 @@ def test_delete_user_blocks_if_has_challenges(client, db):
     )
     assert db.session.get(User, target_id) is not None
     assert b"Challenges erstellt" in rv.data
+
+
+def test_delete_user_cascades_sick_period_likes(client, db):
+    """User-Löschung entfernt Likes auf eigene UND Likes auf fremde Abwesenheiten."""
+    from app.models.challenge import Challenge, ChallengeParticipation
+    from app.models.sick_period import SickPeriod, SickPeriodLike
+
+    admin = _create_and_login(client, db, "admin@test.com", is_admin=True)
+    target = _create_user(db, "target@test.com")
+
+    # Challenge vom Admin (target hat keine erstellt -> Löschung nicht blockiert)
+    ch = Challenge(name="Cascade", start_date=date(2024, 1, 1),
+                   end_date=date(2024, 12, 31), created_by_id=admin.id)
+    db.session.add(ch)
+    db.session.commit()
+    db.session.add_all([
+        ChallengeParticipation(user_id=admin.id, challenge_id=ch.id, weekly_goal=3, status="accepted"),
+        ChallengeParticipation(user_id=target.id, challenge_id=ch.id, weekly_goal=3, status="accepted"),
+    ])
+    # target's eigene Abwesenheit + admin's Abwesenheit
+    sp_target = SickPeriod(user_id=target.id, challenge_id=ch.id,
+                           start_date=date(2024, 1, 1), end_date=date(2024, 1, 2))
+    sp_admin = SickPeriod(user_id=admin.id, challenge_id=ch.id,
+                          start_date=date(2024, 2, 1), end_date=date(2024, 2, 2))
+    db.session.add_all([sp_target, sp_admin])
+    db.session.commit()
+    # Like auf target's Abwesenheit (von admin) + target's Like auf admin's Abwesenheit
+    like_on_own = SickPeriodLike(sick_period_id=sp_target.id, user_id=admin.id)
+    like_by_target = SickPeriodLike(sick_period_id=sp_admin.id, user_id=target.id)
+    db.session.add_all([like_on_own, like_by_target])
+    db.session.commit()
+    own_id, by_target_id = like_on_own.id, like_by_target.id
+    target_id = target.id
+
+    client.post(
+        f"/admin/users/{target_id}/delete",
+        data={"confirm_email": "target@test.com"},
+        follow_redirects=True,
+    )
+    assert db.session.get(User, target_id) is None
+    # Like auf target's (gelöschte) Abwesenheit weg
+    assert db.session.get(SickPeriodLike, own_id) is None
+    # Like, den target auf admin's Abwesenheit gesetzt hatte, ebenfalls weg
+    assert db.session.get(SickPeriodLike, by_target_id) is None
+    # admin's Abwesenheit bleibt erhalten
+    assert db.session.get(SickPeriod, sp_admin.id) is not None

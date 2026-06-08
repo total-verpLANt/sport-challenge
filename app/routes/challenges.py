@@ -9,7 +9,7 @@ from app.models.activity import Activity
 from app.models.bonus import BonusChallenge, BonusChallengeEntry
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.penalty import PenaltyOverride
-from app.models.sick_period import SickPeriod
+from app.models.sick_period import SickPeriod, SickPeriodLike
 from app.models.user import User
 from app.utils.decorators import admin_required
 from app.utils.uploads import delete_media_files, delete_upload
@@ -383,7 +383,15 @@ def delete_challenge(public_id: str):
     BonusChallenge.query.filter_by(challenge_id=challenge.id).delete()
     # 3. PenaltyOverride
     PenaltyOverride.query.filter_by(challenge_id=challenge.id).delete()
-    # 4. SickPeriod
+    # 4. SickPeriod (inkl. Likes – keine DB-Cascade garantiert)
+    _sp_ids = [
+        sp.id
+        for sp in SickPeriod.query.filter_by(challenge_id=challenge.id).all()
+    ]
+    if _sp_ids:
+        SickPeriodLike.query.filter(
+            SickPeriodLike.sick_period_id.in_(_sp_ids)
+        ).delete(synchronize_session="fetch")
     SickPeriod.query.filter_by(challenge_id=challenge.id).delete()
     # 5. Activity – ORM-Iteration wegen ActivityMedia-Dateisystem-Cleanup!
     for _act in Activity.query.filter_by(challenge_id=challenge.id).all():

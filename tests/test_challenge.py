@@ -676,3 +676,47 @@ def test_multi_invite_via_detail(client, db):
     user_ids = {p.user_id for p in participations}
     assert user_ids == {user1.id, user2.id}
     assert all(p.status == "invited" for p in participations)
+
+
+def test_sick_period_with_reason(client, db):
+    """Optionaler Grund wird gespeichert und serverseitig auf 500 Zeichen begrenzt."""
+    admin = _create_and_login(client, db, email="reason_admin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+    participant = User(email="reason_part@test.com", is_approved=True)
+    participant.set_password("pass123")
+    db.session.add(participant)
+    db.session.commit()
+    db.session.add(ChallengeParticipation(
+        user_id=participant.id, challenge_id=challenge.id, status="accepted"))
+    db.session.commit()
+
+    client.post("/auth/logout")
+    client.post("/auth/login", data={"email": "reason_part@test.com", "password": "pass123"})
+
+    today = date.today()
+    # Mit Grund
+    client.post("/challenge-activities/sick-period", data={
+        "sick_from": today.isoformat(), "sick_to": today.isoformat(),
+        "reason": "Urlaub auf Malle",
+    })
+    sp = db.session.execute(db.select(SickPeriod).where(
+        SickPeriod.user_id == participant.id)).scalar_one()
+    assert sp.reason == "Urlaub auf Malle"
+
+    # Update mit überlangem Grund -> auf 500 begrenzt
+    client.post("/challenge-activities/sick-period", data={
+        "sick_period_id": sp.id,
+        "sick_from": today.isoformat(), "sick_to": today.isoformat(),
+        "reason": "X" * 600,
+    })
+    db.session.refresh(sp)
+    assert len(sp.reason) == 500
+
+    # Leerer Grund -> None
+    client.post("/challenge-activities/sick-period", data={
+        "sick_period_id": sp.id,
+        "sick_from": today.isoformat(), "sick_to": today.isoformat(),
+        "reason": "   ",
+    })
+    db.session.refresh(sp)
+    assert sp.reason is None

@@ -52,7 +52,7 @@
         {% set wd = p.weeks.get(week_start) %}
         {% if wd %}
           {% if wd.is_sick %}
-          <td class="text-center bg-secondary bg-opacity-25" title="Krankmeldung">🤒</td>
+          <td class="text-center bg-secondary bg-opacity-25" title="Abwesend">🚫</td>
           {% elif is_bailed %}
           <td class="text-center text-muted">–</td>
           {% elif wd.overachieved %}
