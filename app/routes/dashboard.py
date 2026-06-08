@@ -43,7 +43,7 @@ def _activity_to_dict(a: Activity, users: dict, current_user_id: int) -> dict:
         "liked_by": [like.user.display_name for like in a.likes if like.user],
         "media": [
             {
-                "url": url_for("static", filename=m.file_path),
+                "url": url_for("media.activity_media", media_id=m.id),
                 "media_type": m.media_type,
                 "original_filename": m.original_filename,
             }

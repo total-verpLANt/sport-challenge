@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.16.2] – 2026-06-08
+
+### Sicherheit
+- **Medien-Uploads gegen anonymen Direktzugriff geschützt** (Issue `1ye`): Hochgeladene Bilder/Videos liegen nicht mehr unter `app/static/uploads` und sind damit nicht länger über geratene Direkt-URLs ohne Login abrufbar. Die Auslieferung erfolgt jetzt ausschließlich über eine login-geschützte Route (`/media/activity/<id>`, `/media/screenshot/<id>`) mit `X-Content-Type-Options: nosniff` und `Cache-Control: private`. Anonyme Requests erhalten 302 zum Login; HTML/JSON enthalten keine `static/uploads`-Direktlinks mehr
+
+### Geändert
+- Default-`UPLOAD_FOLDER` zeigt jetzt auf `<root>/data/uploads` (außerhalb von `static`); leeres `UPLOAD_FOLDER=` fällt sicher auf den Default zurück statt ins Arbeitsverzeichnis zu schreiben. Docker-Volume entsprechend auf `./data/uploads:/app/data/uploads` umgestellt (Host-Pfad unverändert – keine Datei-Migration nötig). DB-Spalten (`file_path`, `screenshot_path`) bleiben unverändert
+
 ## [0.16.1] – 2026-06-08
 
 ### Sicherheit

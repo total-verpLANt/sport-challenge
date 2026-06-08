@@ -188,15 +188,15 @@
                 </a>
               {% else %}
                 <a href="{{ url_for('challenge_activities.activity_detail', activity_id=activity.id) }}">
-                  <img src="{{ url_for('static', filename=first.file_path) }}"
+                  <img src="{{ url_for('media.activity_media', media_id=first.id) }}"
                        alt="Vorschau" class="img-thumbnail" style="max-height: 80px; max-width: 120px;">
                 </a>
               {% endif %}
             </div>
           {% elif activity.screenshot_path %}
             <div class="mt-2">
-              <a href="{{ url_for('static', filename=activity.screenshot_path) }}" target="_blank" rel="noopener">
-                <img src="{{ url_for('static', filename=activity.screenshot_path) }}"
+              <a href="{{ url_for('media.activity_screenshot', activity_id=activity.id) }}" target="_blank" rel="noopener">
+                <img src="{{ url_for('media.activity_screenshot', activity_id=activity.id) }}"
                      alt="Screenshot" class="img-thumbnail" style="max-height: 80px; max-width: 120px;">
               </a>
             </div>

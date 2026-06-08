@@ -80,14 +80,14 @@
       {% for m in activity.media %}
       <div class="col-6 col-md-4 position-relative">
         {% if m.media_type == "video" %}
-        <video src="{{ url_for('static', filename=m.file_path) }}"
+        <video src="{{ url_for('media.activity_media', media_id=m.id) }}"
                controls class="img-fluid rounded w-100" style="max-height:200px;object-fit:contain"></video>
         {% else %}
-        <a href="{{ url_for('static', filename=m.file_path) }}"
+        <a href="{{ url_for('media.activity_media', media_id=m.id) }}"
            class="glightbox"
            data-gallery="activity-media"
            data-title="{{ m.original_filename }}">
-          <img src="{{ url_for('static', filename=m.file_path) }}"
+          <img src="{{ url_for('media.activity_media', media_id=m.id) }}"
                alt="{{ m.original_filename }}"
                class="img-fluid rounded w-100" style="max-height:200px;object-fit:cover">
         </a>
@@ -112,14 +112,14 @@
 <div class="card mb-4">
   <div class="card-header">Screenshot</div>
   <div class="card-body text-center">
-    <a href="{{ url_for('static', filename=activity.screenshot_path) }}" target="_blank" rel="noopener">
-      <img src="{{ url_for('static', filename=activity.screenshot_path) }}"
+    <a href="{{ url_for('media.activity_screenshot', activity_id=activity.id) }}" target="_blank" rel="noopener">
+      <img src="{{ url_for('media.activity_screenshot', activity_id=activity.id) }}"
            alt="Screenshot"
            class="img-fluid"
            style="max-width: 100%;">
     </a>
     <div class="mt-2">
-      <a href="{{ url_for('static', filename=activity.screenshot_path) }}"
+      <a href="{{ url_for('media.activity_screenshot', activity_id=activity.id) }}"
          target="_blank" rel="noopener"
          class="btn btn-outline-secondary btn-sm">
         Original in neuem Tab öffnen

@@ -9,7 +9,9 @@ services:
       GUNICORN_WORKERS: "1"
     volumes:
       - ./data/instance:/app/instance
-      - ./data/uploads:/app/app/static/uploads
+      # Uploads liegen außerhalb von static (siehe 1ye); Host-Pfad unverändert,
+      # nur das Container-Ziel folgt dem neuen UPLOAD_FOLDER-Default (/app/data/uploads).
+      - ./data/uploads:/app/data/uploads
       - ./data/logs:/app/logs
     ports:
       - "127.0.0.1:5000:5000"

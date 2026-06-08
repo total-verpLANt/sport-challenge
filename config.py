@@ -12,8 +12,12 @@ class Config:
     DEBUG = os.environ.get("FLASK_DEBUG", "0") == "1"
     STRAVA_CLIENT_ID: str = os.environ.get("STRAVA_CLIENT_ID", "")
     STRAVA_CLIENT_SECRET: str = os.environ.get("STRAVA_CLIENT_SECRET", "")
-    _default_upload_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app", "static", "uploads")
-    UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", _default_upload_folder)
+    # Uploads liegen bewusst AUSSERHALB von static (siehe 1ye): keine anonymen Direkt-URLs.
+    # Ausgeliefert werden Medien nur über die login-geschützte media-Route.
+    _default_upload_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "uploads")
+    # `or` statt Default-Arg: leeres UPLOAD_FOLDER= fällt auf den Default zurück
+    # (verhindert versehentliches Schreiben ins CWD / nicht-persistenten Container-Pfad).
+    UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER") or _default_upload_folder
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50 MB
     MAILGUN_API_KEY: str = os.environ.get("MAILGUN_API_KEY", "")
     MAILGUN_DOMAIN: str = os.environ.get("MAILGUN_DOMAIN", "")
