@@ -4,6 +4,18 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.16.0] – 2026-06-08
+
+### Geändert
+- Die bisherige **Krankmeldung** ist jetzt eine allgemeine **Abwesenheit**: Wording und Emojis (🤒 → 🚫) im gesamten UI neutralisiert, da es auch andere Gründe gibt, zeitweise nicht teilzunehmen (Urlaub, Dienstreise …). Die Strafberechnung bleibt unverändert (pro 2 Abwesenheitstage wird eine benötigte Aktivität abgezogen)
+
+### Neu
+- Beim Eintragen einer Abwesenheit kann ein **optionaler Grund** angegeben werden (Textfeld, max. 500 Zeichen)
+- Eingetragene Abwesenheiten erscheinen jetzt im **Dashboard-Feed** (Zeitraum + Grund, ohne Motivationsspruch) und können wie Aktivitäten **gelikt** werden
+
+### Behoben
+- `/dashboard/feed`: fehlender `url_for`-Import behoben, der den Endpunkt bei Aktivitäten mit hochgeladenen Medien zum Absturz gebracht hätte
+
 ## [0.15.2] – 2026-06-05
 
 ### Geändert

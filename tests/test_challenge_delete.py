@@ -111,3 +111,32 @@ def test_user_cannot_delete_challenge(client, db):
     resp = client.post(f"/challenges/{public_id}/delete", follow_redirects=False)
     assert resp.status_code in (302, 403)
     assert db.session.get(Challenge, challenge_id) is not None
+
+
+def test_delete_challenge_cascades_sick_period_likes(client, db):
+    """Beim Löschen einer Challenge werden auch die Likes auf Abwesenheiten entfernt."""
+    from app.models.sick_period import SickPeriodLike
+
+    admin = _create_admin_and_login(client, db, email="chdel_splike@test.com")
+    challenge = Challenge(
+        name="SP-Like Cascade", start_date=date(2024, 1, 1),
+        end_date=date(2024, 12, 31), created_by_id=admin.id,
+    )
+    db.session.add(challenge)
+    db.session.commit()
+    db.session.add(ChallengeParticipation(
+        user_id=admin.id, challenge_id=challenge.id, weekly_goal=3, status="accepted"))
+    sp = SickPeriod(user_id=admin.id, challenge_id=challenge.id,
+                    start_date=date(2024, 1, 1), end_date=date(2024, 1, 3))
+    db.session.add(sp)
+    db.session.commit()
+    like = SickPeriodLike(sick_period_id=sp.id, user_id=admin.id)
+    db.session.add(like)
+    db.session.commit()
+    like_id = like.id
+    public_id = str(challenge.public_id)
+
+    resp = client.post(f"/challenges/{public_id}/delete", follow_redirects=False)
+    assert resp.status_code == 302
+    assert db.session.get(SickPeriodLike, like_id) is None
+    assert db.session.get(SickPeriod, sp.id) is None
