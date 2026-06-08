@@ -126,6 +126,53 @@ class TestResetPasswordRoute:
         assert resp.status_code == 200
         assert b"Passwort vergessen" in resp.data
 
+    def test_expired_token_is_rejected(self, client):
+        """Ein Token, der älter als _RESET_TOKEN_MAX_AGE (1 h) ist, wird abgelehnt –
+        die Ablaufzeit bleibt trotz One-Time-Use-Härtung wirksam."""
+        import time
+        from unittest.mock import patch
+
+        from itsdangerous import URLSafeTimedSerializer
+
+        from app import create_app
+
+        app = create_app(TestConfig)
+        with app.app_context():
+            _db.create_all()
+            user = User(email="test@example.com")
+            user.set_password("oldpassword123")
+            user.is_approved = True
+            _db.session.add(user)
+            _db.session.commit()
+
+            # Token mit Zeitstempel 2 Stunden in der Vergangenheit ausstellen.
+            s = URLSafeTimedSerializer(app.config["SECRET_KEY"])
+            with patch("itsdangerous.timed.time.time", return_value=time.time() - 7200):
+                token = s.dumps(
+                    {"uid": user.id, "pv": user.password_hash[-16:]},
+                    salt="password-reset",
+                )
+
+            test_client = app.test_client()
+            resp = test_client.get(
+                f"/auth/reset-password/{token}", follow_redirects=True
+            )
+            assert resp.status_code == 200
+            assert "abgelaufen".encode() in resp.data
+
+            # Auch ein POST mit abgelaufenem Token darf das Passwort nicht ändern.
+            resp_post = test_client.post(
+                f"/auth/reset-password/{token}",
+                data={"password": "neupass456", "password2": "neupass456"},
+                follow_redirects=True,
+            )
+            assert resp_post.status_code == 200
+            updated = _db.session.execute(
+                _db.select(User).filter_by(email="test@example.com")
+            ).scalar_one()
+            assert updated.check_password("oldpassword123")
+            assert not updated.check_password("neupass456")
+
     def test_post_valid_token_changes_password(self, client):
         from app import create_app
 
