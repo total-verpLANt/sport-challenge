@@ -61,6 +61,12 @@ else
     fail "migrations/ fehlt – 'flask db init' ausführen"
 fi
 
+if command -v ffprobe >/dev/null 2>&1; then
+    pass "ffprobe vorhanden (Video-Upload-Validierung, Issue 43k)"
+else
+    info "ffprobe fehlt – Video-Uploads werden abgelehnt; 'brew install ffmpeg' (lokal optional)"
+fi
+
 if grep -q "## Aktueller Stand" CLAUDE.md 2>/dev/null; then
     pass "CLAUDE.md enthält 'Aktueller Stand'-Abschnitt"
 else

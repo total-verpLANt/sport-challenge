@@ -44,6 +44,14 @@ FLASK_APP=run.py
 GUNICORN_WORKERS=1
 ```
 
+**Security-Vars für den Produktionsbetrieb hinter Cloudflare/HTTPS** (siehe `.env.example`):
+```
+PUBLIC_BASE_URL=https://<deine-domain>   # kanonische Basis für Mail-/OAuth-Links (haf)
+TRUSTED_HOSTS=<deine-domain>             # Allowlist erlaubter Host-Header (haf)
+PROXY_X_HOST=0                           # X-Forwarded-Host nur vertrauen, wenn Proxy ihn garantiert
+SECURE_COOKIES=1                         # Session-/Remember-Me-Cookie nur über HTTPS (26x)
+```
+
 Optionale Vars für Strava:
 ```
 STRAVA_CLIENT_ID=
@@ -51,13 +59,15 @@ STRAVA_CLIENT_SECRET=
 ```
 
 > ⚠️ `.env` niemals ins Git-Repository einchecken. `SECRET_KEY` darf sich nie ändern – er ist die Basis der Fernet-Verschlüsselung aller Connector-Credentials.
+>
+> ⚠️ **Produktion:** Neue/geänderte `.env`-Vars müssen vor dem Deploy in der Prod-`.env` gesetzt werden. `SECURE_COOKIES=1` ist hinter HTTPS Pflicht – ohne sie bleibt das Remember-Me-Cookie unsicher. Lokale HTTP-Dev lässt `SECURE_COOKIES` weg (Default `0`).
 
 ### Volumes
 
 | Host | Container | Inhalt |
 |---|---|---|
 | `./data/instance/` | `/app/instance/` | SQLite-Datenbank |
-| `./data/uploads/` | `/app/app/static/uploads/` | Foto-/Video-Uploads |
+| `./data/uploads/` | `/app/data/uploads/` | Foto-/Video-Uploads (außerhalb `static`, seit `1ye`) |
 | `./data/logs/` | `/app/logs/` | Access-Log (Rotating) |
 
 ### CI/CD
@@ -80,6 +90,7 @@ Siehe `docs/prod-migration-guide.md`.
 
 - Python 3.14+
 - [uv](https://github.com/astral-sh/uv) für venv-Management
+- **ffmpeg** (liefert `ffprobe`) – wird für die Inhaltsvalidierung von Video-Uploads (`43k`) und das Auslesen der Aufnahmezeit benötigt. Ohne `ffprobe` werden Video-Uploads abgelehnt. (Im Docker-Image bereits enthalten.)
 
 ### Setup
 

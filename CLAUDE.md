@@ -50,43 +50,43 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-08, Wachwechsel #10)
+## Aktueller Stand (2026-06-08, Wachwechsel #11)
 
-**Aktive Arbeit:** Keine offenen Issues
+**Aktive Arbeit:** Keine offenen Issues – Security-Welle abgeschlossen, Queue leer.
 
 - **Epic:** Kein aktiver Epic
 - **Lessons Learned:** `docs/lessons-learned.md`
-- **Version:** 0.16.0 (live in Prod)
+- **Version:** 0.16.6 (live in Prod – vom Kapitän am 2026-06-08 ausgerollt)
 
-**Änderungen seit Wachwechsel #9 (Multimedia-Upload):**
-- `501ddfd` – Merge: Krankmeldung → allgemeine Abwesenheit (v0.16.0)
-- 5 atomare Commits `f285310..bbe169e` (Modell, Grund-Feld, Wording, Feed, Tests)
+**Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abwesenheits-Feature umfasst (Krankmeldung → allgemeine Abwesenheit):**
-- **Bewusst NUR UI umbenannt** – Modell/Tabelle/Routen bleiben `sick_*` (`SickPeriod`, `sick_periods`, `sick_period_submit`, `/sick-period`). Variablen `sick_periods`, `sick_days_val` unverändert.
-- `SickPeriod.reason` (Text, nullable) – optionaler Grund, serverseitig auf 500 Zeichen begrenzt
-- `SickPeriodLike` (analog `ActivityLike`) macht Abwesenheiten im Feed likebar; Migration `aab58a149773` (rein additiv: Spalte + Tabelle)
-- Cascade-Härtung: `SickPeriodLike` wird bei User-/Challenge-Löschung explizit mitgelöscht (`admin.py`, `challenges.py`) – SQLite-PRAGMA foreign_keys nicht garantiert
-- Dashboard-Feed (`dashboard.py`) mischt jetzt Aktivitäten + Abwesenheiten zu einer nach Zeit sortierten Liste (naive/aware datetimes normalisiert via `_feed_sort_key`); vereinheitlichte Item-Struktur (`type` activity|absence) für Server-Render UND `/feed`-JSON
-- Neue Route `like_sick_period` (Teilnehmer-Check + Rate-Limit `30/min` wie `like_activity`); Like-Button via `data-like-url` generalisiert
-- Abwesenheits-Karte: Zeitraum + Grund (falls vorhanden), **kein** Motivationsspruch; Feed ist reine Anzeige (kein Löschen/Bearbeiten – das geht nur über „Meine Woche")
-- UI: 🤒 → 🚫, „Krankmeldung" → „Abwesenheit" in allen Templates + Flash-Messages
-- Strafberechnung **unverändert** (`penalty.py`/`weekly_summary.py` nicht angefasst)
-- Nebenfix: fehlender `url_for`-Import in `dashboard.py` (latenter `/feed`-Crash bei Medien)
-- Feed-JSON-Key: `activities` → `items`
-- **ACHTUNG:** `flask db migrate` erzeugt weiterhin falschen Uuid-Diff für `challenges.public_id` → vor Upgrade aus Migration entfernen (siehe Lessons Learned)
-- 199 Tests
+**Änderungen seit Wachwechsel #10 (5 Security-Bugs abgearbeitet):**
+- `haf` → v0.16.1 – Host-Header-Härtung (`PUBLIC_BASE_URL`, `TRUSTED_HOSTS`, `PROXY_X_HOST`)
+- `1ye` → v0.16.2 – Medien-Uploads gegen anonymen Direktzugriff (login-geschützte `/media`-Route; Upload-Pfad nach `data/uploads` außerhalb `static`)
+- v0.16.3 – Medien-Darstellungsfixes (GLightbox-Typ, Bild-Vorschau)
+- `znn` → v0.16.4 – Login-Lockout-DoS: korrektes Passwort durchbricht Lockout; Brute-Force-Schutz via IP-Rate-Limit (`10/min; 60/h`) am Login-POST
+- `26x` → v0.16.5 – Secure-Cookies env-gesteuert (`SECURE_COOKIES=1`): Session **und** Remember-Me als `Secure`; `HttpOnly`/`SameSite=Lax` explizit. Talisman sicherte zuvor nur das Session-Cookie
+- `43k` → v0.16.6 – Upload-Inhaltsvalidierung: Bilder via **Pillow** (Decode + Format-Allowlist + Bomb-Schutz), Videos via **ffprobe** (Video-Stream **+** Container-Allowlist). Validierung zentral in `save_upload()`, Routen unverändert
+- `q4d` – Passwort-Reset One-Time-Use + Ablauf waren bereits korrekt implementiert; nur fehlende Test-Coverage für abgelaufene Tokens ergänzt (kein Produktivcode-Change)
+- 226 Tests
 
-**Nächste Queue (5 offene Security-Bugs, unabhängig vom Abwesenheits-Feature):**
-`haf` (Host-Header-Poisoning), `znn` (Login-Lockout-DoS), `1ye` (Medien ohne Login abrufbar), `43k` (Upload-Inhalt validieren), `q4d` (Passwort-Reset-Links invalidieren)
+**Prod-relevante Neuerungen dieser Wache (bereits ausgerollt):**
+- **Neue Pflicht-`.env`-Vars:** `PUBLIC_BASE_URL`, `TRUSTED_HOSTS`, `SECURE_COOKIES=1` (vom Kapitän gesetzt). Default `SECURE_COOKIES=0` für lokale HTTP-Dev.
+- **Neue Dependency Pillow** (`requirements.txt`) → Image-Rebuild beim Deploy nötig. ffprobe ist im Docker-Image bereits vorhanden.
+
+**Nächste Queue:** leer (`bd ready` → keine offenen Issues). Nächste Arbeit kommt per neuem Plan/Epic.
+
+### Nachricht vom scheidenden Wachoffizier (2026-06-08)
+
+> Wichtig ist, dass Änderungen nie die produktive Instanz gefährden. Falls in prod etwas geändert werden muss (wie zuletzt in .env) muss darauf hingewiesen werden.
 
 ### Einstieg für neue Sessions
 
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories absence-feature           # Pointer für diesen Wachwechsel
-bd ready                              # nächste Issues (5 Security-Bugs)
+bd memories security-hardening        # Pointer für diesen Wachwechsel
+bd ready                              # nächste Issues (aktuell leer)
 ```
 
 ## Build & Test

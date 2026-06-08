@@ -289,3 +289,35 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wo sichtbar:** Methodik – betrifft alle manuellen `python -c`-Verifikationen gegen die App-Factory.
 
 **Quelle:** Wachwechsel #10 (Abwesenheits-Feature), 2026-06-08.
+
+---
+
+## Security: Upload-Inhaltsvalidierung
+
+### 2026-06-08: ffprobe meldet Einzelbilder als `codec_type=video` – Container-Check nötig
+
+**Erkenntnis:** Bei der Inhaltsvalidierung von Video-Uploads (`43k`) reicht es **nicht**, via `ffprobe` zu prüfen, ob ein Stream mit `codec_type=video` existiert. ffprobe behandelt ein einzelnes Bild (z. B. PNG, als `.mp4` umbenannt) als 1-Frame-Video-Stream und meldet `codec_type=video`. Ein Bild würde so als „gültiges Video" durchrutschen.
+
+**Warum relevant:** Die naheliegende Implementierung (`-select_streams v:0 -show_entries stream=codec_type`) ist unvollständig und täuscht Sicherheit vor. Der Angreifer-Pfad „Bild mit Video-Endung" bliebe offen.
+
+**Wie vermeiden:** Zusätzlich den **Container** prüfen (`format=format_name`) und gegen eine Allowlist abgleichen. Echte Videos liefern `mov,mp4,m4a,...` bzw. `matroska,webm`; ein PNG liefert `png_pipe`. Erst Container-Match **und** vorhandener Video-Stream gelten als gültig. Implementiert in `app/utils/uploads.py:_is_valid_video` (`ALLOWED_VIDEO_CONTAINERS`).
+
+**Wo sichtbar:** `app/utils/uploads.py`, Tests in `tests/test_upload_validation.py` (`test_image_content_as_mp4_rejected`).
+
+**Quelle:** Wachwechsel #11 (Security-Welle), Issue `43k`, 2026-06-08.
+
+---
+
+## Security: Cookie-Härtung
+
+### 2026-06-08: Flask-Talisman sichert nur das Session-Cookie, nicht Remember-Me
+
+**Erkenntnis:** Flask-Talisman setzt in `_force_https` (before_request) `SESSION_COOKIE_SECURE=True` – aber nur für das **Session**-Cookie, request-zeit-abhängig und an `app.debug` gekoppelt. Das **Remember-Me**-Cookie von Flask-Login (`REMEMBER_COOKIE_SECURE`) bleibt davon unberührt und wäre ohne explizite Konfiguration unsicher (würde auch über HTTP gesendet).
+
+**Warum relevant:** Man könnte fälschlich annehmen, Talisman härte „die Cookies" pauschal. Tatsächlich klafft eine Lücke genau beim langlebigen Remember-Me-Token – dem wertvollsten Ziel.
+
+**Wie vermeiden:** Cookie-Flags explizit und env-gesteuert in `config.py` setzen – `SESSION_COOKIE_SECURE` **und** `REMEMBER_COOKIE_SECURE` (plus `HTTPONLY`/`SAMESITE` für beide). Steuerung über `SECURE_COOKIES` (Default `0` für lokale HTTP-Dev, `1` in Prod hinter HTTPS). Talisman bleibt als Defense-in-Depth-Fallback für das Session-Cookie erhalten.
+
+**Wo sichtbar:** `config.py` (Cookie-Flags), `tests/test_secure_cookies.py`.
+
+**Quelle:** Wachwechsel #11 (Security-Welle), Issue `26x`, 2026-06-08.
