@@ -1,4 +1,29 @@
 {% extends "base.html" %}
+
+{% macro format_like_names(names) %}
+  {%- if names|length == 1 -%}
+    {{ names[0] }} gefällt das
+  {%- elif names|length == 2 -%}
+    {{ names[0] }} und {{ names[1] }} gefällt das
+  {%- elif names|length <= 5 -%}
+    {{ names[:-1] | join(', ') }} und {{ names[-1] }} gefällt das
+  {%- else -%}
+    {{ names[:4] | join(', ') }} und {{ names|length - 4 }} weitere{{ 'n' if names|length - 4 > 1 else 'm' }}
+  {%- endif -%}
+{% endmacro %}
+
+{% macro like_button(item) %}
+  <button
+    class="btn btn-sm like-btn {% if item.liked_by_me %}btn-danger{% else %}btn-outline-danger{% endif %}"
+    data-like-url="{{ item.like_url }}"
+    data-csrf="{{ csrf_token() }}">
+    ❤️ <span class="like-count">{{ item.like_count }}</span>
+  </button>
+  {% if item.liked_by %}
+  <span class="like-names text-muted small ms-2">{{ format_like_names(item.liked_by) }}</span>
+  {% endif %}
+{% endmacro %}
+
 {% block content %}
 
 {% if summary is none %}
@@ -108,71 +133,66 @@
 </div>
 
 <hr class="my-4">
-<h4 class="mb-3">Aktivitäten-Feed</h4>
+<h4 class="mb-3">Feed</h4>
 
-{% if feed_activities %}
+{% if feed_items %}
 <div id="activity-feed">
-  {% for activity in feed_activities %}
-  <div class="card mb-3" id="feed-post-{{ activity.id }}">
-    <div class="card-body">
-      <p class="card-text mb-1">
-        <strong>{{ feed_user_names.get(activity.user_id, 'Unbekannt') }}</strong> hat um
-        <strong>{{ (activity.started_at or activity.created_at).strftime('%H:%M') }} Uhr</strong> am
-        {{ activity.activity_date.strftime('%d.%m.%Y') }}
-        <em>{{ activity.sport_type }}</em> gemacht.
-        Die Einheit hat <strong>{{ activity.duration_minutes }} Minuten</strong> gedauert.
-      </p>
-      <p class="text-muted fst-italic small mb-2">💪 {{ feed_quotes[activity.id] }}</p>
+  {% for item in feed_items %}
+    {% if item.type == "activity" %}
+    <div class="card mb-3" id="feed-post-activity-{{ item.id }}">
+      <div class="card-body">
+        <p class="card-text mb-1">
+          <strong>{{ item.user_display_name }}</strong> hat um
+          <strong>{{ item.time }} Uhr</strong> am {{ item.activity_date }}
+          <em>{{ item.sport_type }}</em> gemacht.
+          Die Einheit hat <strong>{{ item.duration_minutes }} Minuten</strong> gedauert.
+        </p>
+        <p class="text-muted fst-italic small mb-2">💪 {{ item.quote }}</p>
 
-      {% if activity.media %}
-      <div class="d-flex flex-wrap gap-2 mb-2">
-        {% for m in activity.media %}
-          {% if m.media_type == "video" %}
-          <video src="{{ url_for('static', filename=m.file_path) }}"
-                 controls class="rounded" style="max-height:180px;max-width:240px;object-fit:cover"></video>
-          {% else %}
-          <a href="{{ url_for('static', filename=m.file_path) }}"
-             class="glightbox" data-gallery="feed-{{ activity.id }}">
-            <img src="{{ url_for('static', filename=m.file_path) }}"
-                 alt="{{ m.original_filename }}"
-                 class="img-thumbnail" style="max-height:180px;max-width:240px;object-fit:cover">
-          </a>
-          {% endif %}
-        {% endfor %}
-      </div>
-      {% endif %}
-
-      {% if activity.notes %}
-      <p class="card-text text-secondary small mt-1 mb-2">{{ activity.notes }}</p>
-      {% endif %}
-
-      <button
-        class="btn btn-sm like-btn {% if current_user.id in liked_ids.get(activity.id, []) %}btn-danger{% else %}btn-outline-danger{% endif %}"
-        data-activity-id="{{ activity.id }}"
-        data-liked="{{ 'true' if current_user.id in liked_ids.get(activity.id, []) else 'false' }}"
-        data-csrf="{{ csrf_token() }}">
-        ❤️ <span class="like-count">{{ activity.likes | length }}</span>
-      </button>
-      {% set names = liked_names.get(activity.id, []) %}
-      {% if names %}
-      <span class="like-names text-muted small ms-2">
-        {% if names | length == 1 %}
-          {{ names[0] }} gefällt das
-        {% elif names | length == 2 %}
-          {{ names[0] }} und {{ names[1] }} gefällt das
-        {% elif names | length <= 5 %}
-          {{ names[:-1] | join(', ') }} und {{ names[-1] }} gefällt das
-        {% else %}
-          {{ names[:4] | join(', ') }} und {{ names | length - 4 }} weitere{{ 'n' if names | length - 4 > 1 else 'm' }}
+        {% if item.media %}
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          {% for m in item.media %}
+            {% if m.media_type == "video" %}
+            <video src="{{ m.url }}"
+                   controls class="rounded" style="max-height:180px;max-width:240px;object-fit:cover"></video>
+            {% else %}
+            <a href="{{ m.url }}"
+               class="glightbox" data-gallery="feed-activity-{{ item.id }}">
+              <img src="{{ m.url }}"
+                   alt="{{ m.original_filename }}"
+                   class="img-thumbnail" style="max-height:180px;max-width:240px;object-fit:cover">
+            </a>
+            {% endif %}
+          {% endfor %}
+        </div>
         {% endif %}
-      </span>
-      {% endif %}
+
+        {% if item.notes %}
+        <p class="card-text text-secondary small mt-1 mb-2">{{ item.notes }}</p>
+        {% endif %}
+
+        {{ like_button(item) }}
+      </div>
     </div>
-  </div>
+    {% else %}
+    <div class="card mb-3 border-secondary-subtle" id="feed-post-absence-{{ item.id }}">
+      <div class="card-body">
+        <p class="card-text mb-1">
+          🚫 <strong>{{ item.user_display_name }}</strong> ist vom
+          <strong>{{ item.start_date }}</strong> bis <strong>{{ item.end_date }}</strong> abwesend.
+        </p>
+        {% if item.reason %}
+        <p class="card-text text-secondary small mt-1 mb-2">{{ item.reason }}</p>
+        {% endif %}
+
+        {{ like_button(item) }}
+      </div>
+    </div>
+    {% endif %}
   {% endfor %}
 </div>
 
-<div id="load-more-container" class="text-center mt-2 mb-4">
+<div id="load-more-container" class="text-center mt-2 mb-4" {% if not feed_has_more %}style="display:none"{% endif %}>
   <button id="load-more-btn" class="btn btn-outline-secondary btn-sm"
           data-challenge-id="{{ challenge.id }}" data-page="1">
     Mehr laden
@@ -180,7 +200,7 @@
 </div>
 
 {% else %}
-<p class="text-muted">Noch keine Aktivitäten im Feed.</p>
+<p class="text-muted">Noch keine Einträge im Feed.</p>
 {% endif %}
 
 {% endif %}
@@ -225,10 +245,10 @@
     btn.addEventListener('click', function() {
       if (this.disabled) return;
       this.disabled = true;
-      const activityId = this.dataset.activityId;
+      const likeUrl = this.dataset.likeUrl;
       const csrf = this.dataset.csrf;
       const self = this;
-      fetch('/dashboard/activities/' + activityId + '/like', {
+      fetch(likeUrl, {
         method: 'POST',
         headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -240,17 +260,97 @@
         if (data.liked) {
           self.classList.remove('btn-outline-danger');
           self.classList.add('btn-danger');
-          self.dataset.liked = 'true';
         } else {
           self.classList.remove('btn-danger');
           self.classList.add('btn-outline-danger');
-          self.dataset.liked = 'false';
         }
         updateLikeNames(self, data.liked_by);
       })
       .catch(console.error)
       .finally(() => { self.disabled = false; });
     });
+  }
+
+  function likeBlockHtml(item, csrf) {
+    const likedClass = item.liked_by_me ? 'btn-danger' : 'btn-outline-danger';
+    const namesHtml = (item.liked_by && item.liked_by.length > 0)
+      ? '<span class="like-names text-muted small ms-2">' + formatLikeNames(item.liked_by) + '</span>'
+      : '';
+    return '<button class="btn btn-sm ' + likedClass + ' like-btn" ' +
+      'data-like-url="' + esc(item.like_url) + '" ' +
+      'data-csrf="' + esc(csrf) + '">❤️ <span class="like-count">' + esc(item.like_count) + '</span></button>' +
+      namesHtml;
+  }
+
+  function buildCard(item, csrf) {
+    const card = document.createElement('div');
+    card.className = 'card mb-3' + (item.type === 'absence' ? ' border-secondary-subtle' : '');
+    card.id = 'feed-post-' + item.type + '-' + item.id;
+
+    if (item.type === 'absence') {
+      const reasonHtml = item.reason
+        ? '<p class="card-text text-secondary small mt-1 mb-2">' + esc(item.reason) + '</p>'
+        : '';
+      card.innerHTML =
+        '<div class="card-body">' +
+          '<p class="card-text mb-1">🚫 <strong>' + esc(item.user_display_name) + '</strong> ist vom ' +
+          '<strong>' + esc(item.start_date) + '</strong> bis <strong>' + esc(item.end_date) + '</strong> abwesend.</p>' +
+          reasonHtml +
+          likeBlockHtml(item, csrf) +
+        '</div>';
+      attachLikeHandler(card.querySelector('.like-btn'));
+      return card;
+    }
+
+    // activity
+    const notesHtml = item.notes
+      ? '<p class="card-text text-secondary small mt-1 mb-2">' + esc(item.notes) + '</p>'
+      : '';
+    card.innerHTML =
+      '<div class="card-body">' +
+        '<p class="card-text mb-1"><strong>' + esc(item.user_display_name) + '</strong> hat um ' +
+        '<strong>' + esc(item.time) + ' Uhr</strong> am ' +
+        esc(item.activity_date) + ' <em>' + esc(item.sport_type) + '</em> gemacht. ' +
+        'Die Einheit hat <strong>' + esc(item.duration_minutes) + ' Minuten</strong> gedauert.</p>' +
+        '<p class="text-muted fst-italic small mb-2">💪 ' + esc(item.quote) + '</p>' +
+        '<div class="js-media-slot"></div>' +
+        notesHtml +
+        likeBlockHtml(item, csrf) +
+      '</div>';
+
+    if (item.media && item.media.length > 0) {
+      const mediaWrapper = document.createElement('div');
+      mediaWrapper.className = 'd-flex flex-wrap gap-2 mb-2';
+      item.media.forEach(function(m) {
+        let el;
+        if (m.media_type === 'video') {
+          el = document.createElement('video');
+          el.src = m.url;
+          el.controls = true;
+          el.className = 'rounded';
+          el.style.cssText = 'max-height:180px;max-width:240px;object-fit:cover';
+        } else {
+          const anchor = document.createElement('a');
+          anchor.href = m.url;
+          anchor.className = 'glightbox';
+          anchor.dataset.gallery = 'feed-activity-' + item.id;
+          const img = document.createElement('img');
+          img.src = m.url;
+          img.alt = m.original_filename;
+          img.className = 'img-thumbnail';
+          img.style.cssText = 'max-height:180px;max-width:240px;object-fit:cover';
+          anchor.appendChild(img);
+          el = anchor;
+        }
+        mediaWrapper.appendChild(el);
+      });
+      card.querySelector('.js-media-slot').replaceWith(mediaWrapper);
+    } else {
+      card.querySelector('.js-media-slot').remove();
+    }
+
+    attachLikeHandler(card.querySelector('.like-btn'));
+    return card;
   }
 
   // Initial
@@ -273,72 +373,8 @@
         const feed = document.getElementById('activity-feed');
         const csrf = document.querySelector('.like-btn')?.dataset?.csrf || '';
 
-        data.activities.forEach(function(a) {
-          const card = document.createElement('div');
-          card.className = 'card mb-3';
-          card.id = 'feed-post-' + a.id;
-
-          const notesHtml = a.notes
-            ? '<p class="card-text text-secondary small mt-1 mb-2">' + esc(a.notes) + '</p>'
-            : '';
-
-          const likedClass = a.liked_by_me ? 'btn-danger' : 'btn-outline-danger';
-          const likeNamesHtml = (a.liked_by && a.liked_by.length > 0)
-            ? '<span class="like-names text-muted small ms-2">' + formatLikeNames(a.liked_by) + '</span>'
-            : '';
-
-          card.innerHTML =
-            '<div class="card-body">' +
-              '<p class="card-text mb-1"><strong>' + esc(a.user_display_name) + '</strong> hat um ' +
-              '<strong>' + esc(a.created_at_time) + ' Uhr</strong> am ' +
-              esc(a.activity_date) + ' <em>' + esc(a.sport_type) + '</em> gemacht. ' +
-              'Die Einheit hat <strong>' + esc(a.duration_minutes) + ' Minuten</strong> gedauert.</p>' +
-              '<p class="text-muted fst-italic small mb-2">💪 ' + esc(a.quote) + '</p>' +
-              '<div class="js-media-slot"></div>' +
-              notesHtml +
-              '<button class="btn btn-sm ' + likedClass + ' like-btn" ' +
-              'data-activity-id="' + esc(a.id) + '" ' +
-              'data-liked="' + (a.liked_by_me ? 'true' : 'false') + '" ' +
-              'data-csrf="' + esc(csrf) + '">❤️ <span class="like-count">' + esc(a.like_count) + '</span></button>' +
-              likeNamesHtml +
-            '</div>';
-
-          if (a.media && a.media.length > 0) {
-            const mediaWrapper = document.createElement('div');
-            mediaWrapper.className = 'd-flex flex-wrap gap-2 mb-2';
-            a.media.forEach(function(m) {
-              const url = m.url;
-              let el;
-              if (m.media_type === 'video') {
-                el = document.createElement('video');
-                el.src = url;
-                el.controls = true;
-                el.className = 'rounded';
-                el.style.cssText = 'max-height:180px;max-width:240px;object-fit:cover';
-              } else {
-                const anchor = document.createElement('a');
-                anchor.href = url;
-                anchor.className = 'glightbox';
-                anchor.dataset.gallery = 'feed-' + a.id;
-                const img = document.createElement('img');
-                img.src = url;
-                img.alt = m.original_filename;
-                img.className = 'img-thumbnail';
-                img.style.cssText = 'max-height:180px;max-width:240px;object-fit:cover';
-                anchor.appendChild(img);
-                el = anchor;
-              }
-              mediaWrapper.appendChild(el);
-            });
-            card.querySelector('.js-media-slot').replaceWith(mediaWrapper);
-          } else {
-            card.querySelector('.js-media-slot').remove();
-          }
-
-          // Like-Handler für dynamisch erstellten Button
-          attachLikeHandler(card.querySelector('.like-btn'));
-
-          feed.appendChild(card);
+        (data.items || []).forEach(function(item) {
+          feed.appendChild(buildCard(item, csrf));
         });
 
         if (lightbox) lightbox.reload();

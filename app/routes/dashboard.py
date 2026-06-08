@@ -1,6 +1,6 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
@@ -8,11 +8,121 @@ from sqlalchemy.orm import selectinload
 from app.extensions import db, limiter
 from app.models.activity import Activity, ActivityLike
 from app.models.challenge import Challenge, ChallengeParticipation
+from app.models.sick_period import SickPeriod, SickPeriodLike
 from app.models.user import User
 from app.services.weekly_summary import get_challenge_summary
 from app.utils.motivational_quotes import get_random_quote
 
 dashboard_bp = Blueprint("dashboard", __name__, template_folder="../templates")
+
+FEED_PAGE_SIZE = 10
+
+
+def _feed_sort_key(dt: datetime) -> datetime:
+    """Vergleichbarer Sortierschlüssel: naive datetimes als UTC interpretieren."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _activity_to_dict(a: Activity, users: dict, current_user_id: int) -> dict:
+    u = users.get(a.user_id)
+    return {
+        "type": "activity",
+        "id": a.id,
+        "user_display_name": u.display_name if u else "Unbekannt",
+        "activity_date": a.activity_date.strftime("%d.%m.%Y"),
+        "time": (a.started_at or a.created_at).strftime("%H:%M"),
+        "sport_type": a.sport_type,
+        "duration_minutes": a.duration_minutes,
+        "notes": a.notes or "",
+        "quote": get_random_quote(),
+        "like_url": url_for("dashboard.like_activity", activity_id=a.id),
+        "liked_by_me": current_user_id in {like.user_id for like in a.likes},
+        "like_count": len(a.likes),
+        "liked_by": [like.user.display_name for like in a.likes if like.user],
+        "media": [
+            {
+                "url": url_for("static", filename=m.file_path),
+                "media_type": m.media_type,
+                "original_filename": m.original_filename,
+            }
+            for m in a.media
+        ],
+    }
+
+
+def _absence_to_dict(p: SickPeriod, users: dict, current_user_id: int) -> dict:
+    u = users.get(p.user_id)
+    return {
+        "type": "absence",
+        "id": p.id,
+        "user_display_name": u.display_name if u else "Unbekannt",
+        "start_date": p.start_date.strftime("%d.%m.%Y"),
+        "end_date": p.end_date.strftime("%d.%m.%Y"),
+        "reason": p.reason or "",
+        "like_url": url_for("dashboard.like_sick_period", sick_period_id=p.id),
+        "liked_by_me": current_user_id in {like.user_id for like in p.likes},
+        "like_count": len(p.likes),
+        "liked_by": [like.user.display_name for like in p.likes if like.user],
+    }
+
+
+def _build_feed_items(challenge_id: int, participant_ids, current_user_id: int, page: int):
+    """Gemischter Feed (Aktivitäten + Abwesenheiten), nach Zeit sortiert + paginiert.
+
+    Beide Quellen werden bis (page+1)*PAGE_SIZE+1 geladen, in Python gemerged,
+    nach Zeitstempel sortiert und dann auf die Seite zugeschnitten. Bei der
+    erwarteten Datenmenge (wenige Teilnehmer) ist das unkritisch.
+    """
+    fetch_n = (page + 1) * FEED_PAGE_SIZE + 1
+
+    activities = db.session.scalars(
+        db.select(Activity)
+        .where(
+            Activity.challenge_id == challenge_id,
+            Activity.user_id.in_(participant_ids),
+        )
+        .order_by(func.coalesce(Activity.started_at, Activity.created_at).desc())
+        .limit(fetch_n)
+        .options(
+            selectinload(Activity.media),
+            selectinload(Activity.likes).selectinload(ActivityLike.user),
+        )
+    ).all()
+
+    periods = db.session.scalars(
+        db.select(SickPeriod)
+        .where(
+            SickPeriod.challenge_id == challenge_id,
+            SickPeriod.user_id.in_(participant_ids),
+        )
+        .order_by(SickPeriod.created_at.desc())
+        .limit(fetch_n)
+        .options(selectinload(SickPeriod.likes).selectinload(SickPeriodLike.user))
+    ).all()
+
+    uid_set = {a.user_id for a in activities} | {p.user_id for p in periods}
+    users = (
+        {u.id: u for u in db.session.scalars(db.select(User).where(User.id.in_(uid_set))).all()}
+        if uid_set
+        else {}
+    )
+
+    items = []
+    for a in activities:
+        items.append((_feed_sort_key(a.started_at or a.created_at),
+                      _activity_to_dict(a, users, current_user_id)))
+    for p in periods:
+        items.append((_feed_sort_key(p.created_at),
+                      _absence_to_dict(p, users, current_user_id)))
+
+    items.sort(key=lambda t: t[0], reverse=True)
+
+    start = page * FEED_PAGE_SIZE
+    end = start + FEED_PAGE_SIZE
+    has_more = len(items) > end
+    return [d for _, d in items[start:end]], has_more
 
 
 @dashboard_bp.route("/")
@@ -41,9 +151,8 @@ def index():
             "dashboard/index.html",
             summary=None,
             timedelta=timedelta,
-            feed_activities=[],
-            feed_quotes={},
-            liked_ids={},
+            feed_items=[],
+            feed_has_more=False,
             challenge=None,
         )
 
@@ -57,50 +166,16 @@ def index():
         )
     ).all()
 
-    # Activity-Feed: 10 neuste Activities
-    feed_activities = db.session.scalars(
-        db.select(Activity)
-        .where(
-            Activity.challenge_id == challenge.id,
-            Activity.user_id.in_(participant_ids),
-        )
-        .order_by(Activity.activity_date.desc(), func.coalesce(Activity.started_at, Activity.created_at).desc())
-        .limit(10)
-        .options(
-            selectinload(Activity.media),
-            selectinload(Activity.likes).selectinload(ActivityLike.user),
-        )
-    ).all()
-
-    # Motivationssprüche pro Activity
-    feed_quotes = {a.id: get_random_quote() for a in feed_activities}
-
-    # Like-Status des aktuellen Users pro Activity
-    liked_ids = {
-        a.id: {like.user_id for like in a.likes}
-        for a in feed_activities
-    }
-
-    # Liker-Spitznamen pro Activity
-    liked_names = {
-        a.id: [like.user.display_name for like in a.likes]
-        for a in feed_activities
-    }
-
-    # Display-Namen pro Activity (User-Lookup via participant_ids)
-    user_ids = {a.user_id for a in feed_activities}
-    users = db.session.scalars(db.select(User).where(User.id.in_(user_ids))).all()
-    feed_user_names = {u.id: u.display_name for u in users}
+    feed_items, feed_has_more = _build_feed_items(
+        challenge.id, participant_ids, current_user.id, page=0
+    )
 
     return render_template(
         "dashboard/index.html",
         summary=summary,
         timedelta=timedelta,
-        feed_activities=feed_activities,
-        feed_quotes=feed_quotes,
-        liked_ids=liked_ids,
-        liked_names=liked_names,
-        feed_user_names=feed_user_names,
+        feed_items=feed_items,
+        feed_has_more=feed_has_more,
         challenge=challenge,
     )
 
@@ -127,12 +202,12 @@ def leaderboard():
 @dashboard_bp.route("/feed")
 @login_required
 def feed():
-    """AJAX-Endpunkt für paginiertes Nachladen des Activity-Feeds."""
+    """AJAX-Endpunkt für paginiertes Nachladen des gemischten Feeds."""
     challenge_id = request.args.get("challenge_id", type=int)
     page = max(0, request.args.get("page", 0, type=int))
 
     if not challenge_id:
-        return jsonify({"activities": [], "has_more": False})
+        return jsonify({"items": [], "has_more": False})
 
     # Berechtigung: current_user muss Teilnehmer sein
     participation = db.session.execute(
@@ -144,7 +219,7 @@ def feed():
     ).scalars().first()
 
     if not participation:
-        return jsonify({"activities": [], "has_more": False}), 403
+        return jsonify({"items": [], "has_more": False}), 403
 
     participant_ids = db.session.scalars(
         db.select(ChallengeParticipation.user_id).where(
@@ -153,89 +228,34 @@ def feed():
         )
     ).all()
 
-    offset = page * 10
-    activities = db.session.scalars(
-        db.select(Activity)
-        .where(
-            Activity.challenge_id == challenge_id,
-            Activity.user_id.in_(participant_ids),
+    items, has_more = _build_feed_items(
+        challenge_id, participant_ids, current_user.id, page=page
+    )
+
+    return jsonify({"items": items, "has_more": has_more})
+
+
+def _is_challenge_participant(challenge_id: int) -> bool:
+    participation = db.session.execute(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.challenge_id == challenge_id,
+            ChallengeParticipation.user_id == current_user.id,
+            ChallengeParticipation.status.in_(["accepted", "bailed_out"]),
         )
-        .order_by(Activity.activity_date.desc(), func.coalesce(Activity.started_at, Activity.created_at).desc())
-        .offset(offset)
-        .limit(11)  # 11 laden um has_more zu prüfen
-        .options(selectinload(Activity.media), selectinload(Activity.likes))
-    ).all()
-
-    has_more = len(activities) > 10
-    activities = activities[:10]
-
-    # User-Objekte laden
-    user_map = {}
-    for a in activities:
-        if a.user_id not in user_map:
-            user_map[a.user_id] = db.session.get(User, a.user_id)
-
-    # Liker-User laden für display_name
-    all_liker_ids = {like.user_id for a in activities for like in a.likes}
-    liker_users = {}
-    if all_liker_ids:
-        liker_users = {
-            u.id: u for u in db.session.scalars(
-                db.select(User).where(User.id.in_(all_liker_ids))
-            ).all()
-        }
-
-    result = []
-    for a in activities:
-        user = user_map.get(a.user_id)
-        liked_by = [
-            liker_users[like.user_id].display_name
-            for like in a.likes if like.user_id in liker_users
-        ]
-        result.append({
-            "id": a.id,
-            "user_display_name": user.display_name if user else "Unbekannt",
-            "activity_date": a.activity_date.strftime("%d.%m.%Y"),
-            "created_at_time": (a.started_at or a.created_at).strftime("%H:%M"),
-            "sport_type": a.sport_type,
-            "duration_minutes": a.duration_minutes,
-            "notes": a.notes or "",
-            "quote": get_random_quote(),
-            "liked_by_me": current_user.id in {like.user_id for like in a.likes},
-            "like_count": len(a.likes),
-            "liked_by": liked_by,
-            "media": [
-                {
-                    "url": url_for('static', filename=m.file_path),
-                    "media_type": m.media_type,
-                    "original_filename": m.original_filename,
-                }
-                for m in a.media
-            ],
-        })
-
-    return jsonify({"activities": result, "has_more": has_more})
+    ).scalars().first()
+    return participation is not None
 
 
 @dashboard_bp.route("/activities/<int:activity_id>/like", methods=["POST"])
 @login_required
 @limiter.limit("30/minute")
 def like_activity(activity_id: int):
-    """AJAX-Like-Toggle: Like hinzufügen oder entfernen."""
+    """AJAX-Like-Toggle für eine Aktivität."""
     activity = db.session.get(Activity, activity_id)
     if not activity:
         return jsonify({"error": "nicht gefunden"}), 404
 
-    # Berechtigung: current_user muss Teilnehmer derselben Challenge sein
-    participation = db.session.execute(
-        db.select(ChallengeParticipation).where(
-            ChallengeParticipation.challenge_id == activity.challenge_id,
-            ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.status.in_(["accepted", "bailed_out"]),
-        )
-    ).scalars().first()
-
-    if not participation:
+    if not _is_challenge_participant(activity.challenge_id):
         return jsonify({"error": "keine Berechtigung"}), 403
 
     existing_like = db.session.execute(
@@ -250,8 +270,7 @@ def like_activity(activity_id: int):
         db.session.commit()
         liked = False
     else:
-        new_like = ActivityLike(activity_id=activity_id, user_id=current_user.id)
-        db.session.add(new_like)
+        db.session.add(ActivityLike(activity_id=activity_id, user_id=current_user.id))
         db.session.commit()
         liked = True
 
@@ -262,5 +281,42 @@ def like_activity(activity_id: int):
     ).all()
 
     liked_by = [like.user.display_name for like in likes]
+    return jsonify({"liked": liked, "count": len(likes), "liked_by": liked_by})
 
+
+@dashboard_bp.route("/sick-periods/<int:sick_period_id>/like", methods=["POST"])
+@login_required
+@limiter.limit("30/minute")
+def like_sick_period(sick_period_id: int):
+    """AJAX-Like-Toggle für eine Abwesenheit."""
+    period = db.session.get(SickPeriod, sick_period_id)
+    if not period:
+        return jsonify({"error": "nicht gefunden"}), 404
+
+    if not _is_challenge_participant(period.challenge_id):
+        return jsonify({"error": "keine Berechtigung"}), 403
+
+    existing_like = db.session.execute(
+        db.select(SickPeriodLike).where(
+            SickPeriodLike.sick_period_id == sick_period_id,
+            SickPeriodLike.user_id == current_user.id,
+        )
+    ).scalars().first()
+
+    if existing_like:
+        db.session.delete(existing_like)
+        db.session.commit()
+        liked = False
+    else:
+        db.session.add(SickPeriodLike(sick_period_id=sick_period_id, user_id=current_user.id))
+        db.session.commit()
+        liked = True
+
+    likes = db.session.scalars(
+        db.select(SickPeriodLike)
+        .where(SickPeriodLike.sick_period_id == sick_period_id)
+        .options(selectinload(SickPeriodLike.user))
+    ).all()
+
+    liked_by = [like.user.display_name for like in likes]
     return jsonify({"liked": liked, "count": len(likes), "liked_by": liked_by})

@@ -299,10 +299,11 @@ def test_feed_returns_json(client, db):
     resp = client.get(f"/dashboard/feed?challenge_id={challenge.id}&page=0")
     assert resp.status_code == 200
     data = resp.get_json()
-    assert "activities" in data
+    assert "items" in data
     assert "has_more" in data
-    assert len(data["activities"]) == 1
-    assert data["activities"][0]["sport_type"] == "Laufen"
+    assert len(data["items"]) == 1
+    assert data["items"][0]["type"] == "activity"
+    assert data["items"][0]["sport_type"] == "Laufen"
 
 
 def test_feed_only_challenge_participants(client, db):
@@ -352,13 +353,13 @@ def test_feed_pagination(client, db):
     resp0 = client.get(f"/dashboard/feed?challenge_id={challenge.id}&page=0")
     assert resp0.status_code == 200
     data0 = resp0.get_json()
-    assert len(data0["activities"]) == 10
+    assert len(data0["items"]) == 10
     assert data0["has_more"] is True
 
     resp1 = client.get(f"/dashboard/feed?challenge_id={challenge.id}&page=1")
     assert resp1.status_code == 200
     data1 = resp1.get_json()
-    assert len(data1["activities"]) == 2
+    assert len(data1["items"]) == 2
     assert data1["has_more"] is False
 
 
@@ -476,3 +477,74 @@ def test_like_requires_challenge_participation(client, db):
         headers={"X-CSRFToken": "test"},
     )
     assert resp.status_code == 403
+
+
+def _create_sick_period(db, user_id, challenge_id, reason=None, days=2):
+    from app.models.sick_period import SickPeriod
+    today = date.today()
+    sp = SickPeriod(
+        user_id=user_id,
+        challenge_id=challenge_id,
+        start_date=today,
+        end_date=today + timedelta(days=days),
+        reason=reason,
+    )
+    db.session.add(sp)
+    db.session.commit()
+    return sp
+
+
+def test_feed_includes_absence(client, db):
+    """Eine Abwesenheit erscheint als absence-Item im Feed (mit Grund, ohne Spruch)."""
+    user = _create_and_login(client, db, "absfeed@test.com", "pw")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    _create_sick_period(db, user.id, challenge.id, reason="Urlaub auf Malle")
+
+    resp = client.get(f"/dashboard/feed?challenge_id={challenge.id}&page=0")
+    assert resp.status_code == 200
+    items = resp.get_json()["items"]
+    absences = [it for it in items if it["type"] == "absence"]
+    assert len(absences) == 1
+    assert absences[0]["reason"] == "Urlaub auf Malle"
+    assert "quote" not in absences[0]
+    assert absences[0]["like_url"].endswith(f"/sick-periods/{absences[0]['id']}/like")
+
+
+def test_like_sick_period_toggle(client, db):
+    """Like-Toggle auf eine Abwesenheit: hinzufügen und wieder entfernen."""
+    user = _create_and_login(client, db, "abslike@test.com", "pw")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    sp = _create_sick_period(db, user.id, challenge.id)
+
+    r1 = client.post(f"/dashboard/sick-periods/{sp.id}/like", headers={"X-CSRFToken": "test"})
+    assert r1.status_code == 200
+    d1 = r1.get_json()
+    assert d1["liked"] is True and d1["count"] == 1
+
+    r2 = client.post(f"/dashboard/sick-periods/{sp.id}/like", headers={"X-CSRFToken": "test"})
+    d2 = r2.get_json()
+    assert d2["liked"] is False and d2["count"] == 0
+
+
+def test_like_sick_period_requires_participation(client, db):
+    """Like auf Abwesenheit gibt 403 für Nicht-Teilnehmer der Challenge."""
+    owner = _create_and_login(client, db, "absowner@test.com", "pw")
+    challenge, _ = _create_challenge_with_participation(db, owner.id)
+    sp = _create_sick_period(db, owner.id, challenge.id)
+
+    client.post("/auth/logout")
+    outsider = User(email="absoutsider@test.com", is_approved=True)
+    outsider.set_password("pw")
+    db.session.add(outsider)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "absoutsider@test.com", "password": "pw"})
+
+    resp = client.post(f"/dashboard/sick-periods/{sp.id}/like", headers={"X-CSRFToken": "test"})
+    assert resp.status_code == 403
+
+
+def test_like_sick_period_not_found(client, db):
+    """Like auf nicht existierende Abwesenheit gibt 404."""
+    _create_and_login(client, db, "abs404@test.com", "pw")
+    resp = client.post("/dashboard/sick-periods/999999/like", headers={"X-CSRFToken": "test"})
+    assert resp.status_code == 404
