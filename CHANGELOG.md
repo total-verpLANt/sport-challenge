@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.16.4] – 2026-06-08
+
+### Sicherheit
+- **Login-Lockout-DoS entschärft** (Issue `znn`): Ein Angreifer konnte ein fremdes Konto durch wenige absichtlich falsche Passwörter temporär aussperren (Account-DoS gegen Verfügbarkeit). Ein **korrektes Passwort durchbricht jetzt immer** eine eventuelle Lockout-Markierung – legitime Nutzer können sich nicht mehr aussperren lassen. Der Brute-Force-Schutz wandert auf ein **IP-Rate-Limit** (`10/min; 60/h`) am Login-POST (Client-IP via `CF-Connecting-IP` unter Cloudflare). `failed_login_attempts`/`locked_until` bleiben als Monitoring-Signal erhalten und werden beim Erreichen der Schwelle geloggt (inkl. IP). Fehlermeldungen unverändert generisch – keine zusätzliche User-Enumeration
+
 ## [0.16.3] – 2026-06-08
 
 ### Behoben

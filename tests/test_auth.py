@@ -4,7 +4,9 @@ Abdeckung:
   1. test_register_creates_user         – POST /auth/register legt User in DB an
   2. test_login_with_valid_credentials  – POST /auth/login mit korrekten Daten → 302
   3. test_login_with_invalid_credentials– POST /auth/login mit falschen Daten → 200 + Fehlertext
-  4. test_login_lockout_after_10_failures – 10 Fehlversuche → Konto gesperrt
+  4. test_correct_password_breaks_lockout – korrektes Passwort durchbricht Lockout (znn)
+  4b. test_login_ip_rate_limited        – IP-Rate-Limit (10/min) bremst Brute-Force (znn)
+  4c. test_login_no_user_enumeration    – Fehlermeldung leakt keine User-Existenz (znn)
   5. test_logout_get_returns_405        – GET /auth/logout → 405
   6. test_csrf_missing_returns_400      – POST /auth/login ohne CSRF-Token → 400
 """
@@ -14,7 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from app import create_app
-from app.extensions import db as _db
+from app.extensions import db as _db, limiter
 from app.models.user import User
 from app.services.mailer import MailgunError
 
@@ -51,6 +53,9 @@ def rate_limit_client():
     with app.app_context():
         _db.create_all()
         yield app.test_client()
+        # Globalen In-Memory-Limiter-State zurücksetzen, damit das aufgebrauchte
+        # Kontingent nicht in nachfolgende Tests (gleiche IP) leakt.
+        limiter.reset()
         _db.drop_all()
 
 
@@ -124,11 +129,16 @@ def test_login_with_invalid_credentials(client, db):
 
 
 # ---------------------------------------------------------------------------
-# Test 4 – Lockout nach 10 Fehlversuchen
+# Test 4 – DoS-Resistenz: korrektes Passwort durchbricht den Lockout (znn)
 # ---------------------------------------------------------------------------
 
-def test_login_lockout_after_10_failures(client, db):
-    user = User(email="lockme@example.com", is_approved=True)
+def test_correct_password_breaks_lockout(client, db):
+    """Ein Angreifer darf ein fremdes Konto nicht durch Fehlversuche aussperren.
+
+    Selbst nach Erreichen der Lockout-Schwelle muss sich der legitime Nutzer
+    mit korrektem Passwort weiterhin einloggen können (Account-DoS-Schutz).
+    """
+    user = User(email="lockme@example.com", is_approved=True, nickname="Test")
     user.set_password("richtiges_passwort")
     db.session.add(user)
     db.session.commit()
@@ -137,14 +147,66 @@ def test_login_lockout_after_10_failures(client, db):
     for _ in range(10):
         client.post("/auth/login", data=payload)
 
-    # 11. Versuch – auch mit richtigem Passwort gesperrt
+    # Schwelle ist erreicht → locked_until ist als Monitoring-Signal gesetzt …
+    db.session.refresh(user)
+    assert user.failed_login_attempts >= 10
+    assert user.locked_until is not None
+
+    # … aber das korrekte Passwort kommt trotzdem durch (kein Aussperren).
     resp = client.post(
         "/auth/login",
         data={"email": "lockme@example.com", "password": "richtiges_passwort"},
         follow_redirects=False,
     )
-    assert resp.status_code == 200
-    assert "gesperrt" in resp.get_data(as_text=True)
+    assert resp.status_code == 302
+    assert "/activities" in resp.headers["Location"]
+
+    # Erfolgreicher Login setzt Zähler und Lockout zurück.
+    db.session.refresh(user)
+    assert user.failed_login_attempts == 0
+    assert user.locked_until is None
+
+
+# ---------------------------------------------------------------------------
+# Test 4b – IP-Rate-Limit auf Login bremst Brute-Force (znn)
+# ---------------------------------------------------------------------------
+
+def test_login_ip_rate_limited(rate_limit_client):
+    """Das IP-Rate-Limit (10/min) ist der primäre Brute-Force-Schutz."""
+    payload = {"email": "whoever@example.com", "password": "falsch"}
+    # 10 Versuche sind erlaubt …
+    for _ in range(10):
+        resp = rate_limit_client.post("/auth/login", data=payload)
+        assert resp.status_code in (200, 302)
+    # … der 11. innerhalb derselben Minute wird geblockt.
+    resp = rate_limit_client.post("/auth/login", data=payload)
+    assert resp.status_code == 429
+
+
+# ---------------------------------------------------------------------------
+# Test 4c – Keine zusätzliche User-Enumeration über die Fehlermeldung (znn)
+# ---------------------------------------------------------------------------
+
+def test_login_no_user_enumeration(client, db):
+    """Falsches Passwort (User existiert) und unbekannte E-Mail liefern die
+    exakt gleiche Fehlermeldung – kein Enumeration-Leak."""
+    user = User(email="real@example.com", is_approved=True)
+    user.set_password("richtiges_passwort")
+    db.session.add(user)
+    db.session.commit()
+
+    resp_existing = client.post(
+        "/auth/login",
+        data={"email": "real@example.com", "password": "falsch"},
+    )
+    resp_unknown = client.post(
+        "/auth/login",
+        data={"email": "ghost@example.com", "password": "falsch"},
+    )
+    assert resp_existing.status_code == 200
+    assert resp_unknown.status_code == 200
+    assert "Ungültige Anmeldedaten" in resp_existing.get_data(as_text=True)
+    assert "Ungültige Anmeldedaten" in resp_unknown.get_data(as_text=True)
 
 
 # ---------------------------------------------------------------------------

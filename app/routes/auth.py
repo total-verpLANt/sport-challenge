@@ -8,7 +8,7 @@ from sqlalchemy import func
 
 from email_validator import validate_email, EmailNotValidError
 
-from app.extensions import db, limiter
+from app.extensions import _get_real_ip, db, limiter
 from app.models.user import User
 from app.services.mailer import MailgunError, get_mailer
 from app.utils.urls import external_url_for
@@ -23,6 +23,7 @@ _MIN_PASSWORD_LENGTH = 8
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute; 60 per hour", methods=["POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("activities.week_view"))
@@ -37,15 +38,13 @@ def login():
             user = db.session.execute(
                 db.select(User).filter_by(email=email)
             ).scalar_one_or_none()
-            now = datetime.now(timezone.utc)
-            if user and user.locked_until:
-                # SQLite liefert naive datetimes → als UTC behandeln
-                lu = user.locked_until if user.locked_until.tzinfo else user.locked_until.replace(tzinfo=timezone.utc)
-                if lu > now:
-                    remaining = int((lu - now).total_seconds() / 60) + 1
-                    error = f"Konto gesperrt – bitte {remaining} Minute(n) warten."
-                    user = None  # verhindert Passwort-Check auf gesperrtem Konto
             if user is not None:
+                # DoS-Resistenz: Ein korrektes Passwort durchbricht IMMER eine
+                # eventuelle Lockout-Markierung. Damit kann ein Angreifer ein
+                # fremdes Konto nicht durch Fehlversuche aussperren – der
+                # Brute-Force-Schutz liegt jetzt auf dem IP-Rate-Limit (oben).
+                # failed_login_attempts/locked_until bleiben als Monitoring-
+                # Signal erhalten (siehe Logging unten).
                 if user.check_password(password):
                     user.failed_login_attempts = 0
                     user.locked_until = None
@@ -62,6 +61,11 @@ def login():
                     user.failed_login_attempts += 1
                     if user.failed_login_attempts >= _MAX_FAILED_ATTEMPTS:
                         user.locked_until = datetime.now(timezone.utc) + _LOCKOUT_DURATION
+                        logger.warning(
+                            "Wiederholte Fehllogins für user_id=%s (%d Versuche) – "
+                            "Lockout-Schwelle erreicht, IP=%s",
+                            user.id, user.failed_login_attempts, _get_real_ip(),
+                        )
                     db.session.commit()
                     error = "Ungültige Anmeldedaten."
             elif error is None:
