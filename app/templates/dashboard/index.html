@@ -157,7 +157,7 @@
                    controls class="rounded" style="max-height:180px;max-width:240px;object-fit:cover"></video>
             {% else %}
             <a href="{{ m.url }}"
-               class="glightbox" data-gallery="feed-activity-{{ item.id }}">
+               class="glightbox" data-type="image" data-gallery="feed-activity-{{ item.id }}">
               <img src="{{ m.url }}"
                    alt="{{ m.original_filename }}"
                    class="img-thumbnail" style="max-height:180px;max-width:240px;object-fit:cover">
@@ -333,6 +333,7 @@
           const anchor = document.createElement('a');
           anchor.href = m.url;
           anchor.className = 'glightbox';
+          anchor.dataset.type = 'image';
           anchor.dataset.gallery = 'feed-activity-' + item.id;
           const img = document.createElement('img');
           img.src = m.url;

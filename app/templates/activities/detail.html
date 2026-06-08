@@ -85,6 +85,7 @@
         {% else %}
         <a href="{{ url_for('media.activity_media', media_id=m.id) }}"
            class="glightbox"
+           data-type="image"
            data-gallery="activity-media"
            data-title="{{ m.original_filename }}">
           <img src="{{ url_for('media.activity_media', media_id=m.id) }}"
