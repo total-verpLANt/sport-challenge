@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.16.5] – 2026-06-08
+
+### Sicherheit
+- **Secure-Cookies env-gesteuert erzwingen** (Issue `26x`): Session- **und** Remember-Me-Cookie werden über die neue Variable `SECURE_COOKIES=1` als `Secure` markiert, sodass Browser sie nur über HTTPS senden (Cloudflare/HTTPS-Setup). Bislang sicherte Flask-Talisman nur das Session-Cookie (request-zeit-abhängig, an `app.debug` gekoppelt) – das **Remember-Me-Cookie war ungeschützt**. Zusätzlich werden `HttpOnly` (XSS-Härtung) und `SameSite=Lax` (CSRF-Härtung) für beide Cookies explizit gesetzt. Default `0` lässt lokale HTTP-Dev funktionsfähig; keine hardcoded Domain. Neue Var in `.env.example` dokumentiert
+
 ## [0.16.4] – 2026-06-08
 
 ### Sicherheit

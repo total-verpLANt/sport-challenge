@@ -34,3 +34,15 @@ class Config:
     ] or None
     # ProxyFix darf X-Forwarded-Host nur vertrauen, wenn die Proxy-Kette ihn garantiert setzt.
     PROXY_X_HOST: int = int(os.environ.get("PROXY_X_HOST", "0"))
+
+    # Secure-Cookies (siehe 26x): hinter HTTPS (Cloudflare) erzwingen, damit Browser
+    # Session- UND Remember-Me-Cookie nur über HTTPS senden. Default 0 → lokale HTTP-Dev
+    # behält funktionierende Cookies. In Produktion SECURE_COOKIES=1 setzen.
+    # HTTPONLY/SAMESITE sind unabhängig vom Transport immer sinnvoll (XSS-/CSRF-Härtung).
+    _secure_cookies: bool = os.environ.get("SECURE_COOKIES", "0") == "1"
+    SESSION_COOKIE_SECURE: bool = _secure_cookies
+    REMEMBER_COOKIE_SECURE: bool = _secure_cookies
+    SESSION_COOKIE_HTTPONLY: bool = True
+    REMEMBER_COOKIE_HTTPONLY: bool = True
+    SESSION_COOKIE_SAMESITE: str = "Lax"
+    REMEMBER_COOKIE_SAMESITE: str = "Lax"
