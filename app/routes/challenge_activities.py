@@ -28,17 +28,57 @@ def _get_week_bounds(offset: int = 0) -> tuple[date, date]:
 
 
 def _active_participation():
-    """Return the current user's accepted ChallengeParticipation, or None."""
+    """Default-Teilnahme (deterministisch). Rückwärtskompat für Single-Challenge-Fall."""
     return (
         db.session.execute(
-            db.select(ChallengeParticipation).where(
+            db.select(ChallengeParticipation)
+            .join(Challenge)
+            .where(
                 ChallengeParticipation.user_id == current_user.id,
                 ChallengeParticipation.status == "accepted",
             )
+            .order_by(Challenge.start_date.desc(), ChallengeParticipation.id.desc())
         )
         .scalars()
         .first()
     )
+
+
+def _accepted_participations():
+    """Alle akzeptierten Teilnahmen des Nutzers, deterministisch sortiert."""
+    return list(
+        db.session.execute(
+            db.select(ChallengeParticipation)
+            .join(Challenge)
+            .where(
+                ChallengeParticipation.user_id == current_user.id,
+                ChallengeParticipation.status == "accepted",
+            )
+            .order_by(Challenge.start_date.desc(), ChallengeParticipation.id.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _resolve_participation(challenge_id):
+    """Verifizierte Teilnahme für (current_user, challenge_id, accepted) oder None.
+
+    challenge_id: roher Form-Wert (str|None). Gibt None zurück bei
+    fehlendem/ungültigem Wert ODER wenn keine akzeptierte Teilnahme existiert.
+    Vorbild: bonus._user_is_accepted_participant (app/routes/bonus.py:30).
+    """
+    try:
+        cid = int(challenge_id)
+    except (TypeError, ValueError):
+        return None
+    return db.session.execute(
+        db.select(ChallengeParticipation).where(
+            ChallengeParticipation.user_id == current_user.id,
+            ChallengeParticipation.challenge_id == cid,
+            ChallengeParticipation.status == "accepted",
+        )
+    ).scalar_one_or_none()
 
 
 @challenge_activities_bp.route("/log", methods=["GET"])
