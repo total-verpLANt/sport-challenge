@@ -334,7 +334,7 @@ def test_feed_returns_json(client, db):
     _db.session.add(activity)
     _db.session.commit()
 
-    resp = client.get(f"/dashboard/feed?challenge_id={challenge.id}&page=0")
+    resp = client.get("/dashboard/feed?page=0")
     assert resp.status_code == 200
     data = resp.get_json()
     assert "items" in data
@@ -342,19 +342,29 @@ def test_feed_returns_json(client, db):
     assert len(data["items"]) == 1
     assert data["items"][0]["type"] == "activity"
     assert data["items"][0]["sport_type"] == "Laufen"
+    # Globaler Feed trägt das Challenge-Label
+    assert data["items"][0]["challenge_name"] == challenge.name
 
 
-def test_feed_only_challenge_participants(client, db):
-    """GET /dashboard/feed liefert 403, wenn der User kein Teilnehmer der Challenge ist."""
+def test_feed_global_shows_other_challenges(client, db):
+    """Der Feed zeigt Aktivitäten ALLER Challenges, auch fremder (alle sehen alles)."""
+    import datetime
+
     from app.extensions import db as _db
-    from app.models.challenge import Challenge, ChallengeParticipation
+    from app.models.activity import Activity
     from app.models.user import User
 
-    # User A mit eigener Challenge
+    # User A legt Challenge + Activity an
     user_a = _create_and_login(client, db, "feed_a@test.com", "pw")
     challenge_a, _ = _create_challenge_with_participation(db, user_a.id)
+    _db.session.add(Activity(
+        user_id=user_a.id, challenge_id=challenge_a.id,
+        activity_date=datetime.date.today(), duration_minutes=42,
+        sport_type="Klettern", source="manual",
+    ))
+    _db.session.commit()
 
-    # User B ohne Teilnahme an challenge_a
+    # User B ohne Teilnahme an challenge_a sieht die Aktivität trotzdem
     client.post("/auth/logout")
     user_b = User(email="feed_b@test.com", is_approved=True)
     user_b.set_password("pw")
@@ -362,8 +372,13 @@ def test_feed_only_challenge_participants(client, db):
     _db.session.commit()
     client.post("/auth/login", data={"email": "feed_b@test.com", "password": "pw"})
 
-    resp = client.get(f"/dashboard/feed?challenge_id={challenge_a.id}&page=0")
-    assert resp.status_code == 403
+    resp = client.get("/dashboard/feed?page=0")
+    assert resp.status_code == 200
+    items = resp.get_json()["items"]
+    sports = {it.get("sport_type") for it in items if it["type"] == "activity"}
+    assert "Klettern" in sports
+    labels = {it.get("challenge_name") for it in items}
+    assert challenge_a.name in labels
 
 
 def test_feed_pagination(client, db):
@@ -388,13 +403,13 @@ def test_feed_pagination(client, db):
         _db.session.add(a)
     _db.session.commit()
 
-    resp0 = client.get(f"/dashboard/feed?challenge_id={challenge.id}&page=0")
+    resp0 = client.get("/dashboard/feed?page=0")
     assert resp0.status_code == 200
     data0 = resp0.get_json()
     assert len(data0["items"]) == 10
     assert data0["has_more"] is True
 
-    resp1 = client.get(f"/dashboard/feed?challenge_id={challenge.id}&page=1")
+    resp1 = client.get("/dashboard/feed?page=1")
     assert resp1.status_code == 200
     data1 = resp1.get_json()
     assert len(data1["items"]) == 2
@@ -541,7 +556,7 @@ def test_feed_includes_absence(client, db):
     challenge, _ = _create_challenge_with_participation(db, user.id)
     _create_sick_period(db, user.id, challenge.id, reason="Urlaub auf Malle")
 
-    resp = client.get(f"/dashboard/feed?challenge_id={challenge.id}&page=0")
+    resp = client.get("/dashboard/feed?page=0")
     assert resp.status_code == 200
     items = resp.get_json()["items"]
     absences = [it for it in items if it["type"] == "absence"]

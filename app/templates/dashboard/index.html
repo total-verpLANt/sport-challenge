@@ -141,6 +141,11 @@
     {% if item.type == "activity" %}
     <div class="card mb-3" id="feed-post-activity-{{ item.id }}">
       <div class="card-body">
+        {% if item.challenge_name %}
+        <a href="{{ item.challenge_url }}" class="badge text-bg-light text-decoration-none border mb-2 d-inline-block">
+          🏆 {{ item.challenge_name }}
+        </a>
+        {% endif %}
         <p class="card-text mb-1">
           <strong>{{ item.user_display_name }}</strong> hat um
           <strong>{{ item.time }} Uhr</strong> am {{ item.activity_date }}
@@ -177,6 +182,11 @@
     {% else %}
     <div class="card mb-3 border-secondary-subtle" id="feed-post-absence-{{ item.id }}">
       <div class="card-body">
+        {% if item.challenge_name %}
+        <a href="{{ item.challenge_url }}" class="badge text-bg-light text-decoration-none border mb-2 d-inline-block">
+          🏆 {{ item.challenge_name }}
+        </a>
+        {% endif %}
         <p class="card-text mb-1">
           🚫 <strong>{{ item.user_display_name }}</strong> ist vom
           <strong>{{ item.start_date }}</strong> bis <strong>{{ item.end_date }}</strong> abwesend.
@@ -194,7 +204,7 @@
 
 <div id="load-more-container" class="text-center mt-2 mb-4" {% if not feed_has_more %}style="display:none"{% endif %}>
   <button id="load-more-btn" class="btn btn-outline-secondary btn-sm"
-          data-challenge-id="{{ challenge.id }}" data-page="1">
+          data-page="1">
     Mehr laden
   </button>
 </div>
@@ -287,12 +297,17 @@
     card.className = 'card mb-3' + (item.type === 'absence' ? ' border-secondary-subtle' : '');
     card.id = 'feed-post-' + item.type + '-' + item.id;
 
+    const badgeHtml = item.challenge_name
+      ? '<a href="' + esc(item.challenge_url) + '" class="badge text-bg-light text-decoration-none border mb-2 d-inline-block">🏆 ' + esc(item.challenge_name) + '</a>'
+      : '';
+
     if (item.type === 'absence') {
       const reasonHtml = item.reason
         ? '<p class="card-text text-secondary small mt-1 mb-2">' + esc(item.reason) + '</p>'
         : '';
       card.innerHTML =
         '<div class="card-body">' +
+          badgeHtml +
           '<p class="card-text mb-1">🚫 <strong>' + esc(item.user_display_name) + '</strong> ist vom ' +
           '<strong>' + esc(item.start_date) + '</strong> bis <strong>' + esc(item.end_date) + '</strong> abwesend.</p>' +
           reasonHtml +
@@ -308,6 +323,7 @@
       : '';
     card.innerHTML =
       '<div class="card-body">' +
+        badgeHtml +
         '<p class="card-text mb-1"><strong>' + esc(item.user_display_name) + '</strong> hat um ' +
         '<strong>' + esc(item.time) + ' Uhr</strong> am ' +
         esc(item.activity_date) + ' <em>' + esc(item.sport_type) + '</em> gemacht. ' +
@@ -361,12 +377,11 @@
   const loadMoreBtn = document.getElementById('load-more-btn');
   if (loadMoreBtn) {
     loadMoreBtn.addEventListener('click', function() {
-      const challengeId = this.dataset.challengeId;
       const page = parseInt(this.dataset.page, 10);
       this.disabled = true;
       this.textContent = 'Laden…';
 
-      fetch('/dashboard/feed?challenge_id=' + challengeId + '&page=' + page, {
+      fetch('/dashboard/feed?page=' + page, {
         credentials: 'same-origin',
       })
       .then(r => r.json())

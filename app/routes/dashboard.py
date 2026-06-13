@@ -45,7 +45,20 @@ def _feed_sort_key(dt: datetime) -> datetime:
     return dt
 
 
-def _activity_to_dict(a: Activity, users: dict, current_user_id: int) -> dict:
+def _challenge_label(challenges: dict, challenge_id: int) -> dict:
+    """Challenge-Label-Felder (Name + Leaderboard-Link) für ein Feed-Item."""
+    c = challenges.get(challenge_id)
+    if c is None:
+        return {"challenge_name": "", "challenge_url": None}
+    return {
+        "challenge_name": c.name,
+        "challenge_url": url_for(
+            "dashboard.leaderboard_challenge", public_id=str(c.public_id)
+        ),
+    }
+
+
+def _activity_to_dict(a: Activity, users: dict, challenges: dict, current_user_id: int) -> dict:
     u = users.get(a.user_id)
     return {
         "type": "activity",
@@ -69,10 +82,11 @@ def _activity_to_dict(a: Activity, users: dict, current_user_id: int) -> dict:
             }
             for m in a.media
         ],
+        **_challenge_label(challenges, a.challenge_id),
     }
 
 
-def _absence_to_dict(p: SickPeriod, users: dict, current_user_id: int) -> dict:
+def _absence_to_dict(p: SickPeriod, users: dict, challenges: dict, current_user_id: int) -> dict:
     u = users.get(p.user_id)
     return {
         "type": "absence",
@@ -85,24 +99,22 @@ def _absence_to_dict(p: SickPeriod, users: dict, current_user_id: int) -> dict:
         "liked_by_me": current_user_id in {like.user_id for like in p.likes},
         "like_count": len(p.likes),
         "liked_by": [like.user.display_name for like in p.likes if like.user],
+        **_challenge_label(challenges, p.challenge_id),
     }
 
 
-def _build_feed_items(challenge_id: int, participant_ids, current_user_id: int, page: int):
-    """Gemischter Feed (Aktivitäten + Abwesenheiten), nach Zeit sortiert + paginiert.
+def _build_feed_items(current_user_id: int, page: int):
+    """Globaler Feed (Aktivitäten + Abwesenheiten ALLER Challenges).
 
     Beide Quellen werden bis (page+1)*PAGE_SIZE+1 geladen, in Python gemerged,
-    nach Zeitstempel sortiert und dann auf die Seite zugeschnitten. Bei der
-    erwarteten Datenmenge (wenige Teilnehmer) ist das unkritisch.
+    nach Zeitstempel sortiert und dann auf die Seite zugeschnitten. Kein
+    Challenge-/Teilnahme-Filter: jeder eingeloggte Nutzer sieht alles. User- und
+    Challenge-Namen werden per Bulk-Load aufgelöst (kein N+1).
     """
     fetch_n = (page + 1) * FEED_PAGE_SIZE + 1
 
     activities = db.session.scalars(
         db.select(Activity)
-        .where(
-            Activity.challenge_id == challenge_id,
-            Activity.user_id.in_(participant_ids),
-        )
         .order_by(func.coalesce(Activity.started_at, Activity.created_at).desc())
         .limit(fetch_n)
         .options(
@@ -113,10 +125,6 @@ def _build_feed_items(challenge_id: int, participant_ids, current_user_id: int, 
 
     periods = db.session.scalars(
         db.select(SickPeriod)
-        .where(
-            SickPeriod.challenge_id == challenge_id,
-            SickPeriod.user_id.in_(participant_ids),
-        )
         .order_by(SickPeriod.created_at.desc())
         .limit(fetch_n)
         .options(selectinload(SickPeriod.likes).selectinload(SickPeriodLike.user))
@@ -129,13 +137,25 @@ def _build_feed_items(challenge_id: int, participant_ids, current_user_id: int, 
         else {}
     )
 
+    cid_set = {a.challenge_id for a in activities} | {p.challenge_id for p in periods}
+    challenges = (
+        {
+            c.id: c
+            for c in db.session.scalars(
+                db.select(Challenge).where(Challenge.id.in_(cid_set))
+            ).all()
+        }
+        if cid_set
+        else {}
+    )
+
     items = []
     for a in activities:
         items.append((_feed_sort_key(a.started_at or a.created_at),
-                      _activity_to_dict(a, users, current_user_id)))
+                      _activity_to_dict(a, users, challenges, current_user_id)))
     for p in periods:
         items.append((_feed_sort_key(p.created_at),
-                      _absence_to_dict(p, users, current_user_id)))
+                      _absence_to_dict(p, users, challenges, current_user_id)))
 
     items.sort(key=lambda t: t[0], reverse=True)
 
@@ -178,17 +198,8 @@ def index():
 
     summary = get_challenge_summary(challenge)
 
-    # Alle Teilnehmer-IDs der aktuellen Challenge (accepted + bailed_out)
-    participant_ids = db.session.scalars(
-        db.select(ChallengeParticipation.user_id).where(
-            ChallengeParticipation.challenge_id == challenge.id,
-            ChallengeParticipation.status.in_(["accepted", "bailed_out"]),
-        )
-    ).all()
-
-    feed_items, feed_has_more = _build_feed_items(
-        challenge.id, participant_ids, current_user.id, page=0
-    )
+    # Globaler Feed über ALLE Challenges (alle sehen alles)
+    feed_items, feed_has_more = _build_feed_items(current_user.id, page=0)
 
     return render_template(
         "dashboard/index.html",
@@ -240,36 +251,13 @@ def _render_leaderboard(challenge: Challenge):
 @dashboard_bp.route("/feed")
 @login_required
 def feed():
-    """AJAX-Endpunkt für paginiertes Nachladen des gemischten Feeds."""
-    challenge_id = request.args.get("challenge_id", type=int)
+    """AJAX-Endpunkt für paginiertes Nachladen des globalen Feeds.
+
+    Kein challenge_id-/Teilnahme-Gate: jeder eingeloggte Nutzer sieht den
+    Feed aller Challenges.
+    """
     page = max(0, request.args.get("page", 0, type=int))
-
-    if not challenge_id:
-        return jsonify({"items": [], "has_more": False})
-
-    # Berechtigung: current_user muss Teilnehmer sein
-    participation = db.session.execute(
-        db.select(ChallengeParticipation).where(
-            ChallengeParticipation.challenge_id == challenge_id,
-            ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.status.in_(["accepted", "bailed_out"]),
-        )
-    ).scalars().first()
-
-    if not participation:
-        return jsonify({"items": [], "has_more": False}), 403
-
-    participant_ids = db.session.scalars(
-        db.select(ChallengeParticipation.user_id).where(
-            ChallengeParticipation.challenge_id == challenge_id,
-            ChallengeParticipation.status.in_(["accepted", "bailed_out"]),
-        )
-    ).all()
-
-    items, has_more = _build_feed_items(
-        challenge_id, participant_ids, current_user.id, page=page
-    )
-
+    items, has_more = _build_feed_items(current_user.id, page=page)
     return jsonify({"items": items, "has_more": has_more})
 
 
