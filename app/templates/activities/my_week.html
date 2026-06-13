@@ -74,6 +74,7 @@
             class="row g-2 align-items-end">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="offset" value="{{ offset }}">
+        {% if participation %}<input type="hidden" name="challenge_id" value="{{ participation.challenge_id }}">{% endif %}
         <input type="hidden" name="sick_period_id" value="{{ p.id }}">
         <div class="col-12 col-sm-5">
           <label for="sick_from_{{ p.id }}" class="form-label">Von</label>
@@ -114,6 +115,7 @@
             class="row g-2 align-items-end">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="offset" value="{{ offset }}">
+        {% if participation %}<input type="hidden" name="challenge_id" value="{{ participation.challenge_id }}">{% endif %}
         <div class="col-12 col-sm-5">
           <label for="sick_from_new" class="form-label">Von</label>
           <input type="date" class="form-control" id="sick_from_new" name="sick_from" required>

@@ -88,8 +88,14 @@ def log_form():
     if participation is None:
         flash("Du nimmst aktuell an keiner Challenge teil.")
         return redirect(url_for("challenges.index"))
+    participations = _accepted_participations()
     today = date.today().isoformat()
-    return render_template("activities/log.html", today=today, participation=participation)
+    return render_template(
+        "activities/log.html",
+        today=today,
+        participation=participation,
+        participations=participations,
+    )
 
 
 @challenge_activities_bp.route("/log", methods=["POST"])
@@ -450,6 +456,8 @@ def import_form():
             )
             error = "Aktivitäten konnten nicht geladen werden. Bitte versuche es später erneut."
 
+    participations = _accepted_participations()
+
     return render_template(
         "activities/import.html",
         activities=connector_activities,
@@ -458,6 +466,7 @@ def import_form():
         sunday=sunday,
         offset=offset,
         participation=participation,
+        participations=participations,
         error=error,
     )
 

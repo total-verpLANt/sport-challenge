@@ -38,6 +38,18 @@
 <form method="post" action="{{ url_for('challenge_activities.import_submit') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="offset" value="{{ offset }}">
+  {% if participations and participations|length > 1 %}
+  <div class="mb-3">
+    <label for="challenge_id_import" class="form-label">Challenge</label>
+    <select name="challenge_id" id="challenge_id_import" class="form-select" required>
+      {% for p in participations %}
+        <option value="{{ p.challenge_id }}">{{ p.challenge.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% elif participations %}
+  <input type="hidden" name="challenge_id" value="{{ participations[0].challenge_id }}">
+  {% endif %}
 
   <div class="table-responsive mb-3">
     <table class="table table-hover align-middle">

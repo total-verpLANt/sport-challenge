@@ -27,6 +27,18 @@
     <div class="tab-pane fade show active" id="activity-panel" role="tabpanel">
     <form method="post" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if participations and participations|length > 1 %}
+      <div class="mb-3">
+        <label for="challenge_id_act" class="form-label">Challenge</label>
+        <select name="challenge_id" id="challenge_id_act" class="form-select" required>
+          {% for p in participations %}
+            <option value="{{ p.challenge_id }}">{{ p.challenge.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% elif participations %}
+      <input type="hidden" name="challenge_id" value="{{ participations[0].challenge_id }}">
+      {% endif %}
       <div class="mb-3">
         <label for="activity_date" class="form-label">Datum</label>
         <input type="date" class="form-control" id="activity_date" name="activity_date"
@@ -78,6 +90,18 @@
     <div class="tab-pane fade" id="sick-panel" role="tabpanel">
       <form method="post" action="{{ url_for('challenge_activities.sick_period_submit') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if participations and participations|length > 1 %}
+        <div class="mb-3">
+          <label for="challenge_id_sick" class="form-label">Challenge</label>
+          <select name="challenge_id" id="challenge_id_sick" class="form-select" required>
+            {% for p in participations %}
+              <option value="{{ p.challenge_id }}">{{ p.challenge.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% elif participations %}
+        <input type="hidden" name="challenge_id" value="{{ participations[0].challenge_id }}">
+        {% endif %}
         <div class="row g-3 mb-3">
           <div class="col-6">
             <label for="sick_from" class="form-label">Von</label>
