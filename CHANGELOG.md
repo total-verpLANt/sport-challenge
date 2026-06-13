@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.17.0] – 2026-06-13
+
+### Hinzugefügt
+- **Statistiken pro Challenge** (Issue `dqn`): Neuer Service `app/services/statistics.py` berechnet neun Top-3-Ranglisten je Challenge – meiste Zeit aktiv, meiste Aktivitäten, längste Wochen-Streak (eine Krankheit/Abwesenheit **bricht** die Serie), längste Tages-Streak, vielseitigster Sportler, beliebteste Aktivität (Likes), Frühaufsteher, Nachteule, längste Einzel-Session. Strikt Bulk-Load (kein N+1, per Query-Count-Wächter abgesichert). Anzeige als Karten-Grid unter dem Leaderboard (`dashboard/_statistics.html`)
+- **Leaderboard pro Challenge** (`/dashboard/leaderboard/<public_id>`): Jedes Leaderboard ist über ein neues **Navbar-Dropdown** (Context-Processor `inject_nav_challenges`) erreichbar, das alle Challenges listet
+- **Globaler News-Feed**: Der Dashboard-Feed zeigt jetzt Aktivitäten und Abwesenheiten **aller** Challenges (auch fremder), jeweils mit verlinktem Challenge-Badge
+- **Mehrere Top-5-Blöcke**: Bei mehreren gleichzeitig aktiven Challenges erhält jede einen eigenen Top-5-Block und Spendentopf; beendete Challenges erscheinen als kompakte Abschluss-Karte (finale Spendensumme + Leaderboard-Link)
+
+### Geändert
+- **Offenes Lesemodell „alle sehen alles"**: Jeder eingeloggte Nutzer kann jedes Leaderboard, jede Aktivität und jeden Feed-Eintrag sehen – auch ohne Teilnahme an der Challenge. Das Like-Gate (vormals nur Teilnehmer) wurde entfernt; `login_required` und `is_approved` bleiben überall Pflicht (kein anonymer Zugriff)
+
 ## [0.16.7] – 2026-06-08
 
 ### Geändert
