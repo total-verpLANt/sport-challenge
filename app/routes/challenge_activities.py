@@ -95,10 +95,19 @@ def log_form():
 @challenge_activities_bp.route("/log", methods=["POST"])
 @login_required
 def log_submit():
-    participation = _active_participation()
-    if participation is None:
+    participations = _accepted_participations()
+    if not participations:
         flash("Du nimmst aktuell an keiner Challenge teil.")
         return redirect(url_for("challenges.index"))
+
+    raw_cid = request.form.get("challenge_id")
+    if len(participations) == 1 and not raw_cid:
+        participation = participations[0]
+    else:
+        participation = _resolve_participation(raw_cid)
+        if participation is None:
+            flash("Bitte wähle eine gültige Challenge aus.")
+            return redirect(url_for("challenge_activities.log_form"))
 
     # Read form data
     raw_date = request.form.get("activity_date", "").strip()
@@ -278,10 +287,19 @@ def my_week():
 @challenge_activities_bp.route("/sick-period", methods=["POST"])
 @login_required
 def sick_period_submit():
-    participation = _active_participation()
-    if participation is None:
+    participations = _accepted_participations()
+    if not participations:
         flash("Du nimmst aktuell an keiner Challenge teil.")
         return redirect(url_for("challenges.index"))
+
+    raw_cid = request.form.get("challenge_id")
+    if len(participations) == 1 and not raw_cid:
+        participation = participations[0]
+    else:
+        participation = _resolve_participation(raw_cid)
+        if participation is None:
+            flash("Bitte wähle eine gültige Challenge aus.")
+            return redirect(url_for("challenge_activities.log_form"))
 
     challenge = participation.challenge
 
@@ -447,10 +465,19 @@ def import_form():
 @challenge_activities_bp.route("/import", methods=["POST"])
 @login_required
 def import_submit():
-    participation = _active_participation()
-    if participation is None:
+    participations = _accepted_participations()
+    if not participations:
         flash("Du nimmst aktuell an keiner Challenge teil.")
         return redirect(url_for("challenges.index"))
+
+    raw_cid = request.form.get("challenge_id")
+    if len(participations) == 1 and not raw_cid:
+        participation = participations[0]
+    else:
+        participation = _resolve_participation(raw_cid)
+        if participation is None:
+            flash("Bitte wähle eine gültige Challenge aus.")
+            return redirect(url_for("challenge_activities.import_form"))
 
     credentials = ConnectorCredential.query.filter_by(user_id=current_user.id).all()
     if not credentials:
