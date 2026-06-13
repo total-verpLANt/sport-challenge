@@ -248,6 +248,67 @@ def test_dashboard_top5_only(client, db):
     assert user_links <= 5, f"Expected <=5 user links, got {user_links}"
 
 
+def test_dashboard_two_active_challenges_two_boards(client, db):
+    """Zwei gleichzeitig aktive Challenges → zwei Top-5-Blöcke + zwei Spendentöpfe."""
+    today = date.today()
+    user = _create_and_login(client, db, "twoboards@test.com", "pw")
+
+    for name in ("Alpha Challenge", "Beta Challenge"):
+        c = Challenge(
+            name=name,
+            start_date=today - timedelta(days=7),
+            end_date=today + timedelta(days=30),
+            penalty_per_miss=5.0,
+            bailout_fee=25.0,
+            created_by_id=user.id,
+        )
+        db.session.add(c)
+        db.session.commit()
+        db.session.add(
+            ChallengeParticipation(
+                user_id=user.id, challenge_id=c.id, status="accepted", weekly_goal=3
+            )
+        )
+        db.session.commit()
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert "Alpha Challenge" in html
+    assert "Beta Challenge" in html
+    # Zwei Spendentöpfe (ein Block je aktiver Challenge)
+    assert html.count("Spendentopf") == 2
+
+
+def test_dashboard_finished_challenge_shows_closing_card(client, db):
+    """Beendete Challenge (kein aktives) → Abschluss-Karte mit Leaderboard-Link."""
+    today = date.today()
+    user = _create_and_login(client, db, "finished@test.com", "pw")
+
+    c = Challenge(
+        name="Vergangene Challenge",
+        start_date=today - timedelta(days=30),
+        end_date=today - timedelta(days=3),  # vor RECENT_FINISHED_DAYS-Fenster
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user.id,
+    )
+    db.session.add(c)
+    db.session.commit()
+    db.session.add(
+        ChallengeParticipation(
+            user_id=user.id, challenge_id=c.id, status="accepted", weekly_goal=3
+        )
+    )
+    db.session.commit()
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert "Abgeschlossen" in html
+    assert f"/dashboard/leaderboard/{c.public_id}" in html
+
+
 def test_leaderboard_full_shows_all_participants(client, db):
     """GET /dashboard/leaderboard zeigt alle Teilnehmer ohne Slice."""
     user = _create_and_login(client, db, "leadfull@test.com", "pw")

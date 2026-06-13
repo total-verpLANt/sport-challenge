@@ -19,6 +19,9 @@ dashboard_bp = Blueprint("dashboard", __name__, template_folder="../templates")
 
 FEED_PAGE_SIZE = 10
 
+# Wie lange eine beendete Challenge als Abschluss-Karte oben sichtbar bleibt.
+RECENT_FINISHED_DAYS = 14
+
 
 def _get_challenge_by_public_id(public_id: str) -> Challenge:
     """Resolve a challenge by its public UUID or abort 404.
@@ -165,49 +168,64 @@ def _build_feed_items(current_user_id: int, page: int):
     return [d for _, d in items[start:end]], has_more
 
 
+def _build_dashboard_boards(today: date) -> list[dict]:
+    """Baut die Liste der Dashboard-Boards (Top-Bereich).
+
+    - Jede AKTIVE Challenge (start <= today <= end) → Top-5-Board mit
+      Spendentopf.
+    - Sonst (keine aktive): kürzlich beendete Challenges (end < today und
+      end >= today - RECENT_FINISHED_DAYS) → Abschluss-Karte mit finaler
+      Spendensumme + Leaderboard-Link.
+    - Greift nichts, wird die neueste Challenge als Abschluss-Karte gezeigt,
+      damit das Dashboard nie leer ist.
+    """
+    active = db.session.scalars(
+        db.select(Challenge)
+        .where(Challenge.start_date <= today, Challenge.end_date >= today)
+        .order_by(Challenge.created_at.desc())
+    ).all()
+
+    if active:
+        return [
+            {"kind": "active", "summary": get_challenge_summary(c)} for c in active
+        ]
+
+    # Keine aktive Challenge → kürzlich beendete als Abschluss-Karten
+    cutoff = today - timedelta(days=RECENT_FINISHED_DAYS)
+    finished = db.session.scalars(
+        db.select(Challenge)
+        .where(Challenge.end_date < today, Challenge.end_date >= cutoff)
+        .order_by(Challenge.end_date.desc())
+    ).all()
+
+    if not finished:
+        # Fallback: neueste Challenge überhaupt, damit das Dashboard nie leer ist
+        newest = db.session.scalars(
+            db.select(Challenge).order_by(Challenge.created_at.desc()).limit(1)
+        ).first()
+        finished = [newest] if newest else []
+
+    return [
+        {"kind": "finished", "summary": get_challenge_summary(c)} for c in finished
+    ]
+
+
 @dashboard_bp.route("/")
 @login_required
 def index():
     today = date.today()
 
-    # Find active challenge: today is between start and end date
-    challenge = db.session.execute(
-        db.select(Challenge)
-        .where(
-            Challenge.start_date <= today,
-            Challenge.end_date >= today,
-        )
-        .order_by(Challenge.created_at.desc())
-    ).scalars().first()
-
-    # Fallback: most recent challenge if no active one
-    if challenge is None:
-        challenge = db.session.execute(
-            db.select(Challenge).order_by(Challenge.created_at.desc())
-        ).scalars().first()
-
-    if challenge is None:
-        return render_template(
-            "dashboard/index.html",
-            summary=None,
-            timedelta=timedelta,
-            feed_items=[],
-            feed_has_more=False,
-            challenge=None,
-        )
-
-    summary = get_challenge_summary(challenge)
+    boards = _build_dashboard_boards(today)
 
     # Globaler Feed über ALLE Challenges (alle sehen alles)
     feed_items, feed_has_more = _build_feed_items(current_user.id, page=0)
 
     return render_template(
         "dashboard/index.html",
-        summary=summary,
+        boards=boards,
         timedelta=timedelta,
         feed_items=feed_items,
         feed_has_more=feed_has_more,
-        challenge=challenge,
     )
 
 

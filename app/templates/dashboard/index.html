@@ -26,21 +26,50 @@
 
 {% block content %}
 
-{% if summary is none %}
+{% if not boards %}
 <div class="alert alert-info">
   <strong>Keine aktive Challenge</strong> – aktuell gibt es keine Challenge, die angezeigt werden kann.
 </div>
 {% else %}
 
-{% set challenge = summary.challenge %}
-{% set weeks = summary.weeks %}
-{% set participants = summary.participants %}
+{% for board in boards %}
+{% set challenge = board.summary.challenge %}
+{% set weeks = board.summary.weeks %}
+{% set participants = board.summary.participants %}
+{% set leaderboard_url = url_for('dashboard.leaderboard_challenge', public_id=challenge.public_id) %}
+{% set total_pot = participants | sum(attribute='total_penalty') %}
 
+{% if board.kind == 'finished' %}
+{# Abschluss-Karte für beendete Challenges #}
+<div class="card mb-4 border-secondary">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <span class="badge text-bg-secondary mb-1">Abgeschlossen</span>
+        <h4 class="mb-0">{{ challenge.name }}</h4>
+        <small class="text-muted">
+          {{ challenge.start_date.strftime('%d.%m.%Y') }} – {{ challenge.end_date.strftime('%d.%m.%Y') }}
+        </small>
+      </div>
+      <div class="text-end">
+        <div class="text-muted small">Spendentopf (final)</div>
+        <span class="fs-4 fw-bold text-danger">
+          {{ "%.2f"|format(total_pot)|replace(".", ",") }} €
+        </span>
+      </div>
+    </div>
+    <a href="{{ leaderboard_url }}" class="btn btn-outline-secondary btn-sm mt-3">
+      Vollständiges Leaderboard &amp; Statistiken →
+    </a>
+  </div>
+</div>
+
+{% else %}
+{# Top-5-Board für aktive Challenge #}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
-    <h2 class="mb-0">Leaderboard</h2>
+    <h2 class="mb-0">{{ challenge.name }}</h2>
     <small class="text-muted">
-      {{ challenge.name }} &nbsp;·&nbsp;
       {{ challenge.start_date.strftime('%d.%m.%Y') }} – {{ challenge.end_date.strftime('%d.%m.%Y') }}
     </small>
   </div>
@@ -102,23 +131,25 @@
 </div>
 
 <div class="text-end mb-3">
-  <a href="{{ url_for('dashboard.leaderboard') }}" class="text-decoration-none text-muted small">
-    Alle Teilnehmer anzeigen →
+  <a href="{{ leaderboard_url }}" class="text-decoration-none text-muted small">
+    Alle Teilnehmer &amp; Statistiken →
   </a>
 </div>
 
-{% set total_pot = participants | sum(attribute='total_penalty') %}
 <div class="card mb-4">
   <div class="card-body d-flex align-items-center justify-content-between">
     <div>
       <h5 class="card-title mb-0">Spendentopf</h5>
-      <small class="text-muted">Gesammelte Strafen aller Teilnehmer</small>
+      <small class="text-muted">Gesammelte Strafen – {{ challenge.name }}</small>
     </div>
     <span class="fs-4 fw-bold text-danger">
       {{ "%.2f"|format(total_pot)|replace(".", ",") }} €
     </span>
   </div>
 </div>
+{% endif %}
+{% endfor %}
+{% endif %}
 
 <div class="d-flex flex-wrap gap-2">
   <a href="{{ url_for('challenge_activities.log_form') }}" class="btn btn-primary">
@@ -211,8 +242,6 @@
 
 {% else %}
 <p class="text-muted">Noch keine Einträge im Feed.</p>
-{% endif %}
-
 {% endif %}
 
 {% block scripts %}
