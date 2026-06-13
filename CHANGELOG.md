@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.17.1] – 2026-06-13
+
+### Geändert
+- **Frühaufsteher/Nachteule auf früheste/späteste Startzeit umgestellt** (Option B): Beide Ranglisten basierten auf der **durchschnittlichen** Startzeit pro Teilnehmer. Bei gemischten Trainingszeiten (z. B. früh + spät) landete der Schnitt irreführend in der Tagesmitte – ein Sportler mit echten 06:00-Einheiten erschien als „Frühaufsteher" erst gegen 10:00. „Frühaufsteher" wertet jetzt die **früheste** je erreichte Startzeit (`min`), „Nachteule" die **späteste** (`max`). Keine DB-/Query-Änderung, rein additive In-Memory-Ableitung aus den bereits geladenen Startzeiten
+
 ## [0.17.0] – 2026-06-13
 
 ### Hinzugefügt

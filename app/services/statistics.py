@@ -234,6 +234,12 @@ def get_challenge_statistics(challenge: Challenge) -> dict:
     avg_start = {
         uid: sum(mins) / len(mins) for uid, mins in start_minutes.items() if mins
     }
+    # Früheste/späteste Startzeit je Teilnehmer (Option B): "Frühaufsteher"
+    # meint die früheste je erreichte Uhrzeit, "Nachteule" die späteste –
+    # nicht den Durchschnitt (der landete bei gemischten Zeiten irreführend
+    # in der Tagesmitte).
+    earliest_start = {uid: min(mins) for uid, mins in start_minutes.items() if mins}
+    latest_start = {uid: max(mins) for uid, mins in start_minutes.items() if mins}
 
     # Beliebteste Aktivität (nicht pro User, sondern pro Aktivität)
     by_id = {row.id: row for row in activity_rows}
@@ -299,13 +305,13 @@ def get_challenge_statistics(challenge: Challenge) -> dict:
             "key": "early_bird",
             "title": "Frühaufsteher",
             "icon": "🌅",
-            "top": _top3(avg_start, user_by_id, _fmt_time, reverse=False),
+            "top": _top3(earliest_start, user_by_id, _fmt_time, reverse=False),
         },
         {
             "key": "night_owl",
             "title": "Nachteule",
             "icon": "🌙",
-            "top": _top3(avg_start, user_by_id, _fmt_time, reverse=True),
+            "top": _top3(latest_start, user_by_id, _fmt_time, reverse=True),
         },
         {
             "key": "longest_session",

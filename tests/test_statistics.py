@@ -218,6 +218,46 @@ def test_most_liked_and_time_of_day(app, db):
         assert "Early" in most_liked[0]["name"]
 
 
+def test_early_bird_night_owl_use_min_max_not_average(app, db):
+    """Option B: Frühaufsteher = früheste, Nachteule = späteste Aktivität.
+
+    Ein User mit gemischten Zeiten (06:00 + 16:00) muss als Frühaufsteher
+    mit 06:00 (min) UND als Nachteule mit 16:00 (max) erscheinen – nicht
+    mit dem Durchschnitt 11:00.
+    """
+    with app.app_context():
+        admin = _user(db, "mm_admin@test.com")
+        challenge, start = _challenge(db, admin)
+        mixed = _user(db, "mixed@test.com", "Mixed")
+        db.session.add(
+            ChallengeParticipation(
+                user_id=mixed.id, challenge_id=challenge.id,
+                status="accepted", weekly_goal=3,
+            )
+        )
+        db.session.commit()
+
+        # Zwei Aktivitäten: früh um 06:00, spät um 16:00 → Schnitt wäre 11:00
+        _activity(
+            db, mixed, challenge, start, 30, "running",
+            started_at=datetime(start.year, start.month, start.day, 6, 0),
+        )
+        _activity(
+            db, mixed, challenge, start, 30, "cycling",
+            started_at=datetime(start.year, start.month, start.day, 16, 0),
+        )
+
+        result = get_challenge_statistics(challenge)
+
+        early_bird = _stat(result, "early_bird")["top"]
+        assert early_bird[0]["name"] == "Mixed"
+        assert early_bird[0]["display"] == "06:00"
+
+        night_owl = _stat(result, "night_owl")["top"]
+        assert night_owl[0]["name"] == "Mixed"
+        assert night_owl[0]["display"] == "16:00"
+
+
 def test_empty_challenge_no_crash(app, db):
     """A challenge without participants/activities returns empty tops, no crash."""
     with app.app_context():
