@@ -273,28 +273,18 @@ def feed():
     return jsonify({"items": items, "has_more": has_more})
 
 
-def _is_challenge_participant(challenge_id: int) -> bool:
-    participation = db.session.execute(
-        db.select(ChallengeParticipation).where(
-            ChallengeParticipation.challenge_id == challenge_id,
-            ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.status.in_(["accepted", "bailed_out"]),
-        )
-    ).scalars().first()
-    return participation is not None
-
-
 @dashboard_bp.route("/activities/<int:activity_id>/like", methods=["POST"])
 @login_required
 @limiter.limit("30/minute")
 def like_activity(activity_id: int):
-    """AJAX-Like-Toggle für eine Aktivität."""
+    """AJAX-Like-Toggle für eine Aktivität.
+
+    Alle eingeloggten Nutzer dürfen jede Aktivität liken (kein
+    Teilnahme-Gate) – konsistent zum offenen Lesemodell.
+    """
     activity = db.session.get(Activity, activity_id)
     if not activity:
         return jsonify({"error": "nicht gefunden"}), 404
-
-    if not _is_challenge_participant(activity.challenge_id):
-        return jsonify({"error": "keine Berechtigung"}), 403
 
     existing_like = db.session.execute(
         db.select(ActivityLike).where(
@@ -326,13 +316,13 @@ def like_activity(activity_id: int):
 @login_required
 @limiter.limit("30/minute")
 def like_sick_period(sick_period_id: int):
-    """AJAX-Like-Toggle für eine Abwesenheit."""
+    """AJAX-Like-Toggle für eine Abwesenheit.
+
+    Alle eingeloggten Nutzer dürfen liken (kein Teilnahme-Gate).
+    """
     period = db.session.get(SickPeriod, sick_period_id)
     if not period:
         return jsonify({"error": "nicht gefunden"}), 404
-
-    if not _is_challenge_participant(period.challenge_id):
-        return jsonify({"error": "keine Berechtigung"}), 403
 
     existing_like = db.session.execute(
         db.select(SickPeriodLike).where(

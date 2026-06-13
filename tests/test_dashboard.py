@@ -479,8 +479,8 @@ def test_like_toggle_removes_like(client, db):
     assert like is None
 
 
-def test_like_requires_challenge_participation(client, db):
-    """POST like gibt 403 zurück, wenn der User nicht an der Challenge teilnimmt."""
+def test_like_allowed_for_non_participant(client, db):
+    """Jeder eingeloggte Nutzer darf liken – auch ohne Teilnahme (alle sehen alles)."""
     import datetime
 
     from app.extensions import db as _db
@@ -514,7 +514,10 @@ def test_like_requires_challenge_participation(client, db):
         f"/dashboard/activities/{activity.id}/like",
         headers={"X-CSRFToken": "test"},
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["liked"] is True
+    assert data["count"] == 1
 
 
 def _create_sick_period(db, user_id, challenge_id, reason=None, days=2):
@@ -564,8 +567,8 @@ def test_like_sick_period_toggle(client, db):
     assert d2["liked"] is False and d2["count"] == 0
 
 
-def test_like_sick_period_requires_participation(client, db):
-    """Like auf Abwesenheit gibt 403 für Nicht-Teilnehmer der Challenge."""
+def test_like_sick_period_allowed_for_non_participant(client, db):
+    """Like auf Abwesenheit ist für jeden eingeloggten Nutzer erlaubt (alle sehen alles)."""
     owner = _create_and_login(client, db, "absowner@test.com", "pw")
     challenge, _ = _create_challenge_with_participation(db, owner.id)
     sp = _create_sick_period(db, owner.id, challenge.id)
@@ -578,7 +581,10 @@ def test_like_sick_period_requires_participation(client, db):
     client.post("/auth/login", data={"email": "absoutsider@test.com", "password": "pw"})
 
     resp = client.post(f"/dashboard/sick-periods/{sp.id}/like", headers={"X-CSRFToken": "test"})
-    assert resp.status_code == 403
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["liked"] is True
+    assert data["count"] == 1
 
 
 def test_like_sick_period_not_found(client, db):
