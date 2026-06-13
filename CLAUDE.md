@@ -50,35 +50,35 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-13, Wachwechsel #12)
+## Aktueller Stand (2026-06-13, Wachwechsel #13)
 
-**Aktive Arbeit:** Feature `dqn` (globales Dashboard + Statistiken) abgeschlossen → **v0.17.0**. Nächste Welle steht in der Queue: **Multi-Challenge-Eingabe** (Epic `0bv`) – funktionaler v1.0-Blocker.
+**Aktive Arbeit:** Keine offene Implementation. Diese Wache war eine Reihe Ad-hoc-Verbesserungen (CI-Reparatur, Test-Härtung, Statistik-Verfeinerung) → **v0.18.0**. Es ist **kein** Epic begonnen. Nächster Blocker bleibt **Multi-Challenge-Eingabe** (Epic `0bv`).
 
-- **Aktiver Epic (nächste Welle):** `sport-challenge-0bv` – Multi-Challenge-Eingabe (noch nicht begonnen)
-- **Lessons Learned:** `docs/lessons-learned.md`
+- **Nächster Epic (noch nicht begonnen):** `sport-challenge-0bv` – Multi-Challenge-Eingabe, funktionaler v1.0-Blocker
+- **Lessons Learned:** `docs/lessons-learned.md` (2 neue Einträge: Statistik-Metrik-Verdacht, GH-Actions-Annotation-Maskierung)
 - **Plan:** `.schrammns_workflow/plans/2026-06-13-multi-challenge-dashboard.md`
-- **Version:** 0.17.0 (gepusht auf `origin/main`). Rein additiv: **kein** `.env`-/Migrations-/Dependency-Eingriff.
+- **Version:** 0.18.0 (gepusht auf `origin/main`, Tag `milestone-v0.18.0`). Rein additiv: **kein** `.env`-/Migrations-/Dependency-Eingriff.
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abgeschlossen diese Wache – Feature `dqn` → v0.17.0 (7 atomare Commits):**
-- Statistik-Service `app/services/statistics.py` – 9 Top-3-Ranglisten je Challenge (Zeit, Aktivitäten, Wochen-/Tages-Streak, Vielseitigkeit, beliebteste Aktivität, Frühaufsteher/Nachteule, längste Session). Bulk-Load, kein N+1 (Query-Count-Wächter)
-- Leaderboard pro Challenge `/dashboard/leaderboard/<public_id>` – **kein** Sichtbarkeits-Gate (alle sehen alles), nur `login_required`
-- Like-Gate entfernt – jeder eingeloggte Nutzer darf liken
-- Globaler News-Feed über alle Challenges, jeder Post mit Challenge-Label
-- Dashboard: mehrere Top-5-Blöcke (je aktiver Challenge) + Abschluss-Karten für beendete (Konstante `RECENT_FINISHED_DAYS=14`)
-- Navbar-Leaderboard-**Dropdown** (Context-Processor `inject_nav_challenges`) + Stats-Karten-Partial `dashboard/_statistics.html`
-- 242 Tests (228 + 14 neue)
+**Abgeschlossen diese Wache (5 atomare Commits):**
+- `3oe` – flaky `test_sick_period_update` gehärtet: datumsabhängiges Clamping (Challenge `start=today-1`) ließ den Test ab Donnerstag kippen → CI rot. Setup auf breit gespannte Challenge umgestellt (Commit `f611ecd`)
+- `oz1` – GitHub-Actions auf Node-24-ready angehoben (Node 20 wird 2026-09-16 entfernt): checkout@v5, setup-python@v6, login@v4, setup-buildx@v4, build-push@v7. Annotation-Gegenprobe = 0 Treffer (Commits `f414023`, `2855509`)
+- **Statistik Option B** → v0.17.1: Frühaufsteher = `min(Startzeit)`, Nachteule = `max(Startzeit)` statt Durchschnitt (`avg_start` landete bei gemischten Zeiten irreführend in der Tagesmitte). Kein Zeitzonen-Bug – reine Metrik-Definition (Commit `db43eec`)
+- **Teilnehmer-Übersicht** → v0.18.0: Tabelle „Durchschnittswerte je Teilnehmer" (Ø Start-Uhrzeit + Ø Dauer + Aktivitätszahl) unter den Top-3-Karten in `dashboard/_statistics.html`. Service-Return um `participants` ergänzt, keine zusätzliche Query (Commit `f848443`)
+- 245 Tests (243 + 2 neue Statistik-Tests). CI grün (test + publish).
 
-**Verifiziertes Problem für v1.0 (Aufklärung am 2026-06-13, als bd-Tickets gesichert):**
+**Akzeptierter Grenzfall (Kapitän-Entscheidung):** Aktivität exakt um 00:00 Uhr fällt im `_top3`-Filter beim Frühaufsteher raus – bewusst nicht gefixt (siehe lessons-learned.md).
+
+**Verifiziertes Problem für v1.0 (weiterhin offen, als bd-Tickets gesichert):**
 - Die **Anzeige** ist multi-challenge-fähig, die **Eingabe** nicht. `_active_participation()` (`app/routes/challenge_activities.py:30`) nutzt `.first()` ohne `ORDER BY` → bei zwei parallel aktiven Challenges landen Aktivitäten/Importe/Abwesenheiten in der **falschen** Challenge (stiller Daten-Bug), und die Eingabe-UIs zeigen keine Challenge-Auswahl. → Epic `0bv` + Kinder `0bv.1`/`0bv.2`/`0bv.3`.
 
 **Nächste Queue (`bd ready`):**
-- **v1.0-Blocker:** `0bv` (Multi-Challenge-Eingabe, Epic) · `7fw` (DSGVO: Impressum/Datenschutz) · `myv` (DSGVO: Self-Service Account-Löschung)
+- **v1.0-Blocker:** `0bv.1` (Multi-Challenge-Eingabe – dringlichster: stiller Daten-Bug) · `0bv.2`/`0bv.3` (Selektoren) · `7fw` (DSGVO: Impressum/Datenschutz) · `myv` (DSGVO: Self-Service Account-Löschung)
 - **Hygiene (nächste Welle):** `tjs` (404/500-Seiten, Health-Check, Limiter-Backend, robots.txt)
-- **Sonstiges:** `3oe` (flaky `test_sick_period_update`, datumsabhängig, P2) · KI-Ideen `18t`/`4t4` (nach v1.0, P3)
+- **Sonstiges:** KI-Ideen `18t`/`4t4` (nach v1.0, P3)
 
-### Nachricht vom scheidenden Wachoffizier (2026-06-13)
+### Nachricht vom scheidenden Wachoffizier (2026-06-13, #12 – weiterhin gültig)
 
 > Die Anzeige ist multi-challenge-fähig, die Eingabe noch nicht — genau hier liegt der Hund begraben (Epic `0bv`). Bevor zwei Challenges in Prod gehen, MUSS die Eingabe-Welle durch, sonst landen Aktivitäten in der falschen Challenge. Das offene Lesemodell "alle sehen alles" ist bewusst so gewollt — nicht als Sicherheitslücke missverstehen und "zurückbauen".
 

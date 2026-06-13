@@ -335,3 +335,37 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wo sichtbar:** `config.py` (Cookie-Flags), `tests/test_secure_cookies.py`.
 
 **Quelle:** Wachwechsel #11 (Security-Welle), Issue `26x`, 2026-06-08.
+
+---
+
+## Statistiken: Metrik-Definition vor Zeitzonen-Verdacht prüfen
+
+### 2026-06-13: „Frühaufsteher" zeigte 10:00 – Durchschnitt statt Minimum, kein UTC-Bug
+
+**Erkenntnis:** Die Kachel „Frühaufsteher" zeigte für sportliche Nutzer 10:00 Uhr, obwohl viele Aktivitäten nachweislich früher stattfanden. Der erste Verdacht (UTC-Verschiebung) war falsch: Beide Schreibpfade speichern Lokalzeit (`startTimeLocal` bei Garmin, `datetime.fromisoformat(date+time)` manuell). Die wahre Ursache war die **Metrik-Definition** – Frühaufsteher/Nachteule basierten auf der **durchschnittlichen** Startzeit (`avg_start`) pro Nutzer. Wer früh und spät mischt, landet im Schnitt in der Tagesmitte; echte 06:00-Einheiten verschwinden im Mittel.
+
+**Warum relevant:** Bei zeitbezogenen Auffälligkeiten ist der reflexhafte Verdacht „Zeitzonen-Bug" naheliegend, aber teuer, wenn man ihn ungeprüft verfolgt. Die billigere erste Frage ist: *Was misst die Metrik überhaupt – Min, Max oder Schnitt?*
+
+**Wie gelöst:** „Frühaufsteher" = `min(Startzeit)`, „Nachteule" = `max(Startzeit)` (Option B). Rein additive In-Memory-Ableitung aus den bereits geladenen `start_minutes`, keine DB-/Query-Änderung. Zusätzlich Teilnehmer-Übersicht mit Ø Start-Uhrzeit + Ø Dauer eingeführt.
+
+**Akzeptierter Grenzfall:** Eine Aktivität exakt um 00:00 Uhr (= 0 Tagesminuten) fällt im `_top3`-Filter (`if v`) beim Frühaufsteher raus. Bewusst als Grenzfall akzeptiert (Kapitän-Entscheidung 2026-06-13), nicht gefixt – ein Wechsel auf `if v is not None` beträfe auch andere Ranglisten (z. B. 0 Sportarten).
+
+**Wo sichtbar:** `app/services/statistics.py` → `earliest_start`/`latest_start`/`avg_start`, `app/templates/dashboard/_statistics.html` (Teilnehmer-Tabelle). Tests: `test_early_bird_night_owl_use_min_max_not_average`, `test_participants_overview`.
+
+**Quelle:** Wachwechsel #13, 2026-06-13. Commits `db43eec` (v0.17.1), `f848443` (v0.18.0).
+
+---
+
+## CI/CD: GitHub-Actions-Deprecation-Annotation maskiert weitere Treffer
+
+### 2026-06-13: Node-20-Warnung listet nur die aktuell sichtbaren Actions, nicht alle
+
+**Erkenntnis:** Die GitHub-Build-Annotation „Node.js 20 actions are deprecated" nannte zunächst nur `actions/checkout@v4` und `actions/setup-python@v5`. Nach deren Anhebung (v5/v6) tauchte beim nächsten Lauf eine **neue** Annotation auf, die jetzt die drei Docker-Actions (`login@v3`, `setup-buildx@v3`, `build-push@v6`) nannte. Sie liefen die ganze Zeit auf Node 20 – die erste Annotation hatte sie nur nicht aufgeführt.
+
+**Warum relevant:** Ich hatte aus der ersten (unvollständigen) Annotation geschlossen, die Docker-Actions seien nicht betroffen, und einer korrekten Recherche eines Sub-Agenten zunächst misstraut. Das hätte die zweite Hälfte des Problems übersehen lassen. Eine Deprecation-Annotation ist eine **Momentaufnahme der sichtbaren Treffer**, kein vollständiger Audit.
+
+**Wie vermeiden:** Nach jedem Action-Bump erneut die Annotation des Folge-Laufs prüfen (`gh run view <id> | grep -ci 'node.js 20'`), bis sie 0 ergibt. Bei Major-Sprüngen am Prod-Pfad (hier `build-push v6→v7`) vorher die Changelogs auf Breaking Changes für das eigene Setup gegenlesen (`cache type=gha`, Inputs) – war hier unkritisch.
+
+**Wo sichtbar:** `.github/workflows/docker-publish.yml` – alle 5 Actions jetzt Node-24-ready (checkout@v5, setup-python@v6, login@v4, setup-buildx@v4, build-push@v7).
+
+**Quelle:** Wachwechsel #13, Issue `oz1`, 2026-06-13. Commits `f414023`, `2855509`.
