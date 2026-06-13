@@ -184,6 +184,20 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 
 ---
 
+### 2026-06-13: `pkill` in der Sandbox verboten – Alt-Server verfälscht Playwright-Tests
+
+**Erkenntnis:** Beim Verifizieren der v0.17.0-Features meldete ein Playwright-Agent „Navbar-Dropdown und Statistiken fehlen" – obwohl pytest grün war und der Code stimmte. Ursache: `pkill`/`kill` schlägt in der Sandbox mit „operation not permitted" fehl. Ein bereits laufender Dev-Server (mit `FLASK_DEBUG=0`, also **kein** Template-Auto-Reload) blieb auf Port 5000 hängen und servierte **veraltete** Templates. Der Neustart scheiterte still mit „Address already in use" (nur im Server-Log sichtbar). Der Agent testete gegen den Alt-Server → False-Negative.
+
+**Warum relevant:** Ein grüner pytest-Lauf bei gleichzeitig „rotem" Browser-Test ist ein verwirrender Widerspruch, der leicht zu Fehlschlüssen über den eigenen Code führt – man sucht den Bug an der falschen Stelle.
+
+**Wie vermeiden:** (1) Bei „Feature wird nicht angezeigt, obwohl Code/Tests stimmen" zuerst per `curl` das **echte gerenderte HTML** prüfen (`grep` nach Markern), nicht dem Browser blind vertrauen. (2) Verifikations-Server auf **frischem Port** starten (`app.run(port=5001, use_reloader=False)`) und den Agenten explizit dorthin schicken. (3) Oder mit `FLASK_DEBUG=1` (Auto-Reload greift bei Template-Änderungen). (4) Offline-Gegenprobe: Service-Funktion direkt in `app.app_context()` aufrufen und Rückgabe prüfen – umgeht den Server komplett.
+
+**Wo sichtbar:** Session 2026-06-13 (Wachwechsel #12), Verifikation Feature `dqn`. Auch als bd-Memory `feedback_playwright_port_conflict` hinterlegt.
+
+**Quelle:** Eigener Stolperstein beim Wachwechsel #12.
+
+---
+
 ## Externe APIs: Garmin Connect (Fortsetzung)
 
 ### 2026-04-24: garminconnect In-Memory-Token-API – kein Disk-Pfad für Reconnect

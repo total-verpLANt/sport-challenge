@@ -50,47 +50,45 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-08, Wachwechsel #11)
+## Aktueller Stand (2026-06-13, Wachwechsel #12)
 
-**Aktive Arbeit:** Keine offenen Issues – Security-Welle + eine Performance-Optimierung (`5gh`) abgeschlossen, Queue leer.
+**Aktive Arbeit:** Feature `dqn` (globales Dashboard + Statistiken) abgeschlossen → **v0.17.0**. Nächste Welle steht in der Queue: **Multi-Challenge-Eingabe** (Epic `0bv`) – funktionaler v1.0-Blocker.
 
-- **Epic:** Kein aktiver Epic
+- **Aktiver Epic (nächste Welle):** `sport-challenge-0bv` – Multi-Challenge-Eingabe (noch nicht begonnen)
 - **Lessons Learned:** `docs/lessons-learned.md`
-- **Version:** 0.16.7 (gepusht auf `origin/main`, **noch nicht in Prod ausgerollt** – live läuft v0.16.6). v0.16.7 ist reine Code-Optimierung: **kein** `.env`-/Migrations-/Dependency-Eingriff, nur `git pull && docker compose pull && docker compose up -d` auf `stonbgsport01`.
+- **Plan:** `.schrammns_workflow/plans/2026-06-13-multi-challenge-dashboard.md`
+- **Version:** 0.17.0 (gepusht auf `origin/main`). Rein additiv: **kein** `.env`-/Migrations-/Dependency-Eingriff.
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Änderungen seit Wachwechsel #10 (5 Security-Bugs abgearbeitet):**
-- `haf` → v0.16.1 – Host-Header-Härtung (`PUBLIC_BASE_URL`, `TRUSTED_HOSTS`, `PROXY_X_HOST`)
-- `1ye` → v0.16.2 – Medien-Uploads gegen anonymen Direktzugriff (login-geschützte `/media`-Route; Upload-Pfad nach `data/uploads` außerhalb `static`)
-- v0.16.3 – Medien-Darstellungsfixes (GLightbox-Typ, Bild-Vorschau)
-- `znn` → v0.16.4 – Login-Lockout-DoS: korrektes Passwort durchbricht Lockout; Brute-Force-Schutz via IP-Rate-Limit (`10/min; 60/h`) am Login-POST
-- `26x` → v0.16.5 – Secure-Cookies env-gesteuert (`SECURE_COOKIES=1`): Session **und** Remember-Me als `Secure`; `HttpOnly`/`SameSite=Lax` explizit. Talisman sicherte zuvor nur das Session-Cookie
-- `43k` → v0.16.6 – Upload-Inhaltsvalidierung: Bilder via **Pillow** (Decode + Format-Allowlist + Bomb-Schutz), Videos via **ffprobe** (Video-Stream **+** Container-Allowlist). Validierung zentral in `save_upload()`, Routen unverändert
-- `q4d` – Passwort-Reset One-Time-Use + Ablauf waren bereits korrekt implementiert; nur fehlende Test-Coverage für abgelaufene Tokens ergänzt (kein Produktivcode-Change)
-- 226 Tests
+**Abgeschlossen diese Wache – Feature `dqn` → v0.17.0 (7 atomare Commits):**
+- Statistik-Service `app/services/statistics.py` – 9 Top-3-Ranglisten je Challenge (Zeit, Aktivitäten, Wochen-/Tages-Streak, Vielseitigkeit, beliebteste Aktivität, Frühaufsteher/Nachteule, längste Session). Bulk-Load, kein N+1 (Query-Count-Wächter)
+- Leaderboard pro Challenge `/dashboard/leaderboard/<public_id>` – **kein** Sichtbarkeits-Gate (alle sehen alles), nur `login_required`
+- Like-Gate entfernt – jeder eingeloggte Nutzer darf liken
+- Globaler News-Feed über alle Challenges, jeder Post mit Challenge-Label
+- Dashboard: mehrere Top-5-Blöcke (je aktiver Challenge) + Abschluss-Karten für beendete (Konstante `RECENT_FINISHED_DAYS=14`)
+- Navbar-Leaderboard-**Dropdown** (Context-Processor `inject_nav_challenges`) + Stats-Karten-Partial `dashboard/_statistics.html`
+- 242 Tests (228 + 14 neue)
 
-**Performance-Optimierung nach der Security-Welle (gepusht, Prod-Deploy ausstehend):**
-- `5gh` → v0.16.7 – Dashboard-Leaderboard: N+1 in `get_challenge_summary` eliminiert. Strafberechnung lädt jetzt 3 Bulk-Queries (erfüllte Tage via `GROUP BY`, Krankheit, Overrides) + `joinedload` für Teilnehmer-User und rechnet rein im Speicher (vorher ~`P×W×7` Queries → jetzt konstant ~3–4). `penalty.py` unangetastet als Goldstandard; Verhalten byte-genau identisch, abgesichert durch Regressionstest (`tests/test_weekly_summary.py`) + Query-Count-Wächter gegen N+1-Rückfall.
-- 228 Tests (226 + 2 neue)
+**Verifiziertes Problem für v1.0 (Aufklärung am 2026-06-13, als bd-Tickets gesichert):**
+- Die **Anzeige** ist multi-challenge-fähig, die **Eingabe** nicht. `_active_participation()` (`app/routes/challenge_activities.py:30`) nutzt `.first()` ohne `ORDER BY` → bei zwei parallel aktiven Challenges landen Aktivitäten/Importe/Abwesenheiten in der **falschen** Challenge (stiller Daten-Bug), und die Eingabe-UIs zeigen keine Challenge-Auswahl. → Epic `0bv` + Kinder `0bv.1`/`0bv.2`/`0bv.3`.
 
-**Prod-relevante Neuerungen dieser Wache (bereits ausgerollt):**
-- **Neue Pflicht-`.env`-Vars:** `PUBLIC_BASE_URL`, `TRUSTED_HOSTS`, `SECURE_COOKIES=1` (vom Kapitän gesetzt). Default `SECURE_COOKIES=0` für lokale HTTP-Dev.
-- **Neue Dependency Pillow** (`requirements.txt`) → Image-Rebuild beim Deploy nötig. ffprobe ist im Docker-Image bereits vorhanden.
+**Nächste Queue (`bd ready`):**
+- **v1.0-Blocker:** `0bv` (Multi-Challenge-Eingabe, Epic) · `7fw` (DSGVO: Impressum/Datenschutz) · `myv` (DSGVO: Self-Service Account-Löschung)
+- **Hygiene (nächste Welle):** `tjs` (404/500-Seiten, Health-Check, Limiter-Backend, robots.txt)
+- **Sonstiges:** `3oe` (flaky `test_sick_period_update`, datumsabhängig, P2) · KI-Ideen `18t`/`4t4` (nach v1.0, P3)
 
-**Nächste Queue:** leer (`bd ready` → keine offenen Issues). Möglicher nächster Fisch (noch kein bd-Issue): **`F-B` – N+1 im Bonus-Index** (`app/routes/bonus.py` `index()`: `db.session.get(User, …)` je Entry/Ranking-User → Bulk-Load via `User.id.in_(...)`). Ansonsten kommt Arbeit per neuem Plan/Epic.
+### Nachricht vom scheidenden Wachoffizier (2026-06-13)
 
-### Nachricht vom scheidenden Wachoffizier (2026-06-08)
-
-> Wichtig ist, dass Änderungen nie die produktive Instanz gefährden. Falls in prod etwas geändert werden muss (wie zuletzt in .env) muss darauf hingewiesen werden.
+> Die Anzeige ist multi-challenge-fähig, die Eingabe noch nicht — genau hier liegt der Hund begraben (Epic `0bv`). Bevor zwei Challenges in Prod gehen, MUSS die Eingabe-Welle durch, sonst landen Aktivitäten in der falschen Challenge. Das offene Lesemodell "alle sehen alles" ist bewusst so gewollt — nicht als Sicherheitslücke missverstehen und "zurückbauen".
 
 ### Einstieg für neue Sessions
 
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories security-hardening        # Pointer für diesen Wachwechsel
-bd ready                              # nächste Issues (aktuell leer)
+bd memories multi-challenge           # Pointer für diesen Wachwechsel
+bd ready                              # nächste Issues
 ```
 
 ## Build & Test

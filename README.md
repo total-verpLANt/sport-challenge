@@ -5,7 +5,7 @@ Flask-Webanwendung für Fitness-Challenges mit Leaderboard, Strafberechnung und 
 ## Was macht dieses Projekt?
 
 - **Challenge-System:** Admin erstellt Challenges mit Start-/Enddatum, lädt Teilnehmer ein, die individuell 2x oder 3x pro Woche ≥30 Min Sport als Ziel setzen
-- **Leaderboard/Dashboard:** Wochenweise Übersicht aller Teilnehmer mit Farbcodierung (grün/gelb/rot), Abwesenheiten (🚫) und Spendentopf; Social-Feed mit Aktivitäten und Abwesenheiten (likebar)
+- **Leaderboard/Dashboard:** Wochenweise Übersicht aller Teilnehmer mit Farbcodierung (grün/gelb/rot), Abwesenheiten (🚫) und Spendentopf. Das Dashboard zeigt je aktiver Challenge einen Top-5-Block (mit eigenem Spendentopf), beendete Challenges als Abschluss-Karte. Pro Challenge erreichbar über ein Navbar-Dropdown ist das vollständige Leaderboard inkl. **Top-3-Statistiken** (meiste Zeit, meiste Aktivitäten, längste Streak u. a.). Der Social-Feed ist **challenge-übergreifend** (jeder Post mit Challenge-Label, likebar). Lesemodell: jeder eingeloggte Nutzer sieht alle Challenges/Aktivitäten (kein Teilnahme-Gate beim Lesen/Liken)
 - **Aktivitäts-Tracking:** Manuelles Eintragen (mit Foto-/Video-Upload) oder Import aus Garmin/Strava
 - **Automatische Strafberechnung:** 5 €/verpasster Tag, Admin-Override möglich; Abwesenheit (mit optionalem Grund) reduziert das Wochenziel anteilig (pro 2 Tage −1 Aktivität)
 - **Bonus-Challenges:** Admin-definierte Termine (z.B. 50 Squat Jumps), Zeiterfassung mit Ranking und Video-Beweis
@@ -115,7 +115,7 @@ SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 .venv/bin/pytest -v
 ```
 
-199 Tests (Auth, Connector, Challenge, Aktivitäten, Penalty, Dashboard, Bonus) – kein externer Service nötig.
+242 Tests (Auth, Connector, Challenge, Aktivitäten, Penalty, Dashboard, Statistiken, Bonus) – kein externer Service nötig.
 
 ---
 
@@ -140,7 +140,8 @@ app/
 │   └── strava.py        # StravaConnector (OAuth2, Token-Refresh automatisch)
 ├── services/
 │   ├── penalty.py       # Strafberechnung (wöchentlich + gesamt)
-│   └── weekly_summary.py # Dashboard-Aggregation (Leaderboard-Daten)
+│   ├── weekly_summary.py # Dashboard-Aggregation (Leaderboard-Daten, Bulk/kein N+1)
+│   └── statistics.py    # Top-3-Statistiken pro Challenge (Bulk/kein N+1)
 ├── routes/
 │   ├── auth.py          # Login/Register/Logout, Rate-Limit
 │   ├── activities.py    # /activities/week – Wochenansicht (Connector)
@@ -149,7 +150,7 @@ app/
 │   ├── admin.py         # /admin/ – Nutzerverwaltung
 │   ├── challenges.py    # /challenges/ – Erstellen, Einladen, Annehmen, Bailout
 │   ├── challenge_activities.py  # /challenge-activities/ – Eintragen, Meine Woche, Import, Medien, Abwesenheit
-│   ├── dashboard.py     # /dashboard/ – Leaderboard + Social-Feed (Aktivitäten & Abwesenheiten, Likes)
+│   ├── dashboard.py     # /dashboard/ – Top-5-Blöcke je Challenge, globaler Social-Feed, Leaderboard pro Challenge (/leaderboard/<public_id>) + Statistiken
 │   └── bonus.py         # /bonus/ – Bonus-Challenges + Einträge
 ├── utils/
 │   ├── crypto.py        # HKDF-Key-Derivation + FernetField TypeDecorator
@@ -161,10 +162,10 @@ app/
     ├── activities/       # Connector-Wochenansicht
     ├── connectors/       # Connect/Disconnect
     ├── challenges/       # Erstellen, Detail, Übersicht
-    ├── dashboard/        # Leaderboard-Tabelle
+    ├── dashboard/        # Leaderboard-Tabelle, _statistics.html (Top-3-Karten)
     └── bonus/            # Bonus-Challenges + Ranking
 migrations/              # Alembic-Migrationen (17 Versionen, 10 Tabellen)
-tests/                   # 199 pytest-Tests, In-Memory-SQLite
+tests/                   # 242 pytest-Tests, In-Memory-SQLite
 ```
 
 **Datenfluss Challenge-System:**
@@ -174,8 +175,8 @@ tests/                   # 199 pytest-Tests, In-Memory-SQLite
 3. Nutzer nimmt an → setzt individuelles Wochenziel (2x oder 3x), Status `accepted`
 4. Nutzer trägt Aktivitäten ein (manuell oder Import aus Garmin/Strava)
 5. `penalty.py` berechnet pro Woche: Tage mit ≥30 Min Gesamtdauer → verfehlte Tage × 5 €
-6. `weekly_summary.py` aggregiert alle Daten für das Dashboard/Leaderboard
-7. Dashboard zeigt Fortschritt aller Teilnehmer, Spendentopf, Bonus-Rankings
+6. `weekly_summary.py` aggregiert alle Daten für das Dashboard/Leaderboard, `statistics.py` die Top-3-Ranglisten pro Challenge
+7. Dashboard zeigt Fortschritt aller Teilnehmer, Spendentopf, Bonus-Rankings; das Leaderboard pro Challenge zusätzlich die Statistiken
 
 **Datenfluss Aktivitäten-Abruf (Connector):**
 
