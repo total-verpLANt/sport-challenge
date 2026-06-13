@@ -43,6 +43,24 @@ def _create_challenge_with_participation(db, user_id, status="accepted"):
     return challenge, participation
 
 
+def _create_two_active_challenges(db, user_id):
+    """Zwei aktive, ueberlappende Challenges + je accepted Participation. Gibt (cA, pA, cB, pB)."""
+    today = date.today()
+    ca = Challenge(name="Challenge A", start_date=today - timedelta(days=7),
+                   end_date=today + timedelta(days=30), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=user_id)
+    cb = Challenge(name="Challenge B", start_date=today - timedelta(days=3),
+                   end_date=today + timedelta(days=20), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=user_id)
+    db.session.add_all([ca, cb])
+    db.session.commit()
+    pa = ChallengeParticipation(user_id=user_id, challenge_id=ca.id, status="accepted")
+    pb = ChallengeParticipation(user_id=user_id, challenge_id=cb.id, status="accepted")
+    db.session.add_all([pa, pb])
+    db.session.commit()
+    return ca, pa, cb, pb
+
+
 def test_log_manual_activity(client, db):
     user = _create_and_login(client, db, email="logger@test.com")
     challenge, _ = _create_challenge_with_participation(db, user.id)
@@ -695,3 +713,246 @@ def test_edit_notes_too_long(client, db):
     assert resp.status_code == 302
     db.session.expire_all()
     assert db.session.get(Activity, activity_id).notes is None
+
+
+# --- Multi-Challenge Routing Tests (log_submit) ---
+
+def test_log_submit_routes_to_selected_challenge(client, db):
+    """Bei 2 aktiven Challenges landet die Aktivität in der GEWÄHLTEN (cb), nicht cA."""
+    user = _create_and_login(client, db, email="mc_route@test.com")
+    ca, _, cb, _ = _create_two_active_challenges(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "challenge_id": str(cb.id),
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "45",
+            "sport_type": "running",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is not None
+    assert activity.challenge_id == cb.id
+    assert activity.challenge_id != ca.id
+
+
+def test_log_submit_rejects_foreign_challenge(client, db):
+    """challenge_id einer Challenge ohne accepted-Teilnahme → keine Activity, Redirect."""
+    user = _create_and_login(client, db, email="mc_foreign@test.com")
+    _create_challenge_with_participation(db, user.id)  # cA accepted
+
+    today = date.today()
+    foreign = Challenge(
+        name="Foreign Challenge",
+        start_date=today - timedelta(days=7),
+        end_date=today + timedelta(days=30),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user.id,
+    )
+    db.session.add(foreign)
+    db.session.commit()
+    # Nur "invited", nicht accepted
+    db.session.add(ChallengeParticipation(
+        user_id=user.id, challenge_id=foreign.id, status="invited",
+    ))
+    db.session.commit()
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "challenge_id": str(foreign.id),
+            "activity_date": today.isoformat(),
+            "duration_minutes": "45",
+            "sport_type": "running",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert Activity.query.count() == 0
+
+
+def test_log_submit_missing_challenge_id_with_multiple(client, db):
+    """2 aktive Challenges, kein challenge_id → keine Activity, Redirect (Flash)."""
+    user = _create_and_login(client, db, email="mc_missing@test.com")
+    _create_two_active_challenges(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "45",
+            "sport_type": "running",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert Activity.query.count() == 0
+
+
+def test_log_submit_single_challenge_no_field_still_works(client, db):
+    """1 Teilnahme, kein challenge_id-Feld → Activity wird angelegt (Rückwärtskompat)."""
+    user = _create_and_login(client, db, email="mc_single@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "activity_date": date.today().isoformat(),
+            "duration_minutes": "45",
+            "sport_type": "running",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is not None
+    assert activity.challenge_id == challenge.id
+
+
+def test_log_submit_non_overlapping_periods(client, db):
+    """cA beendet (Vergangenheit), cB aktiv; POST mit cb.id + heutigem Datum → Activity in cb."""
+    user = _create_and_login(client, db, email="mc_nonoverlap@test.com")
+    today = date.today()
+    ca = Challenge(
+        name="Past Challenge",
+        start_date=today - timedelta(days=30),
+        end_date=today - timedelta(days=1),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user.id,
+    )
+    cb = Challenge(
+        name="Current Challenge",
+        start_date=today,
+        end_date=today + timedelta(days=30),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user.id,
+    )
+    db.session.add_all([ca, cb])
+    db.session.commit()
+    db.session.add_all([
+        ChallengeParticipation(user_id=user.id, challenge_id=ca.id, status="accepted"),
+        ChallengeParticipation(user_id=user.id, challenge_id=cb.id, status="accepted"),
+    ])
+    db.session.commit()
+
+    resp = client.post(
+        "/challenge-activities/log",
+        data={
+            "challenge_id": str(cb.id),
+            "activity_date": today.isoformat(),
+            "duration_minutes": "45",
+            "sport_type": "running",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(Activity.user_id == user.id)
+    ).scalar_one_or_none()
+    assert activity is not None
+    assert activity.challenge_id == cb.id
+
+
+# --- SickPeriod POST Tests (sick_period_submit) ---
+
+def test_sick_period_submit_creates(client, db):
+    """1 Teilnahme; POST /sick-period innerhalb Periode → SickPeriod angelegt, geclamped."""
+    from app.models.sick_period import SickPeriod
+    user = _create_and_login(client, db, email="sp_create@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    # sick_from VOR Challenge-Start → muss auf challenge.start_date geclamped werden
+    sick_from = challenge.start_date - timedelta(days=3)
+    sick_to = challenge.start_date + timedelta(days=2)
+
+    resp = client.post(
+        "/challenge-activities/sick-period",
+        data={
+            "sick_from": sick_from.isoformat(),
+            "sick_to": sick_to.isoformat(),
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    sp = db.session.execute(
+        db.select(SickPeriod).where(SickPeriod.user_id == user.id)
+    ).scalar_one_or_none()
+    assert sp is not None
+    assert sp.challenge_id == challenge.id
+    assert sp.start_date == challenge.start_date  # geclamped
+    assert sp.end_date == sick_to
+
+
+def test_sick_period_submit_routes_to_selected_challenge(client, db):
+    """2 aktive; POST /sick-period mit challenge_id=cb.id → SickPeriod in cb."""
+    from app.models.sick_period import SickPeriod
+    user = _create_and_login(client, db, email="sp_route@test.com")
+    ca, _, cb, _ = _create_two_active_challenges(db, user.id)
+
+    sick_from = date.today()
+    sick_to = date.today() + timedelta(days=2)
+
+    resp = client.post(
+        "/challenge-activities/sick-period",
+        data={
+            "challenge_id": str(cb.id),
+            "sick_from": sick_from.isoformat(),
+            "sick_to": sick_to.isoformat(),
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+    sp = db.session.execute(
+        db.select(SickPeriod).where(SickPeriod.user_id == user.id)
+    ).scalar_one_or_none()
+    assert sp is not None
+    assert sp.challenge_id == cb.id
+    assert sp.challenge_id != ca.id
+
+
+def test_sick_period_submit_overlap_rejected(client, db):
+    """Zweite überlappende Periode wird abgelehnt → nur 1 SickPeriod in DB."""
+    from app.models.sick_period import SickPeriod
+    user = _create_and_login(client, db, email="sp_overlap@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    sick_from = date.today()
+    sick_to = date.today() + timedelta(days=4)
+
+    resp1 = client.post(
+        "/challenge-activities/sick-period",
+        data={
+            "sick_from": sick_from.isoformat(),
+            "sick_to": sick_to.isoformat(),
+        },
+        follow_redirects=False,
+    )
+    assert resp1.status_code == 302
+    assert SickPeriod.query.filter_by(user_id=user.id).count() == 1
+
+    # Überlappende zweite Periode
+    resp2 = client.post(
+        "/challenge-activities/sick-period",
+        data={
+            "sick_from": (sick_from + timedelta(days=2)).isoformat(),
+            "sick_to": (sick_to + timedelta(days=2)).isoformat(),
+        },
+        follow_redirects=False,
+    )
+    assert resp2.status_code == 302
+    assert SickPeriod.query.filter_by(user_id=user.id).count() == 1

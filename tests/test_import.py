@@ -278,6 +278,67 @@ def test_import_submit_handles_missing_ext_id(client, db):
     assert len(count) == 0
 
 
+def test_import_submit_routes_to_selected_challenge(client, db):
+    """POST /import mit challenge_id=cb.id → importierte Activity landet in cb, nicht cA."""
+    user = _create_and_login(client, db, email="import_route@test.com")
+    today = date.today()
+    # Beide Challenges umschließen das Mock-Aktivitätsdatum (today - 7)
+    ca = Challenge(
+        name="Import Challenge A",
+        start_date=today - timedelta(days=14),
+        end_date=today + timedelta(days=30),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user.id,
+    )
+    cb = Challenge(
+        name="Import Challenge B",
+        start_date=today - timedelta(days=10),
+        end_date=today + timedelta(days=20),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user.id,
+    )
+    db.session.add_all([ca, cb])
+    db.session.commit()
+    db.session.add_all([
+        ChallengeParticipation(user_id=user.id, challenge_id=ca.id, status="accepted"),
+        ChallengeParticipation(user_id=user.id, challenge_id=cb.id, status="accepted"),
+    ])
+    db.session.commit()
+    _add_connector(db, user.id)
+
+    with (
+        patch("app.connectors.garmin.GarminConnector.connect") as mock_connect,
+        patch(
+            "app.connectors.garmin.GarminConnector.get_activities",
+            return_value=MOCK_ACTIVITIES,
+        ),
+        patch(
+            "app.connectors.garmin.GarminConnector.get_token_updates",
+            return_value={},
+        ),
+    ):
+        mock_connect.return_value = None
+        resp = client.post(
+            "/challenge-activities/import",
+            data={"challenge_id": str(cb.id), "selected": [MOCK_EXT_ID]},
+            follow_redirects=False,
+        )
+
+    assert resp.status_code == 302
+
+    activity = db.session.execute(
+        db.select(Activity).where(
+            Activity.user_id == user.id,
+            Activity.external_id == MOCK_EXT_ID,
+        )
+    ).scalar_one_or_none()
+    assert activity is not None
+    assert activity.challenge_id == cb.id
+    assert activity.challenge_id != ca.id
+
+
 def test_import_submit_handles_connector_error(client, db):
     """POST /import wenn get_activities() eine Exception wirft → kein 500, 0 neue Activities."""
     user = _create_and_login(client, db, email="connectorerr@test.com")
