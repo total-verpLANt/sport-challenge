@@ -413,14 +413,25 @@ def test_sick_period_submit_partial(client, db):
 def test_sick_period_update(client, db):
     """POST mit sick_period_id aktualisiert end_date statt Duplikat anzulegen."""
     admin = _create_and_login(client, db, email="admin_upd@test.com", is_admin=True)
-    challenge = _create_challenge(db, admin.id)
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    # Breit gespannte Challenge, damit das Update-Datum an jedem Wochentag
+    # innerhalb der Grenzen liegt (sonst clampt die Route, Ticket 3oe).
+    challenge = Challenge(
+        name="Update Test",
+        start_date=monday - timedelta(weeks=4),
+        end_date=monday + timedelta(weeks=4),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=admin.id,
+    )
+    db.session.add(challenge)
+    db.session.commit()
     client.post("/auth/logout")
 
     participant = _create_participant(db, challenge.id, email="p_upd@test.com")
     client.post("/auth/login", data={"email": "p_upd@test.com", "password": "pass123"})
 
-    today = date.today()
-    monday = today - timedelta(days=today.weekday())
     sick_from = monday
     sick_to_initial = monday + timedelta(days=6)
 
