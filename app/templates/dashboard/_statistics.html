@@ -1,0 +1,31 @@
+{# Statistik-Karten (Top-3 je Kategorie). Erwartet `stats` = {"stats": [...]}. #}
+{% if stats and stats.stats %}
+<h4 class="mb-3">Statistiken</h4>
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 mb-4">
+  {% for stat in stats.stats %}
+  <div class="col">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-3">
+          <span class="me-1">{{ stat.icon }}</span>{{ stat.title }}
+        </h6>
+        {% if stat.top %}
+        <ol class="list-unstyled mb-0">
+          {% for entry in stat.top %}
+          <li class="d-flex justify-content-between align-items-center {% if not loop.last %}mb-1{% endif %}">
+            <span class="text-truncate me-2">
+              {{ ["🥇", "🥈", "🥉"][loop.index0] }} {{ entry.name }}
+            </span>
+            <span class="badge text-bg-light border">{{ entry.display }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}
+        <p class="text-muted small mb-0">Noch keine Daten</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

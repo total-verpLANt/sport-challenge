@@ -137,6 +137,32 @@ def create_app(config_class=Config):
     def inject_version():
         return {"app_version": __version__}
 
+    @app.context_processor
+    def inject_nav_challenges():
+        """Stellt allen Templates die Challenge-Liste fürs Navbar-Dropdown bereit.
+
+        'Alle sehen alles': keine User-Filterung, nur eine schlanke Query mit
+        den fürs Dropdown benötigten Feldern. Nur für eingeloggte Nutzer.
+        """
+        from flask_login import current_user
+
+        if not current_user.is_authenticated:
+            return {"nav_challenges": []}
+
+        from app.extensions import db
+        from app.models.challenge import Challenge
+
+        rows = db.session.execute(
+            db.select(Challenge.public_id, Challenge.name).order_by(
+                Challenge.created_at.desc()
+            )
+        ).all()
+        return {
+            "nav_challenges": [
+                {"public_id": str(pid), "name": name} for pid, name in rows
+            ]
+        }
+
     @app.route("/")
     def index():
         from flask_login import current_user

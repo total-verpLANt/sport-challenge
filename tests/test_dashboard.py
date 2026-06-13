@@ -374,6 +374,44 @@ def test_leaderboard_by_public_id_unknown_404(client, db):
     assert resp.status_code == 404
 
 
+def test_navbar_leaderboard_dropdown_lists_challenges(client, db):
+    """Die Navbar zeigt ein Leaderboard-Dropdown mit allen Challenges."""
+    user = _create_and_login(client, db, "navdrop@test.com", "pw")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert "dropdown-toggle" in html
+    # Dropdown-Eintrag verlinkt auf das Challenge-Leaderboard
+    assert f"/dashboard/leaderboard/{challenge.public_id}" in html
+    assert challenge.name in html
+
+
+def test_leaderboard_shows_statistics_section(client, db):
+    """Die Leaderboard-Seite zeigt unterhalb des Spendentopfs die Statistik-Karten."""
+    import datetime
+
+    from app.extensions import db as _db
+    from app.models.activity import Activity
+
+    user = _create_and_login(client, db, "statsview@test.com", "pw")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+    _db.session.add(Activity(
+        user_id=user.id, challenge_id=challenge.id,
+        activity_date=datetime.date.today(), duration_minutes=60,
+        sport_type="Laufen", source="manual",
+    ))
+    _db.session.commit()
+
+    resp = client.get(f"/dashboard/leaderboard/{challenge.public_id}")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert "Statistiken" in html
+    assert "Meiste Zeit aktiv" in html
+    assert "Vielseitigster Sportler" in html
+
+
 def test_feed_returns_json(client, db):
     """GET /dashboard/feed?challenge_id=X&page=0 liefert JSON mit activities und has_more."""
     import datetime
