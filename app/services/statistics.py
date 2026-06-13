@@ -321,4 +321,18 @@ def get_challenge_statistics(challenge: Challenge) -> dict:
         },
     ]
 
-    return {"stats": stats}
+    # Teilnehmer-Übersicht: Ø Start-Uhrzeit + Ø Dauer je Teilnehmer.
+    # Alle akzeptierten Teilnehmer werden gelistet (auch ohne Aktivität);
+    # fehlende Werte als "–". Sortiert nach Anzeigename (case-insensitiv).
+    participants = []
+    for uid in participant_ids:
+        count = activity_count[uid]
+        participants.append({
+            "name": user_by_id[uid].display_name,
+            "avg_start": _fmt_time(avg_start[uid]) if uid in avg_start else "–",
+            "avg_duration": _fmt_duration(total_minutes[uid] / count) if count else "–",
+            "activity_count": count,
+        })
+    participants.sort(key=lambda p: p["name"].lower())
+
+    return {"stats": stats, "participants": participants}

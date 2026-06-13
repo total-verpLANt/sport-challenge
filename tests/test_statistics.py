@@ -258,6 +258,48 @@ def test_early_bird_night_owl_use_min_max_not_average(app, db):
         assert night_owl[0]["display"] == "16:00"
 
 
+def test_participants_overview(app, db):
+    """Teilnehmer-Übersicht: Ø Start-Uhrzeit + Ø Dauer, inkl. User ohne Aktivität."""
+    with app.app_context():
+        admin = _user(db, "po_admin@test.com")
+        challenge, start = _challenge(db, admin)
+        active = _user(db, "active@test.com", "Aktiv")
+        idle = _user(db, "idle@test.com", "Ohne")
+        for u in (active, idle):
+            db.session.add(
+                ChallengeParticipation(
+                    user_id=u.id, challenge_id=challenge.id,
+                    status="accepted", weekly_goal=3,
+                )
+            )
+        db.session.commit()
+
+        # Aktiv: 06:00/30min + 16:00/90min → Ø-Start 11:00, Ø-Dauer 60 min
+        _activity(
+            db, active, challenge, start, 30, "running",
+            started_at=datetime(start.year, start.month, start.day, 6, 0),
+        )
+        _activity(
+            db, active, challenge, start, 90, "cycling",
+            started_at=datetime(start.year, start.month, start.day, 16, 0),
+        )
+
+        result = get_challenge_statistics(challenge)
+        by_name = {p["name"]: p for p in result["participants"]}
+
+        # Sortierung nach Name (case-insensitiv): Aktiv vor Ohne
+        assert [p["name"] for p in result["participants"]] == ["Aktiv", "Ohne"]
+
+        assert by_name["Aktiv"]["avg_start"] == "11:00"
+        assert by_name["Aktiv"]["avg_duration"] == "1 h"  # 60 min
+        assert by_name["Aktiv"]["activity_count"] == 2
+
+        # Teilnehmer ohne Aktivität: Platzhalter, count 0
+        assert by_name["Ohne"]["avg_start"] == "–"
+        assert by_name["Ohne"]["avg_duration"] == "–"
+        assert by_name["Ohne"]["activity_count"] == 0
+
+
 def test_empty_challenge_no_crash(app, db):
     """A challenge without participants/activities returns empty tops, no crash."""
     with app.app_context():

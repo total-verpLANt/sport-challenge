@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.18.0] – 2026-06-13
+
+### Hinzugefügt
+- **Teilnehmer-Übersicht mit Durchschnittswerten** auf der Challenge-Statistik-Seite: Neue Tabelle „Durchschnittswerte je Teilnehmer" unter den Top-3-Karten listet **alle** akzeptierten Teilnehmer (auch ohne Aktivität) mit ihrer **Ø Start-Uhrzeit**, **Ø Trainingsdauer** und der Anzahl Aktivitäten. Fehlende Werte erscheinen als „–". Rein additiv aus den bereits geladenen Aggregaten abgeleitet – keine zusätzliche DB-Query
+
 ## [0.17.1] – 2026-06-13
 
 ### Geändert

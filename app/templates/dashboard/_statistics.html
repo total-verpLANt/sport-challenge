@@ -29,3 +29,30 @@
   {% endfor %}
 </div>
 {% endif %}
+
+{# Teilnehmer-Übersicht: Ø Start-Uhrzeit + Ø Dauer. Erwartet `stats.participants`. #}
+{% if stats and stats.participants %}
+<h4 class="mb-3">Durchschnittswerte je Teilnehmer</h4>
+<div class="table-responsive mb-4">
+  <table class="table table-sm table-striped align-middle mb-0">
+    <thead>
+      <tr>
+        <th scope="col">Teilnehmer</th>
+        <th scope="col" class="text-end">Ø Start-Uhrzeit</th>
+        <th scope="col" class="text-end">Ø Dauer</th>
+        <th scope="col" class="text-end">Aktivitäten</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in stats.participants %}
+      <tr>
+        <td class="text-truncate">{{ p.name }}</td>
+        <td class="text-end">{{ p.avg_start }}</td>
+        <td class="text-end">{{ p.avg_duration }}</td>
+        <td class="text-end">{{ p.activity_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
