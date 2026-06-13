@@ -1,6 +1,7 @@
+import uuid as _uuid
 from datetime import date, datetime, timedelta, timezone
 
-from flask import Blueprint, jsonify, render_template, request, url_for
+from flask import Blueprint, abort, jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
@@ -10,12 +11,31 @@ from app.models.activity import Activity, ActivityLike
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.sick_period import SickPeriod, SickPeriodLike
 from app.models.user import User
+from app.services.statistics import get_challenge_statistics
 from app.services.weekly_summary import get_challenge_summary
 from app.utils.motivational_quotes import get_random_quote
 
 dashboard_bp = Blueprint("dashboard", __name__, template_folder="../templates")
 
 FEED_PAGE_SIZE = 10
+
+
+def _get_challenge_by_public_id(public_id: str) -> Challenge:
+    """Resolve a challenge by its public UUID or abort 404.
+
+    No visibility gate: every logged-in user may view every leaderboard
+    (login_required + is_approved still enforced upstream).
+    """
+    try:
+        uid = _uuid.UUID(public_id)
+    except (ValueError, AttributeError):
+        abort(404)
+    challenge = db.session.execute(
+        db.select(Challenge).where(Challenge.public_id == uid)
+    ).scalar_one_or_none()
+    if challenge is None:
+        abort(404)
+    return challenge
 
 
 def _feed_sort_key(dt: datetime) -> datetime:
@@ -183,6 +203,7 @@ def index():
 @dashboard_bp.route("/leaderboard")
 @login_required
 def leaderboard():
+    """Leaderboard der aktiven/neuesten Challenge (Fallback ohne public_id)."""
     today = date.today()
     challenge = db.session.execute(
         db.select(Challenge)
@@ -194,9 +215,26 @@ def leaderboard():
             db.select(Challenge).order_by(Challenge.created_at.desc())
         ).scalars().first()
     if challenge is None:
-        return render_template("dashboard/leaderboard.html", summary=None, timedelta=timedelta)
+        return render_template(
+            "dashboard/leaderboard.html", summary=None, stats=None, timedelta=timedelta
+        )
+    return _render_leaderboard(challenge)
+
+
+@dashboard_bp.route("/leaderboard/<public_id>")
+@login_required
+def leaderboard_challenge(public_id: str):
+    """Leaderboard einer bestimmten Challenge (alle sehen alles)."""
+    challenge = _get_challenge_by_public_id(public_id)
+    return _render_leaderboard(challenge)
+
+
+def _render_leaderboard(challenge: Challenge):
     summary = get_challenge_summary(challenge)
-    return render_template("dashboard/leaderboard.html", summary=summary, timedelta=timedelta)
+    stats = get_challenge_statistics(challenge)
+    return render_template(
+        "dashboard/leaderboard.html", summary=summary, stats=stats, timedelta=timedelta
+    )
 
 
 @dashboard_bp.route("/feed")

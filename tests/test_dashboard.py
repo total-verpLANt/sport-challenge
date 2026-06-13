@@ -275,6 +275,44 @@ def test_leaderboard_full_shows_all_participants(client, db):
     assert user_links >= 7, f"Expected >=7 user links, got {user_links}"
 
 
+def test_leaderboard_by_public_id_visible_to_non_participant(client, db):
+    """GET /dashboard/leaderboard/<public_id> ist für JEDEN eingeloggten User sichtbar.
+
+    'Alle sehen alles': auch ein Nicht-Teilnehmer erhält 200, kein 403/404.
+    """
+    owner = _create_and_login(client, db, "lb_owner@test.com", "pw")
+    challenge, _ = _create_challenge_with_participation(db, owner.id)
+    public_id = str(challenge.public_id)
+
+    # Outsider ohne Teilnahme
+    client.post("/auth/logout")
+    outsider = User(email="lb_outsider@test.com", is_approved=True)
+    outsider.set_password("pw")
+    db.session.add(outsider)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "lb_outsider@test.com", "password": "pw"})
+
+    resp = client.get(f"/dashboard/leaderboard/{public_id}")
+    assert resp.status_code == 200
+    assert challenge.name.encode() in resp.data
+
+
+def test_leaderboard_by_public_id_invalid_uuid_404(client, db):
+    """Ungültige public_id → 404."""
+    _create_and_login(client, db, "lb_bad@test.com", "pw")
+    resp = client.get("/dashboard/leaderboard/not-a-uuid")
+    assert resp.status_code == 404
+
+
+def test_leaderboard_by_public_id_unknown_404(client, db):
+    """Unbekannte (gültige) UUID → 404."""
+    import uuid as _uuid
+
+    _create_and_login(client, db, "lb_unknown@test.com", "pw")
+    resp = client.get(f"/dashboard/leaderboard/{_uuid.uuid4()}")
+    assert resp.status_code == 404
+
+
 def test_feed_returns_json(client, db):
     """GET /dashboard/feed?challenge_id=X&page=0 liefert JSON mit activities und has_more."""
     import datetime
