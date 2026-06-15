@@ -36,3 +36,6 @@ dashboard-*.md
 
 # Claude Code – Skills und lokale MCP-Artefakte
 .claude/skills/
+
+# Agenten-Workflow-Artefakte (Briefings/Pläne/Research) – lokal, nicht ins Produkt-Repo
+.schrammns_workflow/
