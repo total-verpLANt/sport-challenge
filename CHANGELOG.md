@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.0.0] – 2026-06-15
+
+### Hinzugefügt
+- **v1.0-Release**: Alle Blocker abgearbeitet. App ist bereit für den produktiven Einsatz in geschlossenen Gruppen.
+
+### Behoben
+- **Härtung `sick_period_submit`** (`9fh`): Update-Pfad prüft jetzt auch `challenge_id` der SickPeriod gegen die verifizierte Participation (Defense-in-depth, konsistent mit IDOR-Modell aus 0bv.1).
+
 ## [0.19.0] – 2026-06-15
 
 ### Hinzugefügt
