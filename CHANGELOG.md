@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.19.0] – 2026-06-15
+
+### Hinzugefügt
+- **DSGVO: Self-Service Account-Löschung** (`myv`): Eingeloggte User können ihr eigenes Konto im Profil mit Passwort-Bestätigung endgültig löschen. Alle abhängigen Daten (Aktivitäten, Medien, Challenge-Teilnahmen, Bonus-Einträge, Penalties, Krankperioden) werden cascade-gelöscht. Last-Admin- und Challenge-Creator-Guard verhindern destruktive Sonderfälle.
+
 ## [0.18.3] – 2026-06-15
 
 ### Behoben
