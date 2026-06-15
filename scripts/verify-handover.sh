@@ -112,7 +112,15 @@ if [ "$CHECKS_FAILED" -gt 0 ]; then
 else
     echo ""
     echo "🏴‍☠️  Alles klar. Erster Einstieg:"
-    echo "    bd memories security-hardening   # Pointer zum letzten Wachwechsel"
+    # Neuesten Wachwechsel-Memory dynamisch ermitteln, statt einen Namen
+    # hartzucodieren (der bei jedem Wachwechsel driftet).
+    LATEST_WW=$(bd memories 2>/dev/null \
+        | grep -oE 'wachwechsel-[0-9]+[a-z0-9-]*' | sort -V | tail -1)
+    if [ -n "$LATEST_WW" ]; then
+        echo "    bd memories $LATEST_WW   # Pointer zum letzten Wachwechsel"
+    else
+        echo "    bd memories                      # Wachwechsel-Pointer suchen"
+    fi
     echo "    bd ready                         # nächste Issues"
     exit 0
 fi
