@@ -8,6 +8,20 @@
   <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary btn-sm">&laquo; Zurück</a>
 </div>
 
+{# Challenge selector (nur bei mehreren gemeinsamen Challenges) #}
+{% if shared_challenges and shared_challenges|length > 1 %}
+<form method="get" action="{{ url_for('challenge_activities.user_activities', user_id=target_user.id) }}"
+      class="mb-3" style="max-width: 22rem;">
+  <label for="challenge_select" class="form-label mb-1 small text-muted">Challenge</label>
+  <select name="challenge_id" id="challenge_select" class="form-select form-select-sm"
+          onchange="this.form.submit()">
+    {% for c in shared_challenges %}
+      <option value="{{ c.id }}" {% if c.id == challenge.id %}selected{% endif %}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+</form>
+{% endif %}
+
 {# Status and goal info #}
 <div class="card mb-4">
   <div class="card-body">

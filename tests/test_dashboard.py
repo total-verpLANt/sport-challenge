@@ -706,3 +706,57 @@ def test_like_sick_period_not_found(client, db):
     _create_and_login(client, db, "abs404@test.com", "pw")
     resp = client.post("/dashboard/sick-periods/999999/like", headers={"X-CSRFToken": "test"})
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# 0bv.2: user_activities ueber mehrere gemeinsame Challenges
+# ---------------------------------------------------------------------------
+def test_user_activities_multi_challenge_selector(client, db):
+    """Bei 2 gemeinsamen Challenges zeigt user_activities die via ?challenge_id
+    gewaehlte Challenge; der Selektor listet beide, nichts 'verschwindet'."""
+    today = date.today()
+    # Ziel-User (nicht eingeloggt) in beiden Challenges accepted
+    user_a = User(email="ua_multi@test.com", is_approved=True)
+    user_a.set_password("testpass123")
+    db.session.add(user_a)
+    db.session.commit()
+    ca = Challenge(name="Multi A", start_date=today - timedelta(days=7),
+                   end_date=today + timedelta(days=30), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=user_a.id)
+    cb = Challenge(name="Multi B", start_date=today - timedelta(days=3),
+                   end_date=today + timedelta(days=20), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=user_a.id)
+    db.session.add_all([ca, cb])
+    db.session.commit()
+    db.session.add_all([
+        Activity(user_id=user_a.id, challenge_id=ca.id, activity_date=today,
+                 duration_minutes=45, sport_type="lauf_ca", source="manual"),
+        Activity(user_id=user_a.id, challenge_id=cb.id, activity_date=today,
+                 duration_minutes=45, sport_type="rad_cb", source="manual"),
+        ChallengeParticipation(user_id=user_a.id, challenge_id=ca.id, status="accepted"),
+        ChallengeParticipation(user_id=user_a.id, challenge_id=cb.id, status="accepted"),
+    ])
+    db.session.commit()
+    # Betrachter in beiden Challenges accepted, eingeloggt
+    user_b = _create_and_login(client, db, email="ub_multi@test.com")
+    db.session.add_all([
+        ChallengeParticipation(user_id=user_b.id, challenge_id=ca.id, status="accepted"),
+        ChallengeParticipation(user_id=user_b.id, challenge_id=cb.id, status="accepted"),
+    ])
+    db.session.commit()
+
+    # Challenge A gewaehlt -> nur A-Aktivitaet, Selektor listet beide
+    resp = client.get(f"/challenge-activities/user/{user_a.id}?challenge_id={ca.id}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "lauf_ca" in body
+    assert "rad_cb" not in body
+    assert "Multi A" in body
+    assert "Multi B" in body
+
+    # Challenge B gewaehlt -> nur B-Aktivitaet
+    resp = client.get(f"/challenge-activities/user/{user_a.id}?challenge_id={cb.id}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "rad_cb" in body
+    assert "lauf_ca" not in body

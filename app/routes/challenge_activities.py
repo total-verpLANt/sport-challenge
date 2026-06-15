@@ -683,22 +683,41 @@ def user_activities(user_id):
     if target_user is None:
         flash("Benutzer nicht gefunden.", "danger")
         return redirect(url_for("dashboard.index"))
-    # Aktive Challenge des aktuellen Users
-    my_participation = _active_participation()
-    if my_participation is None:
+    # Eigene akzeptierte Teilnahmen
+    my_participations = _accepted_participations()
+    if not my_participations:
         flash("Du nimmst an keiner aktiven Challenge teil.", "warning")
         return redirect(url_for("dashboard.index"))
-    challenge = db.session.get(Challenge, my_participation.challenge_id)
-    # Ziel-User muss dieselbe Challenge haben
-    target_participation = db.session.scalar(
-        db.select(ChallengeParticipation).where(
+    my_challenge_ids = [p.challenge_id for p in my_participations]
+    # Gemeinsame Challenges: Ziel-User nimmt an einer meiner Challenges teil
+    # (Status des Ziel-Users beliebig – wird im Template ausgewiesen).
+    shared = list(db.session.scalars(
+        db.select(ChallengeParticipation)
+        .join(Challenge)
+        .where(
             ChallengeParticipation.user_id == user_id,
-            ChallengeParticipation.challenge_id == challenge.id,
+            ChallengeParticipation.challenge_id.in_(my_challenge_ids),
         )
-    )
-    if target_participation is None:
-        flash("Dieser Benutzer nimmt nicht an deiner Challenge teil.", "warning")
+        .order_by(Challenge.start_date.desc(), ChallengeParticipation.id.desc())
+    ).all())
+    if not shared:
+        flash("Dieser Benutzer nimmt an keiner deiner Challenges teil.", "warning")
         return redirect(url_for("dashboard.index"))
+    # Auswahl der anzuzeigenden gemeinsamen Challenge (Default = erste)
+    target_participation = shared[0]
+    raw_cid = request.args.get("challenge_id")
+    if raw_cid:
+        try:
+            cid = int(raw_cid)
+        except (TypeError, ValueError):
+            cid = None
+        if cid is not None:
+            for tp in shared:
+                if tp.challenge_id == cid:
+                    target_participation = tp
+                    break
+    challenge = db.session.get(Challenge, target_participation.challenge_id)
+    shared_challenges = [tp.challenge for tp in shared]
     activities = db.session.scalars(
         db.select(Activity)
         .where(
@@ -712,6 +731,7 @@ def user_activities(user_id):
         target_user=target_user,
         target_participation=target_participation,
         challenge=challenge,
+        shared_challenges=shared_challenges,
         activities=activities,
     )
 
