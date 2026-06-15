@@ -4,21 +4,18 @@
   <div class="col-md-8">
     <h2 class="mb-4">Changelog</h2>
     <div class="changelog-content">
-      {% for line in changelog.splitlines() %}
-        {% if line.startswith('## ') %}
-          {% if not loop.first %}</ul>{% endif %}
-          <h4 class="mt-4">{{ line[3:] }}</h4>
-          <ul>
-        {% elif line.startswith('### ') %}
-          <li class="fw-semibold mt-2 list-unstyled">{{ line[4:] }}</li>
-        {% elif line.startswith('- ') %}
-          <li>{{ line[2:] }}</li>
-        {% elif line.startswith('# ') %}
-          {# Hauptüberschrift wird ausgelassen, da h2 oben steht #}
-        {% endif %}
-      {% endfor %}
-      {% if changelog %}</ul>{% endif %}
+      {{ changelog }}
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block styles %}
+<style nonce="{{ csp_nonce() }}">
+  .changelog-content h2 { font-size: 1.4rem; margin-top: 2rem; border-bottom: 1px solid #dee2e6; padding-bottom: .4rem; }
+  .changelog-content h3 { font-size: 1.1rem; margin-top: 1.2rem; color: #495057; }
+  .changelog-content ul { padding-left: 1.4rem; }
+  .changelog-content li { margin-bottom: .3rem; }
+  .changelog-content code { background: #f8f9fa; padding: .1rem .35rem; border-radius: .25rem; font-size: .875em; }
+</style>
 {% endblock %}
