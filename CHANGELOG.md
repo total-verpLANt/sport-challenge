@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.18.3] – 2026-06-15
+
+### Behoben
+- **Multi-Challenge-Bonus: richtige Challenge in Anzeige und Anlage** (Epic `0bv.3`, schließt Epic `0bv` ab): `bonus.index()` zeigte über `_get_active_challenge()` nur die *global neueste* Challenge – bei mehreren parallelen Challenges sah ein Teilnehmer die Bonus-Challenges der anderen nicht (bzw. eine, an der er gar nicht teilnimmt). Die Bonus-Übersicht richtet sich jetzt nach den **eigenen akzeptierten Challenges** (Selektor, Default = erste, deterministisch); Nicht-Teilnehmer behalten als Fallback die Lese-Sicht auf die neueste Challenge. Die Admin-Anlage (`create`) band neue Bonus-Challenges fix an die neueste Challenge – jetzt wählt der Admin die Ziel-Challenge explizit (verifiziert), sodass auch ältere parallele Challenges bestückt werden können. `add_entry()` war bereits korrekt (Challenge stammt aus der Bonus-Challenge selbst)
+
+### Hinzugefügt
+- **Challenge-Selektor (Dropdown) im Bonus-Bereich**: `bonus/index.html` (eigene Challenges) und `bonus/create.html` (alle Challenges, Admin) zeigen bei mehreren Challenges ein Auswahl-Dropdown; bei genau einer bleibt es ausgeblendet (kein UX-Regress)
+
 ## [0.18.2] – 2026-06-15
 
 ### Behoben
