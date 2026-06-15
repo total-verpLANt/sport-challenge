@@ -956,3 +956,69 @@ def test_sick_period_submit_overlap_rejected(client, db):
     )
     assert resp2.status_code == 302
     assert SickPeriod.query.filter_by(user_id=user.id).count() == 1
+
+
+# ---------------------------------------------------------------------------
+# 0bv.2: my_week-Anzeige mit Challenge-Selektor
+# ---------------------------------------------------------------------------
+def test_my_week_selector_shows_selected_challenge(client, db):
+    """Bei 2 aktiven Challenges zeigt my_week NUR die Aktivitäten der via
+    ?challenge_id gewählten Challenge – nichts 'verschwindet', es wird nur
+    pro Challenge getrennt angezeigt."""
+    user = _create_and_login(client, db, email="myweek_sel@test.com")
+    ca, _, cb, _ = _create_two_active_challenges(db, user.id)
+    today = date.today()
+    db.session.add_all([
+        Activity(user_id=user.id, challenge_id=ca.id, activity_date=today,
+                 duration_minutes=45, sport_type="schwimmen_aaa", source="manual"),
+        Activity(user_id=user.id, challenge_id=cb.id, activity_date=today,
+                 duration_minutes=45, sport_type="radeln_bbb", source="manual"),
+    ])
+    db.session.commit()
+
+    # Challenge A gewählt -> nur A-Aktivität, B-Aktivität ausgeblendet
+    resp = client.get(f"/challenge-activities/my-week?challenge_id={ca.id}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "schwimmen_aaa" in body
+    assert "radeln_bbb" not in body
+    # Selektor listet beide Challenges
+    assert "Challenge A" in body
+    assert "Challenge B" in body
+
+    # Challenge B gewählt -> nur B-Aktivität
+    resp = client.get(f"/challenge-activities/my-week?challenge_id={cb.id}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "radeln_bbb" in body
+    assert "schwimmen_aaa" not in body
+
+
+def test_my_week_invalid_challenge_id_falls_back_to_default(client, db):
+    """Manipuliertes/fremdes challenge_id darf nicht crashen – Default greift."""
+    user = _create_and_login(client, db, email="myweek_bad@test.com")
+    ca, _, cb, _ = _create_two_active_challenges(db, user.id)
+    today = date.today()
+    db.session.add(Activity(user_id=user.id, challenge_id=cb.id, activity_date=today,
+                            duration_minutes=45, sport_type="radeln_default", source="manual"))
+    db.session.commit()
+
+    # cb ist Default (spaeteres start_date -> in _accepted_participations zuerst)
+    resp = client.get("/challenge-activities/my-week?challenge_id=999999")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "radeln_default" in body  # Default = cb, kein Crash
+
+    # Nicht-numerischer Wert ebenfalls unkritisch
+    resp = client.get("/challenge-activities/my-week?challenge_id=abc")
+    assert resp.status_code == 200
+
+
+def test_my_week_single_challenge_no_selector(client, db):
+    """Bei genau 1 Teilnahme erscheint KEIN Selektor (kein UX-Regress)."""
+    user = _create_and_login(client, db, email="myweek_single@test.com")
+    _create_challenge_with_participation(db, user.id)
+    resp = client.get("/challenge-activities/my-week")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert 'id="challenge_select"' not in body

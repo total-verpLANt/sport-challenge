@@ -81,6 +81,28 @@ def _resolve_participation(challenge_id):
     ).scalar_one_or_none()
 
 
+def _selected_participation(participations):
+    """Anzuzeigende Teilnahme aus GET-Param ``challenge_id``; Default = erste.
+
+    participations: Liste aus _accepted_participations() (deterministisch sortiert).
+    Bei fehlendem/ungültigem/fremdem challenge_id fällt der erste Eintrag heraus
+    (kein Crash bei manipuliertem Parameter). Gibt None bei leerer Liste zurück.
+    """
+    if not participations:
+        return None
+    raw_cid = request.args.get("challenge_id")
+    if raw_cid:
+        try:
+            cid = int(raw_cid)
+        except (TypeError, ValueError):
+            cid = None
+        if cid is not None:
+            for p in participations:
+                if p.challenge_id == cid:
+                    return p
+    return participations[0]
+
+
 @challenge_activities_bp.route("/log", methods=["GET"])
 @login_required
 def log_form():
@@ -204,7 +226,8 @@ def log_submit():
 @challenge_activities_bp.route("/my-week", methods=["GET"])
 @login_required
 def my_week():
-    participation = _active_participation()
+    participations = _accepted_participations()
+    participation = _selected_participation(participations)
 
     offset = 0
     try:
@@ -284,6 +307,7 @@ def my_week():
         fulfilled_days=fulfilled_days,
         weekly_goal=weekly_goal,
         participation=participation,
+        participations=participations,
         has_connector=has_connector,
         sick_periods=sick_periods,
         sick_days_val=sick_days_val,
@@ -374,7 +398,11 @@ def sick_period_submit():
     # Redirect: wenn aus my_week (offset im Form), dorthin zurück; sonst log_form
     offset = request.form.get("offset", type=int)
     if offset is not None:
-        return redirect(url_for("challenge_activities.my_week", offset=offset))
+        return redirect(url_for(
+            "challenge_activities.my_week",
+            offset=offset,
+            challenge_id=participation.challenge_id,
+        ))
     return redirect(url_for("challenge_activities.log_form"))
 
 

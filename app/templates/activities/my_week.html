@@ -12,15 +12,32 @@
   {% endif %}
 </div>
 
+{# Challenge selector (nur bei mehreren akzeptierten Teilnahmen) #}
+{% if participations and participations|length > 1 %}
+<form method="get" action="{{ url_for('challenge_activities.my_week') }}" class="mb-3" style="max-width: 22rem;">
+  <input type="hidden" name="offset" value="{{ offset }}">
+  <label for="challenge_select" class="form-label mb-1 small text-muted">Challenge</label>
+  <select name="challenge_id" id="challenge_select" class="form-select form-select-sm"
+          onchange="this.form.submit()">
+    {% for p in participations %}
+      <option value="{{ p.challenge_id }}"
+              {% if participation and p.challenge_id == participation.challenge_id %}selected{% endif %}>
+        {{ p.challenge.name }}
+      </option>
+    {% endfor %}
+  </select>
+</form>
+{% endif %}
+
 {# Week navigation #}
 <div class="d-flex align-items-center justify-content-between mb-4">
-  <a href="{{ url_for('challenge_activities.my_week', offset=offset - 1) }}"
+  <a href="{{ url_for('challenge_activities.my_week', offset=offset - 1, challenge_id=participation.challenge_id if participation else None) }}"
      class="btn btn-outline-secondary btn-sm">&laquo; Vorwoche</a>
   <span class="text-muted small">
     {{ monday.strftime('%d.%m.%Y') }} – {{ sunday.strftime('%d.%m.%Y') }}
   </span>
   {% if offset < 0 %}
-  <a href="{{ url_for('challenge_activities.my_week', offset=offset + 1) }}"
+  <a href="{{ url_for('challenge_activities.my_week', offset=offset + 1, challenge_id=participation.challenge_id if participation else None) }}"
      class="btn btn-outline-secondary btn-sm">Nächste Woche &raquo;</a>
   {% else %}
   <span class="btn btn-outline-secondary btn-sm disabled">Nächste Woche &raquo;</span>
