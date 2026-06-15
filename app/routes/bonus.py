@@ -39,10 +39,48 @@ def _user_is_accepted_participant(challenge_id: int) -> bool:
     return participation is not None
 
 
+def _user_accepted_challenges():
+    """Challenges, in denen current_user akzeptiert teilnimmt (deterministisch)."""
+    return list(db.session.scalars(
+        db.select(Challenge)
+        .join(ChallengeParticipation, ChallengeParticipation.challenge_id == Challenge.id)
+        .where(
+            ChallengeParticipation.user_id == current_user.id,
+            ChallengeParticipation.status == "accepted",
+        )
+        .order_by(Challenge.start_date.desc(), Challenge.id.desc())
+    ).all())
+
+
+def _pick_challenge(challenges):
+    """Waehlt aus ?challenge_id die anzuzeigende Challenge; Default = erste.
+
+    Faellt bei fehlendem/ungueltigem/fremdem Wert auf challenges[0] zurueck.
+    """
+    selected = challenges[0]
+    raw_cid = request.args.get("challenge_id")
+    if raw_cid:
+        try:
+            cid = int(raw_cid)
+        except (TypeError, ValueError):
+            cid = None
+        if cid is not None:
+            for c in challenges:
+                if c.id == cid:
+                    return c
+    return selected
+
+
 @bonus_bp.route("/")
 @login_required
 def index():
-    active_challenge = _get_active_challenge()
+    # Multi-Challenge: Selektor ueber eigene akzeptierte Challenges.
+    # Fallback fuer Nicht-Teilnehmer: neueste Challenge global (read-only).
+    my_challenges = _user_accepted_challenges()
+    if my_challenges:
+        active_challenge = _pick_challenge(my_challenges)
+    else:
+        active_challenge = _get_active_challenge()
 
     bonus_challenges = []
     if active_challenge:
@@ -114,6 +152,7 @@ def index():
     return render_template(
         "bonus/index.html",
         active_challenge=active_challenge,
+        my_challenges=my_challenges,
         bonus_challenges=bonus_challenges,
         rankings=rankings,
         user_entries=user_entries,

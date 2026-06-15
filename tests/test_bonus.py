@@ -280,3 +280,59 @@ def test_overall_ranking_best_time(client, db, app):
     assert resp.status_code == 200
     # Beste Zeit 2:00 muss erscheinen, nicht 3:00
     assert b"2:00" in resp.data
+
+
+# ---------------------------------------------------------------------------
+# 0bv.3: Bonus-Index mit Challenge-Selektor (mehrere parallele Challenges)
+# ---------------------------------------------------------------------------
+def _two_bonus_challenges(db, user_id):
+    today = date.today()
+    ca = Challenge(name="Bonus A", start_date=today - timedelta(days=7),
+                   end_date=today + timedelta(days=30), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=user_id)
+    cb = Challenge(name="Bonus B", start_date=today - timedelta(days=3),
+                   end_date=today + timedelta(days=20), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=user_id)
+    db.session.add_all([ca, cb])
+    db.session.commit()
+    db.session.add_all([
+        ChallengeParticipation(user_id=user_id, challenge_id=ca.id, status="accepted"),
+        ChallengeParticipation(user_id=user_id, challenge_id=cb.id, status="accepted"),
+        BonusChallenge(challenge_id=ca.id, scheduled_date=today, description="bonus_aaa_burpees"),
+        BonusChallenge(challenge_id=cb.id, scheduled_date=today, description="bonus_bbb_planks"),
+    ])
+    db.session.commit()
+    return ca, cb
+
+
+def test_bonus_index_selector_shows_selected_challenge(client, db):
+    """Bei 2 eigenen Challenges zeigt /bonus nur die Bonus-Challenges der
+    via ?challenge_id gewaehlten Challenge; der Selektor listet beide."""
+    user = _create_and_login(client, db, email="bonus_sel@test.com")
+    ca, cb = _two_bonus_challenges(db, user.id)
+
+    resp = client.get(f"/bonus/?challenge_id={ca.id}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "bonus_aaa_burpees" in body
+    assert "bonus_bbb_planks" not in body
+    assert "Bonus A" in body
+    assert "Bonus B" in body
+
+    resp = client.get(f"/bonus/?challenge_id={cb.id}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "bonus_bbb_planks" in body
+    assert "bonus_aaa_burpees" not in body
+
+
+def test_bonus_index_invalid_challenge_id_falls_back(client, db):
+    """Manipuliertes challenge_id darf nicht crashen – Default greift."""
+    user = _create_and_login(client, db, email="bonus_bad@test.com")
+    _two_bonus_challenges(db, user.id)
+    resp = client.get("/bonus/?challenge_id=999999")
+    assert resp.status_code == 200
+    # Default = Bonus B (spaeteres start_date) -> dessen Bonus sichtbar
+    assert "bonus_bbb_planks" in resp.get_data(as_text=True)
+    resp = client.get("/bonus/?challenge_id=abc")
+    assert resp.status_code == 200

@@ -9,6 +9,19 @@
   {% endif %}
 </div>
 
+{# Challenge selector (nur bei mehreren eigenen akzeptierten Challenges) #}
+{% if my_challenges and my_challenges|length > 1 %}
+<form method="get" action="{{ url_for('bonus.index') }}" class="mb-4" style="max-width: 22rem;">
+  <label for="challenge_select" class="form-label mb-1 small text-muted">Challenge</label>
+  <select name="challenge_id" id="challenge_select" class="form-select form-select-sm"
+          onchange="this.form.submit()">
+    {% for c in my_challenges %}
+      <option value="{{ c.id }}" {% if active_challenge and c.id == active_challenge.id %}selected{% endif %}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+</form>
+{% endif %}
+
 {% if not bonus_challenges %}
   <div class="alert alert-info">
     Noch keine Bonus-Challenges vorhanden.
