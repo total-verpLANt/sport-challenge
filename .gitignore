@@ -23,6 +23,7 @@ instance/
 .serena/
 
 # Playwright – Screenshots und MCP-Artefakte
+.playwright/
 .playwright-mcp/
 playwright-report/
 test-results/

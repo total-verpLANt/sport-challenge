@@ -50,42 +50,36 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-15, Wachwechsel #14)
+## Aktueller Stand (2026-06-15, Wachwechsel #15)
 
-**Aktive Arbeit:** Keine offene Implementation. Diese Wache wurde der **Epic `0bv` (Multi-Challenge-Eingabe) vollständig abgeschlossen** (alle 3 Kinder + Folgebefund `kkz`) → drei Patch-Releases **v0.18.1/.2/.3**. Damit ist die App durchgängig für parallele Challenges tauglich (Eingabe, Anzeige **und** Bonus). **Live deployt auf `stonbgsport01` und vom Kapitän als funktionierend bestätigt.**
+**Aktive Arbeit:** Keine. **v1.0.0 released**, live deployed auf `stonbgsport01`, vom Kapitän bestätigt.
 
-- **Letzter Epic:** `sport-challenge-0bv` – **geschlossen** (3/3 Kinder)
-- **Lessons Learned:** `docs/lessons-learned.md` (neuer Eintrag: Multi-Entity-Routing – `.first()` ohne ORDER BY/User-Kontext als stiller Multi-Tenant-Bug)
-- **Plan:** `.schrammns_workflow/plans/2026-06-13-multi-challenge-eingabe-0bv1.md`
-- **Version:** 0.18.3 (gepusht auf `origin/main`, Tag `milestone-v0.18.3`). Rein additiv: **kein** `.env`-/Migrations-/Dependency-Eingriff.
+- **Version:** 1.0.0 (Tag `milestone-v1.0.0`, gepusht auf `origin/main`)
+- **270 Tests grün.** CI grün (inkl. Docker-Publish).
+- **Kein** `.env`-/Migrations-/Dependency-Eingriff erforderlich.
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abgeschlossen diese Wache (Epic `0bv`, 9 atomare Commits + 3 Release-Commits):**
-- `0bv.1` → **v0.18.1**: Eingabe-Pfade (`log_submit`/`sick_period_submit`/`import_submit`) ziehen die `challenge_id` jetzt aus einer per `_resolve_participation()` **verifizierten** Teilnahme (IDOR/BOLA geschlossen); Challenge-Select in den Eingabe-Formularen. Security-Review: PASS_WITH_NOTES
-- `0bv.2` → **v0.18.2**: Anzeige-Selektoren – `my_week` + `user_activities` (über alle gemeinsamen Challenges) + Vorauswahl in `log`/`import`. Toter Helfer `_active_participation()` entfernt. Schließt `kkz` (M-1) mit
-- `0bv.3` → **v0.18.3**: Bonus-Bereich – `bonus.index()` richtet sich nach eigenen Challenges (Selektor + Fallback), Admin-`create` ordnet gezielt zu. `add_entry()` war bereits korrekt
-- 263 Tests grün (245 + 18 neue). CI grün. Folgebefund `9fh` (L-1, Härtung) bewusst separat offen (P3)
+**Abgeschlossen diese Wache:**
+- `myv` → **v0.19.0**: Self-Service Account-Löschung im Nutzerprofil (Passwort-Bestätigung, Cascade, Last-Admin-Guard, Challenge-Creator-Guard). 6 neue Tests.
+- `9fh` → Härtung `sick_period_submit`-Update: `period.challenge_id` wird gegen verifizierte Participation geprüft (Defense-in-depth). 1 neuer Test.
+- `7fw` → gestrichen (geschlossene Gruppe, kein Impressum erforderlich).
+- Changelog-Seite rendert Markdown korrekt via `python-markdown`-Bibliothek (`app/routes/misc.py`, `markdown>=3.0` in `requirements.txt`).
+- CI Bandit-Fix: `# nosec B704` für `Markup()` auf statischer Projektdatei (dokumentierter False Positive).
 
-**Multi-Challenge-Bug (Wachwechsel #12/#13 als offen geführt): ERLEDIGT.** Eingabe, Anzeige und Bonus binden nun überall an eine explizit gewählte + verifizierte Challenge. Details siehe `docs/lessons-learned.md` (Multi-Entity-Routing).
+**Bestehender Grenzfall (unverändert):** Aktivität exakt um 00:00 Uhr fällt im `_top3`-Filter beim Frühaufsteher raus – bewusst nicht gefixt (siehe `docs/lessons-learned.md`).
 
-**Bestehender Grenzfall (unverändert):** Aktivität exakt um 00:00 Uhr fällt im `_top3`-Filter beim Frühaufsteher raus – bewusst nicht gefixt (siehe lessons-learned.md).
-
-**Nächste Queue (`bd ready`):**
-- **v1.0-Blocker (P1):** `7fw` (DSGVO: Impressum/Datenschutzerklärung) · `myv` (DSGVO: Self-Service Account-Löschung) – rechtlich relevant vor öffentlichem v1.0-Launch
-- **Hygiene (P3):** `9fh` (Härtung sick_period_submit-Update prüft challenge_id) · `tjs` (404/500-Seiten, Health-Check, Limiter-Backend, robots.txt)
-- **Sonstiges (P3):** KI-Ideen `4t4`/`18t` (nach v1.0)
-
-### Nachricht vom scheidenden Wachoffizier (2026-06-15, #14)
-
-> Multi-Challenge ist durch – Eingabe, Anzeige und Bonus sind sauber an verifizierte Challenges gebunden, live und bestätigt. Das offene Lesemodell „alle sehen alles" bleibt bewusst so (nicht als Lücke missverstehen und zurückbauen). Nächster v1.0-Blocker ist die DSGVO-Pflicht (`7fw`/`myv`) – die würde ich vor einem breiteren Launch nicht hinten anstellen. `9fh` ist nur Defense-in-depth (eigene Daten), nicht dringend.
+**Nächste Queue (`bd ready`) – alle P3, kein Blocker:**
+- `tjs` – Release-Hygiene: 404/500-Fehlerseiten, Health-Check, Limiter-Backend, robots.txt
+- `4t4` – KI: Kalorien aus Screenshot schätzen (kcal-Auswertung)
+- `18t` – KI: Sportart aus Screenshot extrahieren (sport_type-Autofill)
 
 ### Einstieg für neue Sessions
 
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories handover                  # Pointer für diesen Wachwechsel (#14)
+bd memories handover                  # Pointer für diesen Wachwechsel (#15)
 bd ready                              # nächste Issues
 ```
 
