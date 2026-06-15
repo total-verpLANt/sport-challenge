@@ -30,7 +30,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card mb-4">
       <div class="card-header">Passwort ändern</div>
       <div class="card-body">
         <form method="post" action="{{ url_for('settings.change_password') }}" novalidate>
@@ -61,6 +61,29 @@
         </form>
       </div>
     </div>
+
+    <div class="card border-danger mt-4">
+      <div class="card-header bg-danger text-white">Konto löschen</div>
+      <div class="card-body">
+        <p class="text-danger mb-3">
+          <strong>Achtung:</strong> Diese Aktion ist unwiderruflich. Alle deine Daten
+          (Aktivitäten, Teilnahmen, Medien) werden dauerhaft gelöscht.
+        </p>
+        <form method="post" action="{{ url_for('settings.delete_account') }}"
+              id="deleteAccountForm" novalidate>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label for="delete_password" class="form-label">Passwort zur Bestätigung</label>
+            <input type="password" class="form-control" id="delete_password"
+                   name="password" autocomplete="current-password" required>
+          </div>
+          <button type="submit" class="btn btn-danger" id="deleteAccountBtn">
+            Konto endgültig löschen
+          </button>
+        </form>
+      </div>
+    </div>
+
   </div>
 </div>
 {% endblock %}
@@ -79,6 +102,17 @@
     } else {
       input.type = 'password';
       icon.innerHTML = eyeIcon;
+    }
+  });
+
+  document.getElementById('deleteAccountForm').addEventListener('submit', function(e) {
+    var pw = document.getElementById('delete_password').value;
+    if (!pw) {
+      e.preventDefault();
+      return;
+    }
+    if (!confirm('Konto wirklich endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+      e.preventDefault();
     }
   });
 }());
