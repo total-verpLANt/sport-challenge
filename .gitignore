@@ -6,9 +6,12 @@
 
 # Projekt
 .env
+.env.*.local
 logs/
+*.log
 data/uploads/
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 *.egg-info/
@@ -17,7 +20,6 @@ venv/
 garmin_tokens.json
 instance/
 .DS_Store
-.venv/
 
 # Serena MCP – lokale Metadaten, nicht teilbar
 .serena/
