@@ -50,44 +50,42 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-13, Wachwechsel #13)
+## Aktueller Stand (2026-06-15, Wachwechsel #14)
 
-**Aktive Arbeit:** Keine offene Implementation. Diese Wache war eine Reihe Ad-hoc-Verbesserungen (CI-Reparatur, Test-Härtung, Statistik-Verfeinerung) → **v0.18.0**. Es ist **kein** Epic begonnen. Nächster Blocker bleibt **Multi-Challenge-Eingabe** (Epic `0bv`).
+**Aktive Arbeit:** Keine offene Implementation. Diese Wache wurde der **Epic `0bv` (Multi-Challenge-Eingabe) vollständig abgeschlossen** (alle 3 Kinder + Folgebefund `kkz`) → drei Patch-Releases **v0.18.1/.2/.3**. Damit ist die App durchgängig für parallele Challenges tauglich (Eingabe, Anzeige **und** Bonus). **Live deployt auf `stonbgsport01` und vom Kapitän als funktionierend bestätigt.**
 
-- **Nächster Epic (noch nicht begonnen):** `sport-challenge-0bv` – Multi-Challenge-Eingabe, funktionaler v1.0-Blocker
-- **Lessons Learned:** `docs/lessons-learned.md` (2 neue Einträge: Statistik-Metrik-Verdacht, GH-Actions-Annotation-Maskierung)
-- **Plan:** `.schrammns_workflow/plans/2026-06-13-multi-challenge-dashboard.md`
-- **Version:** 0.18.0 (gepusht auf `origin/main`, Tag `milestone-v0.18.0`). Rein additiv: **kein** `.env`-/Migrations-/Dependency-Eingriff.
+- **Letzter Epic:** `sport-challenge-0bv` – **geschlossen** (3/3 Kinder)
+- **Lessons Learned:** `docs/lessons-learned.md` (neuer Eintrag: Multi-Entity-Routing – `.first()` ohne ORDER BY/User-Kontext als stiller Multi-Tenant-Bug)
+- **Plan:** `.schrammns_workflow/plans/2026-06-13-multi-challenge-eingabe-0bv1.md`
+- **Version:** 0.18.3 (gepusht auf `origin/main`, Tag `milestone-v0.18.3`). Rein additiv: **kein** `.env`-/Migrations-/Dependency-Eingriff.
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abgeschlossen diese Wache (5 atomare Commits):**
-- `3oe` – flaky `test_sick_period_update` gehärtet: datumsabhängiges Clamping (Challenge `start=today-1`) ließ den Test ab Donnerstag kippen → CI rot. Setup auf breit gespannte Challenge umgestellt (Commit `f611ecd`)
-- `oz1` – GitHub-Actions auf Node-24-ready angehoben (Node 20 wird 2026-09-16 entfernt): checkout@v5, setup-python@v6, login@v4, setup-buildx@v4, build-push@v7. Annotation-Gegenprobe = 0 Treffer (Commits `f414023`, `2855509`)
-- **Statistik Option B** → v0.17.1: Frühaufsteher = `min(Startzeit)`, Nachteule = `max(Startzeit)` statt Durchschnitt (`avg_start` landete bei gemischten Zeiten irreführend in der Tagesmitte). Kein Zeitzonen-Bug – reine Metrik-Definition (Commit `db43eec`)
-- **Teilnehmer-Übersicht** → v0.18.0: Tabelle „Durchschnittswerte je Teilnehmer" (Ø Start-Uhrzeit + Ø Dauer + Aktivitätszahl) unter den Top-3-Karten in `dashboard/_statistics.html`. Service-Return um `participants` ergänzt, keine zusätzliche Query (Commit `f848443`)
-- 245 Tests (243 + 2 neue Statistik-Tests). CI grün (test + publish).
+**Abgeschlossen diese Wache (Epic `0bv`, 9 atomare Commits + 3 Release-Commits):**
+- `0bv.1` → **v0.18.1**: Eingabe-Pfade (`log_submit`/`sick_period_submit`/`import_submit`) ziehen die `challenge_id` jetzt aus einer per `_resolve_participation()` **verifizierten** Teilnahme (IDOR/BOLA geschlossen); Challenge-Select in den Eingabe-Formularen. Security-Review: PASS_WITH_NOTES
+- `0bv.2` → **v0.18.2**: Anzeige-Selektoren – `my_week` + `user_activities` (über alle gemeinsamen Challenges) + Vorauswahl in `log`/`import`. Toter Helfer `_active_participation()` entfernt. Schließt `kkz` (M-1) mit
+- `0bv.3` → **v0.18.3**: Bonus-Bereich – `bonus.index()` richtet sich nach eigenen Challenges (Selektor + Fallback), Admin-`create` ordnet gezielt zu. `add_entry()` war bereits korrekt
+- 263 Tests grün (245 + 18 neue). CI grün. Folgebefund `9fh` (L-1, Härtung) bewusst separat offen (P3)
 
-**Akzeptierter Grenzfall (Kapitän-Entscheidung):** Aktivität exakt um 00:00 Uhr fällt im `_top3`-Filter beim Frühaufsteher raus – bewusst nicht gefixt (siehe lessons-learned.md).
+**Multi-Challenge-Bug (Wachwechsel #12/#13 als offen geführt): ERLEDIGT.** Eingabe, Anzeige und Bonus binden nun überall an eine explizit gewählte + verifizierte Challenge. Details siehe `docs/lessons-learned.md` (Multi-Entity-Routing).
 
-**Verifiziertes Problem für v1.0 (weiterhin offen, als bd-Tickets gesichert):**
-- Die **Anzeige** ist multi-challenge-fähig, die **Eingabe** nicht. `_active_participation()` (`app/routes/challenge_activities.py:30`) nutzt `.first()` ohne `ORDER BY` → bei zwei parallel aktiven Challenges landen Aktivitäten/Importe/Abwesenheiten in der **falschen** Challenge (stiller Daten-Bug), und die Eingabe-UIs zeigen keine Challenge-Auswahl. → Epic `0bv` + Kinder `0bv.1`/`0bv.2`/`0bv.3`.
+**Bestehender Grenzfall (unverändert):** Aktivität exakt um 00:00 Uhr fällt im `_top3`-Filter beim Frühaufsteher raus – bewusst nicht gefixt (siehe lessons-learned.md).
 
 **Nächste Queue (`bd ready`):**
-- **v1.0-Blocker:** `0bv.1` (Multi-Challenge-Eingabe – dringlichster: stiller Daten-Bug) · `0bv.2`/`0bv.3` (Selektoren) · `7fw` (DSGVO: Impressum/Datenschutz) · `myv` (DSGVO: Self-Service Account-Löschung)
-- **Hygiene (nächste Welle):** `tjs` (404/500-Seiten, Health-Check, Limiter-Backend, robots.txt)
-- **Sonstiges:** KI-Ideen `18t`/`4t4` (nach v1.0, P3)
+- **v1.0-Blocker (P1):** `7fw` (DSGVO: Impressum/Datenschutzerklärung) · `myv` (DSGVO: Self-Service Account-Löschung) – rechtlich relevant vor öffentlichem v1.0-Launch
+- **Hygiene (P3):** `9fh` (Härtung sick_period_submit-Update prüft challenge_id) · `tjs` (404/500-Seiten, Health-Check, Limiter-Backend, robots.txt)
+- **Sonstiges (P3):** KI-Ideen `4t4`/`18t` (nach v1.0)
 
-### Nachricht vom scheidenden Wachoffizier (2026-06-13, #12 – weiterhin gültig)
+### Nachricht vom scheidenden Wachoffizier (2026-06-15, #14)
 
-> Die Anzeige ist multi-challenge-fähig, die Eingabe noch nicht — genau hier liegt der Hund begraben (Epic `0bv`). Bevor zwei Challenges in Prod gehen, MUSS die Eingabe-Welle durch, sonst landen Aktivitäten in der falschen Challenge. Das offene Lesemodell "alle sehen alles" ist bewusst so gewollt — nicht als Sicherheitslücke missverstehen und "zurückbauen".
+> Multi-Challenge ist durch – Eingabe, Anzeige und Bonus sind sauber an verifizierte Challenges gebunden, live und bestätigt. Das offene Lesemodell „alle sehen alles" bleibt bewusst so (nicht als Lücke missverstehen und zurückbauen). Nächster v1.0-Blocker ist die DSGVO-Pflicht (`7fw`/`myv`) – die würde ich vor einem breiteren Launch nicht hinten anstellen. `9fh` ist nur Defense-in-depth (eigene Daten), nicht dringend.
 
 ### Einstieg für neue Sessions
 
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories multi-challenge           # Pointer für diesen Wachwechsel
+bd memories handover                  # Pointer für diesen Wachwechsel (#14)
 bd ready                              # nächste Issues
 ```
 

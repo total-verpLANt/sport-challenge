@@ -369,3 +369,19 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wo sichtbar:** `.github/workflows/docker-publish.yml` – alle 5 Actions jetzt Node-24-ready (checkout@v5, setup-python@v6, login@v4, setup-buildx@v4, build-push@v7).
 
 **Quelle:** Wachwechsel #13, Issue `oz1`, 2026-06-13. Commits `f414023`, `2855509`.
+
+---
+
+## Architektur: Multi-Entity-Routing
+
+### 2026-06-15: `.first()` ohne ORDER BY/User-Kontext als stiller Multi-Challenge-Routing-Bug
+
+**Erkenntnis:** Die App war monatelang „multi-challenge-fähig" in der **Anzeige**, aber nicht in der **Eingabe**. Mehrere Routen bestimmten die Ziel-Challenge über einen Helfer, der `.first()` ohne `ORDER BY` und ohne Bezug zur Nutzer-Auswahl absetzte (`_active_participation()` in `challenge_activities.py`, `_get_active_challenge()` in `bonus.py`). Solange jeder Nutzer nur an **einer** Challenge teilnahm, fiel das nie auf – ab zwei parallel aktiven Challenges landeten Aktivitäten, Importe und Abwesenheiten still in der **falschen** Challenge, und die Bonus-/Anzeige-Seiten zeigten nur eine davon.
+
+**Warum relevant:** Das ist ein klassischer latenter Multi-Tenant-Bug: korrekt bei n=1, falsch ab n=2, ohne Fehlermeldung. Er trat zusätzlich als IDOR-Risiko auf, weil die Schreibpfade die `challenge_id` aus einem impliziten Default statt aus einer **verifizierten** Teilnahme ableiteten. Die Lese-Anzeige zu „können" verleitet zur Annahme, das Feature sei fertig – die Eingabe ist der eigentliche Gradmesser.
+
+**Wie vermeiden:** Bei jedem Feature, das über mehrere gleichartige Entitäten (Challenges, Teams, Mandanten) hinweg arbeitet, früh den Fall n≥2 durchspielen. Ziel-Entität immer aus einer **explizit gewählten + serverseitig verifizierten** Zugehörigkeit ableiten (Muster: `_resolve_participation()` / `_pick_challenge()` prüfen gegen `(user, id, status=accepted)`), nie aus `.first()`. Default nur bei genau einer Zugehörigkeit; bei mehreren ohne gültige Auswahl **keinen** stillen Schreibzugriff. `add_entry()` im Bonus-Bereich war übrigens schon korrekt, weil es die `challenge_id` aus dem geladenen Objekt statt aus dem Default zog – das ist das nachahmenswerte Muster.
+
+**Wo sichtbar:** Epic `0bv` (Kinder `0bv.1`/`0bv.2`/`0bv.3`), `app/routes/challenge_activities.py` (`_resolve_participation`, `_selected_participation`), `app/routes/bonus.py` (`_user_accepted_challenges`, `_pick_challenge`). Tests: `test_log_submit_rejects_foreign_challenge`, `test_my_week_selector_*`, `test_bonus_index_selector_*`.
+
+**Quelle:** Wachwechsel #14, Epic `0bv`, 2026-06-15. Releases v0.18.1/.2/.3.

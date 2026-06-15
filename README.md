@@ -6,7 +6,7 @@ Flask-Webanwendung für Fitness-Challenges mit Leaderboard, Strafberechnung und 
 
 - **Challenge-System:** Admin erstellt Challenges mit Start-/Enddatum, lädt Teilnehmer ein, die individuell 2x oder 3x pro Woche ≥30 Min Sport als Ziel setzen
 - **Leaderboard/Dashboard:** Wochenweise Übersicht aller Teilnehmer mit Farbcodierung (grün/gelb/rot), Abwesenheiten (🚫) und Spendentopf. Das Dashboard zeigt je aktiver Challenge einen Top-5-Block (mit eigenem Spendentopf), beendete Challenges als Abschluss-Karte. Pro Challenge erreichbar über ein Navbar-Dropdown ist das vollständige Leaderboard inkl. **Top-3-Statistiken** (meiste Zeit, meiste Aktivitäten, längste Streak, Frühaufsteher/Nachteule nach **frühester/spätester** Startzeit u. a.) sowie einer **Teilnehmer-Übersicht** mit durchschnittlicher Start-Uhrzeit und Trainingsdauer. Der Social-Feed ist **challenge-übergreifend** (jeder Post mit Challenge-Label, likebar). Lesemodell: jeder eingeloggte Nutzer sieht alle Challenges/Aktivitäten (kein Teilnahme-Gate beim Lesen/Liken)
-- **Aktivitäts-Tracking:** Manuelles Eintragen (mit Foto-/Video-Upload) oder Import aus Garmin/Strava
+- **Aktivitäts-Tracking:** Manuelles Eintragen (mit Foto-/Video-Upload) oder Import aus Garmin/Strava. Bei mehreren parallel aktiven Challenges wählt ein Challenge-Selektor (in Eingabe wie Anzeige) das Ziel – Aktivitäten, Abwesenheiten und Importe landen verlässlich in der gewählten Challenge
 - **Automatische Strafberechnung:** 5 €/verpasster Tag, Admin-Override möglich; Abwesenheit (mit optionalem Grund) reduziert das Wochenziel anteilig (pro 2 Tage −1 Aktivität)
 - **Bonus-Challenges:** Admin-definierte Termine (z.B. 50 Squat Jumps), Zeiterfassung mit Ranking und Video-Beweis
 - **Bailout-Option:** Teilnehmer können aussteigen (+25 € Gebühr), werden im Leaderboard ausgegraut
@@ -115,7 +115,7 @@ SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 .venv/bin/pytest -v
 ```
 
-245 Tests (Auth, Connector, Challenge, Aktivitäten, Penalty, Dashboard, Statistiken, Bonus) – kein externer Service nötig.
+263 Tests (Auth, Connector, Challenge, Aktivitäten, Penalty, Dashboard, Statistiken, Bonus) – kein externer Service nötig.
 
 ---
 
