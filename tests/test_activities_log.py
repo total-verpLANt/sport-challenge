@@ -959,6 +959,46 @@ def test_sick_period_submit_overlap_rejected(client, db):
     assert SickPeriod.query.filter_by(user_id=user.id).count() == 1
 
 
+def test_sick_period_update_wrong_challenge_rejected(client, db):
+    """9fh-Härtung: Update einer SickPeriod aus Challenge A über Formular von
+    Challenge B wird abgelehnt – period.challenge_id wird gegen participation
+    geprüft."""
+    from app.models.sick_period import SickPeriod
+    user = _create_and_login(client, db, email="sp_guard@test.com")
+    ca, _, cb, _ = _create_two_active_challenges(db, user.id)
+
+    # SickPeriod in Challenge A anlegen
+    sp = SickPeriod(
+        user_id=user.id,
+        challenge_id=ca.id,
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=1),
+    )
+    db.session.add(sp)
+    db.session.commit()
+    sp_id = sp.id
+
+    # Update-Versuch über Challenge B → Guard muss blockieren
+    resp = client.post(
+        "/challenge-activities/sick-period",
+        data={
+            "challenge_id": str(cb.id),
+            "sick_period_id": str(sp_id),
+            "sick_from": date.today().isoformat(),
+            "sick_to": (date.today() + timedelta(days=3)).isoformat(),
+        },
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert "nicht gefunden" in resp.get_data(as_text=True)
+
+    # SickPeriod unverändert in Challenge A
+    refreshed = db.session.get(SickPeriod, sp_id)
+    assert refreshed is not None
+    assert refreshed.challenge_id == ca.id
+    assert refreshed.end_date == date.today() + timedelta(days=1)
+
+
 # ---------------------------------------------------------------------------
 # 0bv.2: my_week-Anzeige mit Challenge-Selektor
 # ---------------------------------------------------------------------------

@@ -359,7 +359,7 @@ def sick_period_submit():
 
     if sick_period_id:
         period = db.session.get(SickPeriod, sick_period_id)
-        if period is None or period.user_id != current_user.id:
+        if period is None or period.user_id != current_user.id or period.challenge_id != challenge.id:
             flash("Abwesenheit nicht gefunden.")
             return redirect(url_for("challenge_activities.log_form"))
         period.start_date = clamped_start
