@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.18.1] – 2026-06-15
+
+### Behoben
+- **Multi-Challenge-Eingabe: stiller Daten-Bug + IDOR** (Epic `0bv.1`): Bei zwei parallel aktiven Challenges zog die Eingabe (`log_submit`, `sick_period_submit`, `import_submit`) die Ziel-Challenge aus `_active_participation().first()` (ohne `ORDER BY`) — Aktivitäten, Importe und Abwesenheiten konnten so in der **falschen** Challenge landen. Außerdem wurde die Datums-Validierung gegen die zufällig gewählte statt die tatsächliche Challenge geprüft. Die Schreibpfade leiten die `challenge_id` jetzt ausschließlich aus einer per `_resolve_participation()` gegen `(current_user, challenge_id, status=accepted)` **verifizierten** Teilnahme ab. Damit ist zugleich ein IDOR/BOLA-Pfad geschlossen: Schreibzugriffe auf fremde oder nur „invited“/„bailed_out“ Challenges werden abgewiesen, und bei mehreren Teilnahmen ohne gültige Auswahl erfolgt **kein** stiller Schreibzugriff. Rückwärtskompatibel: bei genau einer akzeptierten Teilnahme greift weiterhin der Default
+
+### Hinzugefügt
+- **Challenge-Auswahl in den Eingabe-Formularen**: `log.html` (beide Tabs), `import.html` und die Abwesenheits-Form zeigen bei mehreren akzeptierten Teilnahmen ein Challenge-Select; bei genau einer Teilnahme bleibt das Feld implizit (kein UI-Regress)
+
 ## [0.18.0] – 2026-06-13
 
 ### Hinzugefügt
