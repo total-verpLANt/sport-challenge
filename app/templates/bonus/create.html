@@ -2,7 +2,7 @@
 {% block content %}
 <h2>Neue Bonus-Challenge erstellen</h2>
 
-{% if active_challenge %}
+{% if active_challenge and not (challenges and challenges|length > 1) %}
 <p class="text-muted">Challenge: <strong>{{ active_challenge.name }}</strong></p>
 {% endif %}
 
@@ -10,6 +10,18 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <div class="row g-3">
+    {% if challenges and challenges|length > 1 %}
+    <div class="col-12">
+      <label for="challenge_id" class="form-label">Challenge</label>
+      <select name="challenge_id" id="challenge_id" class="form-select" required>
+        {% for c in challenges %}
+          <option value="{{ c.id }}" {% if active_challenge and c.id == active_challenge.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% elif active_challenge %}
+    <input type="hidden" name="challenge_id" value="{{ active_challenge.id }}">
+    {% endif %}
     <div class="col-12">
       <label for="description" class="form-label">Beschreibung</label>
       <input type="text" class="form-control" id="description" name="description"

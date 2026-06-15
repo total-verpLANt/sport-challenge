@@ -27,6 +27,13 @@ def _get_active_challenge():
     ).scalars().first()
 
 
+def _all_challenges():
+    """Alle Challenges, deterministisch sortiert (Admin-Kontext fuer create)."""
+    return list(db.session.scalars(
+        db.select(Challenge).order_by(Challenge.start_date.desc(), Challenge.id.desc())
+    ).all())
+
+
 def _user_is_accepted_participant(challenge_id: int) -> bool:
     """Check if the current user has accepted participation in the given challenge."""
     participation = db.session.execute(
@@ -165,20 +172,39 @@ def index():
 @bonus_bp.route("/create")
 @admin_required
 def create():
-    active_challenge = _get_active_challenge()
-    if not active_challenge:
+    challenges = _all_challenges()
+    if not challenges:
         flash("Es gibt noch keine aktive Challenge. Bitte zuerst eine Challenge erstellen.")
         return redirect(url_for("bonus.index"))
-    return render_template("bonus/create.html", active_challenge=active_challenge)
+    active_challenge = _pick_challenge(challenges)
+    return render_template(
+        "bonus/create.html",
+        active_challenge=active_challenge,
+        challenges=challenges,
+    )
 
 
 @bonus_bp.route("/create", methods=["POST"])
 @admin_required
 def create_post():
-    active_challenge = _get_active_challenge()
-    if not active_challenge:
+    challenges = _all_challenges()
+    if not challenges:
         flash("Es gibt noch keine aktive Challenge.")
         return redirect(url_for("bonus.index"))
+
+    # Ziel-Challenge aus Form (verifiziert), Default = neueste
+    active_challenge = challenges[0]
+    raw_cid = request.form.get("challenge_id")
+    if raw_cid:
+        try:
+            cid = int(raw_cid)
+        except (TypeError, ValueError):
+            cid = None
+        if cid is not None:
+            for c in challenges:
+                if c.id == cid:
+                    active_challenge = c
+                    break
 
     description = request.form.get("description", "").strip()
     date_strings = [s.strip() for s in request.form.getlist("scheduled_date") if s.strip()]
@@ -202,6 +228,7 @@ def create_post():
         return render_template(
             "bonus/create.html",
             active_challenge=active_challenge,
+            challenges=challenges,
             form_data=request.form,
         )
 

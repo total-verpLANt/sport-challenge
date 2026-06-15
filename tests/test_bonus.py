@@ -336,3 +336,33 @@ def test_bonus_index_invalid_challenge_id_falls_back(client, db):
     assert "bonus_bbb_planks" in resp.get_data(as_text=True)
     resp = client.get("/bonus/?challenge_id=abc")
     assert resp.status_code == 200
+
+
+def test_admin_create_bonus_for_selected_challenge(client, db):
+    """Admin legt Bonus-Challenge gezielt fuer die AELTERE (nicht-neueste)
+    parallele Challenge an – challenge_id aus dem Form wird respektiert."""
+    admin = _create_and_login(client, db, email="admin_sel@test.com", is_admin=True)
+    today = date.today()
+    ca = Challenge(name="Sel A", start_date=today - timedelta(days=7),
+                   end_date=today + timedelta(days=30), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=admin.id)
+    cb = Challenge(name="Sel B", start_date=today - timedelta(days=3),
+                   end_date=today + timedelta(days=20), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=admin.id)
+    db.session.add_all([ca, cb])
+    db.session.commit()
+
+    d1 = today + timedelta(days=5)
+    resp = client.post("/bonus/create", data=MultiDict([
+        ("challenge_id", str(ca.id)),  # gezielt aeltere Challenge
+        ("description", "Gezielt fuer A"),
+        ("scheduled_date", d1.isoformat()),
+    ]), follow_redirects=False)
+    assert resp.status_code == 302
+
+    bc = db.session.execute(
+        db.select(BonusChallenge).where(BonusChallenge.description == "Gezielt fuer A")
+    ).scalar_one_or_none()
+    assert bc is not None
+    assert bc.challenge_id == ca.id
+    assert bc.challenge_id != cb.id
