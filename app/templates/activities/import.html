@@ -43,7 +43,8 @@
     <label for="challenge_id_import" class="form-label">Challenge</label>
     <select name="challenge_id" id="challenge_id_import" class="form-select" required>
       {% for p in participations %}
-        <option value="{{ p.challenge_id }}">{{ p.challenge.name }}</option>
+        <option value="{{ p.challenge_id }}"
+                {% if participation and p.challenge_id == participation.challenge_id %}selected{% endif %}>{{ p.challenge.name }}</option>
       {% endfor %}
     </select>
   </div>

@@ -1,4 +1,5 @@
 """Integration tests for the Garmin import flow."""
+import re
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -370,3 +371,35 @@ def test_import_submit_handles_connector_error(client, db):
         db.select(Activity).where(Activity.user_id == user.id)
     ).scalars().all()
     assert len(count) == 0
+
+
+def test_import_form_preselects_challenge_from_query(client, db):
+    """import_form GET belegt das Challenge-Select aus ?challenge_id vor (0bv.2)."""
+    user = _create_and_login(client, db, email="import_pre@test.com")
+    today = date.today()
+    ca = Challenge(name="Pre A", start_date=today - timedelta(days=14),
+                   end_date=today + timedelta(days=30), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=user.id)
+    cb = Challenge(name="Pre B", start_date=today - timedelta(days=10),
+                   end_date=today + timedelta(days=20), penalty_per_miss=5.0,
+                   bailout_fee=25.0, created_by_id=user.id)
+    db.session.add_all([ca, cb])
+    db.session.commit()
+    db.session.add_all([
+        ChallengeParticipation(user_id=user.id, challenge_id=ca.id, status="accepted"),
+        ChallengeParticipation(user_id=user.id, challenge_id=cb.id, status="accepted"),
+    ])
+    db.session.commit()
+    _add_connector(db, user.id)
+
+    with (
+        patch("app.connectors.garmin.GarminConnector.connect", return_value=None),
+        patch("app.connectors.garmin.GarminConnector.get_activities", return_value=MOCK_ACTIVITIES),
+        patch("app.connectors.garmin.GarminConnector.get_token_updates", return_value={}),
+    ):
+        resp = client.get(f"/challenge-activities/import?challenge_id={cb.id}")
+
+    assert resp.status_code == 200
+    compact = re.sub(r"\s+", " ", resp.get_data(as_text=True))
+    assert f'value="{cb.id}" selected>' in compact
+    assert f'value="{ca.id}" selected>' not in compact

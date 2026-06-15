@@ -1,4 +1,5 @@
 """Integration tests for challenge activity logging routes."""
+import re
 from datetime import date, timedelta
 from io import BytesIO
 
@@ -1022,3 +1023,14 @@ def test_my_week_single_challenge_no_selector(client, db):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'id="challenge_select"' not in body
+
+
+def test_log_form_preselects_challenge_from_query(client, db):
+    """log_form belegt das Challenge-Select aus ?challenge_id vor."""
+    user = _create_and_login(client, db, email="logpre@test.com")
+    ca, _, cb, _ = _create_two_active_challenges(db, user.id)
+    resp = client.get(f"/challenge-activities/log?challenge_id={cb.id}")
+    assert resp.status_code == 200
+    compact = re.sub(r"\s+", " ", resp.get_data(as_text=True))
+    assert f'value="{cb.id}" selected>' in compact
+    assert f'value="{ca.id}" selected>' not in compact

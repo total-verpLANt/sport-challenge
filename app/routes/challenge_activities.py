@@ -27,23 +27,6 @@ def _get_week_bounds(offset: int = 0) -> tuple[date, date]:
     return monday, sunday
 
 
-def _active_participation():
-    """Default-Teilnahme (deterministisch). Rückwärtskompat für Single-Challenge-Fall."""
-    return (
-        db.session.execute(
-            db.select(ChallengeParticipation)
-            .join(Challenge)
-            .where(
-                ChallengeParticipation.user_id == current_user.id,
-                ChallengeParticipation.status == "accepted",
-            )
-            .order_by(Challenge.start_date.desc(), ChallengeParticipation.id.desc())
-        )
-        .scalars()
-        .first()
-    )
-
-
 def _accepted_participations():
     """Alle akzeptierten Teilnahmen des Nutzers, deterministisch sortiert."""
     return list(
@@ -106,11 +89,11 @@ def _selected_participation(participations):
 @challenge_activities_bp.route("/log", methods=["GET"])
 @login_required
 def log_form():
-    participation = _active_participation()
+    participations = _accepted_participations()
+    participation = _selected_participation(participations)
     if participation is None:
         flash("Du nimmst aktuell an keiner Challenge teil.")
         return redirect(url_for("challenges.index"))
-    participations = _accepted_participations()
     today = date.today().isoformat()
     return render_template(
         "activities/log.html",
@@ -409,7 +392,8 @@ def sick_period_submit():
 @challenge_activities_bp.route("/import", methods=["GET"])
 @login_required
 def import_form():
-    participation = _active_participation()
+    participations = _accepted_participations()
+    participation = _selected_participation(participations)
     if participation is None:
         flash("Du nimmst aktuell an keiner Challenge teil.")
         return redirect(url_for("challenges.index"))
@@ -483,8 +467,6 @@ def import_form():
                 "Import-Vorschau fehlgeschlagen provider=%s user=%s", provider_type, current_user.id
             )
             error = "Aktivitäten konnten nicht geladen werden. Bitte versuche es später erneut."
-
-    participations = _accepted_participations()
 
     return render_template(
         "activities/import.html",
