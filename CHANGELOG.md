@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] – 2026-06-15
+
+### Geändert
+- **Log-Rotation komprimiert Archive** (`8ag`): Der `RotatingFileHandler` archiviert rotierte Logdateien jetzt als gzip (`access.log.1.gz` …) statt sie unkomprimiert vorzuhalten und beim Überlauf zu verwerfen. `backupCount` von 5 auf 10 erhöht (gzip spart ~90 %, mehr Historie bei geringerem Platzbedarf). Warnhinweis im Code ergänzt: bei `GUNICORN_WORKERS > 1` ist auf `concurrent-log-handler` umzustellen.
+
 ## [1.0.0] – 2026-06-15
 
 ### Hinzugefügt

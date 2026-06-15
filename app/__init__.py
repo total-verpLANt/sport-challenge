@@ -1,4 +1,6 @@
+import gzip
 import logging
+import shutil
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -11,6 +13,20 @@ from config import Config
 
 _LOG_FORMAT = "%(asctime)s %(levelname)-5s %(name)s %(message)s"
 _LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def _gzip_rotator(source, dest):
+    """Rotiert eine volle Logdatei: komprimiert <source> nach <dest> (gzip)
+    und entfernt das unkomprimierte Original. So bleiben rotierte Logs als
+    Archiv erhalten, statt unkomprimiert verworfen zu werden."""
+    with open(source, "rb") as f_in, gzip.open(dest, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+    Path(source).unlink()
+
+
+def _gzip_namer(name):
+    """Hängt .gz an den Namen der rotierten Datei (z.B. access.log.1.gz)."""
+    return name + ".gz"
 
 
 def create_app(config_class=Config):
@@ -32,12 +48,18 @@ def create_app(config_class=Config):
 
     log_dir = Path(app.root_path).parent / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
+    # WARNUNG: RotatingFileHandler ist nur fuer EINEN schreibenden Prozess sicher.
+    # Bei GUNICORN_WORKERS > 1 muss auf concurrent-log-handler (Datei-Locking)
+    # umgestellt werden, sonst drohen korrupte/verlorene Logzeilen bei Rotation.
     file_handler = RotatingFileHandler(
         log_dir / "access.log",
         maxBytes=10 * 1024 * 1024,
-        backupCount=5,
+        backupCount=10,
         encoding="utf-8",
     )
+    # Rotierte Logs gzip-archivieren statt unkomprimiert zu verwerfen.
+    file_handler.rotator = _gzip_rotator
+    file_handler.namer = _gzip_namer
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATE_FORMAT))
     app.logger.addHandler(file_handler)
