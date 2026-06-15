@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [0.18.2] – 2026-06-15
+
+### Behoben
+- **Multi-Challenge-Anzeige: getrennte Sicht je Challenge** (Epic `0bv.2`): Die Anzeige-Routen `my_week` und `user_activities` hingen an `_active_participation().first()` und zeigten bei zwei parallel aktiven Challenges nur **eine** davon – Aktivitäten und Abwesenheiten der anderen „verschwanden" optisch. Beide Routen bestimmen die anzuzeigende Challenge jetzt über einen Selektor (`?challenge_id`, Default = erste, deterministisch); manipulierte/fremde Werte fallen sauber auf den Default zurück. `user_activities` berücksichtigt **alle** gemeinsamen Challenges von Betrachter und Ziel-Person (Sichtbarkeit bleibt auf gemeinsame Challenges beschränkt). Die Abwesenheits-Formulare in `my_week` binden nun an die gewählte Challenge (schließt `kkz`/M-1)
+
+### Hinzugefügt
+- **Challenge-Selektor (Dropdown) in der Anzeige**: `my_week.html` und `user_activities.html` zeigen bei mehreren (gemeinsamen) Challenges ein Auswahl-Dropdown; bei genau einer Teilnahme bleibt es ausgeblendet (kein UX-Regress). Die Eingabe-Formulare `log.html`/`import.html` belegen ihr Challenge-Select aus `?challenge_id` vor, sodass der Wechsel-Kontext aus „Meine Woche" erhalten bleibt
+
 ## [0.18.1] – 2026-06-15
 
 ### Behoben
