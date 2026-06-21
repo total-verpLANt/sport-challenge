@@ -219,6 +219,41 @@ def test_most_liked_and_time_of_day(app, db):
         assert "Early" in most_liked[0]["name"]
 
 
+def test_likes_given_counts_own_and_foreign(app, db):
+    """Meiste Likes verteilt: zählt vergebene Likes, eigene wie fremde."""
+    with app.app_context():
+        admin = _user(db, "lg_admin@test.com")
+        challenge, start = _challenge(db, admin)
+        alice = _user(db, "lg_alice@test.com", "Alice")
+        bob = _user(db, "lg_bob@test.com", "Bob")
+        for u in (alice, bob):
+            db.session.add(
+                ChallengeParticipation(
+                    user_id=u.id, challenge_id=challenge.id,
+                    status="accepted", weekly_goal=3,
+                )
+            )
+        db.session.commit()
+
+        a_alice = _activity(db, alice, challenge, start, 30, "running")
+        a_bob = _activity(db, bob, challenge, start, 30, "cycling")
+
+        # Alice verteilt 2 Likes (eigene + fremde Aktivität), Bob 1 (fremde).
+        db.session.add_all([
+            ActivityLike(activity_id=a_bob.id, user_id=alice.id),
+            ActivityLike(activity_id=a_alice.id, user_id=alice.id),
+            ActivityLike(activity_id=a_alice.id, user_id=bob.id),
+        ])
+        db.session.commit()
+
+        result = get_challenge_statistics(challenge)
+        likes_given = _stat(result, "likes_given")["top"]
+        assert likes_given[0]["name"] == "Alice"
+        assert likes_given[0]["value"] == 2 and likes_given[0]["rank"] == 0
+        assert likes_given[1]["name"] == "Bob"
+        assert likes_given[1]["value"] == 1 and likes_given[1]["rank"] == 1
+
+
 def test_early_bird_night_owl_use_min_max_not_average(app, db):
     """Option B: Frühaufsteher = früheste, Nachteule = späteste Aktivität.
 
@@ -307,7 +342,7 @@ def test_empty_challenge_no_crash(app, db):
         admin = _user(db, "empty_admin@test.com")
         challenge, _ = _challenge(db, admin)
         result = get_challenge_statistics(challenge)
-        assert len(result["stats"]) == 9
+        assert len(result["stats"]) == 10
         for s in result["stats"]:
             assert s["top"] == []
 

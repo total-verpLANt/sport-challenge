@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] – 2026-06-21
+
+### Hinzugefügt
+- **Leaderboard-Statistik „Meiste Likes verteilt“** (`gbx`): Neue Karte, die pro Teilnehmer die Anzahl der im Social-Feed *vergebenen* Likes zählt – eigene wie fremde Aktivitäten. Nutzt dieselbe Tie-Medaillen-Logik und „mehr“-Liste wie die übrigen Statistiken. Die bestehende Like-Query wurde auf rohe Zeilen umgestellt und aggregiert „Likes pro Aktivität“ und „Likes pro Verteiler“ gemeinsam in-memory – ohne zusätzlichen DB-Roundtrip (N+1-Guard unverändert).
+
 ## [1.1.0] – 2026-06-21
 
 ### Geändert

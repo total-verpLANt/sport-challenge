@@ -211,7 +211,8 @@ def get_challenge_statistics(challenge: Challenge) -> dict:
     days_by_user: dict[int, set] = defaultdict(set)
 
     activity_rows = []
-    like_counts: dict[int, int] = {}
+    like_counts: dict[int, int] = defaultdict(int)
+    likes_given: dict[int, int] = defaultdict(int)
     fulfilled_set: set[tuple[int, date]] = set()
     sick_by_user: dict[int, list] = defaultdict(list)
 
@@ -244,16 +245,20 @@ def get_challenge_statistics(challenge: Challenge) -> dict:
                     row.started_at.hour * 60 + row.started_at.minute
                 )
 
-        # 3. Like-Counts pro Aktivität – eine Query
+        # 3. Likes der Challenge – eine Query (rohe Zeilen), zwei Aggregationen:
+        #    like_counts (pro Aktivität, für "Beliebteste Aktivität") und
+        #    likes_given (pro Liker, für "Meiste Likes verteilt"). Das spart
+        #    gegenüber zwei GROUP-BY-Queries einen DB-Roundtrip.
         activity_ids = [row.id for row in activity_rows]
         if activity_ids:
-            like_counts = dict(
-                db.session.execute(
-                    db.select(ActivityLike.activity_id, func.count(ActivityLike.id))
-                    .where(ActivityLike.activity_id.in_(activity_ids))
-                    .group_by(ActivityLike.activity_id)
-                ).all()
-            )
+            like_rows = db.session.execute(
+                db.select(ActivityLike.activity_id, ActivityLike.user_id).where(
+                    ActivityLike.activity_id.in_(activity_ids)
+                )
+            ).all()
+            for aid, liker_id in like_rows:
+                like_counts[aid] += 1
+                likes_given[liker_id] += 1
 
         # 4. Erfüllte Tage (≥30 min) – GROUP BY/HAVING, eine Query
         fulfilled_rows = db.session.execute(
@@ -367,6 +372,14 @@ def get_challenge_statistics(challenge: Challenge) -> dict:
             "title": "Beliebteste Aktivität",
             "icon": "❤️",
             "top": top_liked,
+        },
+        {
+            "key": "likes_given",
+            "title": "Meiste Likes verteilt",
+            "icon": "👍",
+            "top": _ranking(
+                likes_given, user_by_id, lambda v: f"{v} ❤️", participant_ids
+            ),
         },
         {
             "key": "early_bird",
