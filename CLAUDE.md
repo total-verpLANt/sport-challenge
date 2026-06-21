@@ -50,24 +50,23 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-15, Wachwechsel #15)
+## Aktueller Stand (2026-06-21, Wachwechsel #16)
 
-**Aktive Arbeit:** Keine. **v1.0.0 released**, live deployed auf `stonbgsport01`, vom Kapitän bestätigt.
+**Aktive Arbeit:** Keine. **v1.2.0**, gepusht auf `origin/main`.
 
-- **Version:** 1.0.0 (Tag `milestone-v1.0.0`, gepusht auf `origin/main`)
-- **270 Tests grün.** CI grün (inkl. Docker-Publish).
-- **Kein** `.env`-/Migrations-/Dependency-Eingriff erforderlich.
+- **Version:** 1.2.0 (gepusht auf `origin/main`; letzter milestone-Tag: `milestone-v1.2.0` auf `8b24f34`)
+- **277 Tests grün.**
+- **Kein** `.env`-/Migrations-/Dependency-Eingriff erforderlich (rein additiv).
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
 **Abgeschlossen diese Wache:**
-- `myv` → **v0.19.0**: Self-Service Account-Löschung im Nutzerprofil (Passwort-Bestätigung, Cascade, Last-Admin-Guard, Challenge-Creator-Guard). 6 neue Tests.
-- `9fh` → Härtung `sick_period_submit`-Update: `period.challenge_id` wird gegen verifizierte Participation geprüft (Defense-in-depth). 1 neuer Test.
-- `7fw` → gestrichen (geschlossene Gruppe, kein Impressum erforderlich).
-- Changelog-Seite rendert Markdown korrekt via `python-markdown`-Bibliothek (`app/routes/misc.py`, `markdown>=3.0` in `requirements.txt`).
-- CI Bandit-Fix: `# nosec B704` für `Markup()` auf statischer Projektdatei (dokumentierter False Positive).
+- `stc` → **v1.1.0**: Leaderboard-Statistiken vergeben Medaillen fair bei Gleichstand (Dense-Ranking). Gleiche Werte teilen sich Gold/Silber/Bronze; eine Lücke nach einem Tie überspringt die nächste Medaille (z. B. 2× Gold, 1× Silber, kein Bronze). 5 Plätze sichtbar + native `<details>`-„mehr"-Liste mit **allen** Teilnehmern (ranglose als „–"). `_top3` → `_assign_medal_ranks` + `_ranking` in `app/services/statistics.py`; Template `app/templates/dashboard/_statistics.html`. 3 neue Tests.
+- `gbx` → **v1.2.0**: Neue Statistik „Meiste Likes verteilt" (vergebene Likes je Teilnehmer, eigene wie fremde). Die Like-Query lädt jetzt Roh-Zeilen und aggregiert `like_counts` (pro Aktivität) **und** `likes_given` (pro Verteiler) in einem Roundtrip → **kein** zusätzlicher DB-Query (N+1-Guard unverändert). 1 neuer Test.
 
-**Bestehender Grenzfall (unverändert):** Aktivität exakt um 00:00 Uhr fällt im `_top3`-Filter beim Frühaufsteher raus – bewusst nicht gefixt (siehe `docs/lessons-learned.md`).
+**Bestehender Grenzfall (unverändert):** Aktivität exakt um 00:00 Uhr fällt im `_ranking`-Filter (`if v`) beim Frühaufsteher raus – bewusst nicht gefixt (siehe `docs/lessons-learned.md`). Hinweis: Die Funktion hieß früher `_top3`.
+
+**Deploy-Hinweis:** Live war zuletzt **v1.0.0** auf `stonbgsport01` – **v1.1.0/v1.2.0 sind noch nicht deployed**. Beide rein additiv (UI/Statistik), daher Prod-Update ohne Migration/`.env`-Änderung: `git pull && docker compose pull && docker compose up -d`.
 
 **Nächste Queue (`bd ready`) – alle P3, kein Blocker:**
 - `tjs` – Release-Hygiene: 404/500-Fehlerseiten, Health-Check, Limiter-Backend, robots.txt
@@ -79,7 +78,7 @@ bd close <id>         # Complete work
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories handover                  # Pointer für diesen Wachwechsel (#15)
+bd memories handover                  # Pointer für diesen Wachwechsel (#16)
 bd ready                              # nächste Issues
 ```
 
