@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] – 2026-06-21
+
+### Hinzugefügt
+- **Notification-Glocke in der Navbar** (`wsco`): 🔔-Symbol oben rechts mit rotem Zähler-Badge für ungelesene Benachrichtigungen. Dropdown listet die letzten 8 (neueste zuerst); ungelesene sind hervorgehoben (Fettschrift + Punkt + `bg-primary-subtle`). Klick auf einen Eintrag markiert genau diesen als gelesen (Badge −1) und leitet zum Ziel weiter (serverseitiger Redirect über `/notifications/<id>/go`, mit Open-Redirect-Guard: nur interne Pfade). Pro Eintrag ein **✕** zum Löschen, darunter **„Alle löschen"** – beide via CSRF-geschützte POST-Endpoints, Badge aktualisiert live. Nachrichten bleiben in der Liste, bis aktiv gelöscht (gelesen ≠ gelöscht). Ungelesen-Zähler + Liste kommen aus einem Context-Processor (zwei schlanke, indexierte Queries, kein N+1). IDOR-Schutz: alle Lese-/Löschoperationen filtern auf die eigene `user_id`. Browser-Check (Login, Dropdown, Einzel-/Alle-Löschen) bestätigt. UI-Gerüst steht; füllt sich, sobald die Auslöser (`bqf5`/`vj7q`/`kfzb`/`ngk0`) gebaut sind.
+
 ## [1.4.1] – 2026-06-21
 
 ### Behoben
