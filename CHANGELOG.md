@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] – 2026-06-21
+
+### Hinzugefügt
+- **Notification-Fundament** (`gau4`): Datenmodell `Notification` (Empfänger, Typ, gerenderter Text, internes Ziel-Link, `read_at`-basierte Ungelesen-Logik) samt Service-Layer (`create_notification`, `unread_count`, `list_for_user`, `mark_read`). Basis für Navbar-Glocke und die einzelnen Notification-Auslöser (Registrierung, Einladung, Challenge-Lifecycle, Likes). Sicherheits-Invarianten: `message` wird im Template auto-escaped (kein XSS), `link_url` stets serverseitig per `url_for()` (kein `javascript:`-Vektor), `mark_read` filtert immer auf `user_id` (kein IDOR). 8 neue Tests. **⚠️ Erfordert Migration beim Deploy** (`flask db upgrade`, neue Tabelle `notifications`) – rein additiv/non-destruktiv.
+
 ## [1.3.1] – 2026-06-21
 
 ### Sicherheit
