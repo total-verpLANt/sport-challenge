@@ -29,9 +29,20 @@ class Config:
     # PUBLIC_BASE_URL: kanonische Basis für Mail-/OAuth-URLs, z. B. https://sport.example.com
     PUBLIC_BASE_URL: str | None = os.environ.get("PUBLIC_BASE_URL") or None
     # TRUSTED_HOSTS: komma-getrennte Allowlist; Flask weist fremde Host-Header mit 400 ab.
-    TRUSTED_HOSTS: list[str] | None = [
+    # `localhost`/`127.0.0.1` werden automatisch ergänzt, damit der container-interne
+    # Docker-Healthcheck (curl auf localhost → /health) nicht am Host-Gate scheitert.
+    # Diese Hosts sind nur container-intern erreichbar; externe Requests laufen über
+    # Cloudflare mit echtem Host. Der Schutz externer Links läuft ohnehin über
+    # PUBLIC_BASE_URL. Nur aktiv, wenn TRUSTED_HOSTS gesetzt ist (None = keine
+    # Validierung, lokale Dev unberührt).
+    _trusted_hosts_env = [
         h.strip() for h in os.environ.get("TRUSTED_HOSTS", "").split(",") if h.strip()
-    ] or None
+    ]
+    TRUSTED_HOSTS: list[str] | None = (
+        list(dict.fromkeys(_trusted_hosts_env + ["localhost", "127.0.0.1"]))
+        if _trusted_hosts_env
+        else None
+    )
     # ProxyFix darf X-Forwarded-Host nur vertrauen, wenn die Proxy-Kette ihn garantiert setzt.
     PROXY_X_HOST: int = int(os.environ.get("PROXY_X_HOST", "0"))
 

@@ -7,6 +7,18 @@ from markupsafe import Markup
 misc_bp = Blueprint("misc", __name__)
 
 
+@misc_bp.route("/health")
+def health():
+    """Leichtgewichtige Liveness-Probe für den Docker-Healthcheck.
+
+    Bewusst ohne DB-Zugriff, Login oder Rate-Limit: prüft nur, ob der
+    Prozess Requests beantwortet. Der container-interne Healthcheck spricht
+    diesen Endpoint über `localhost` an – dafür sind `localhost`/`127.0.0.1`
+    in der TRUSTED_HOSTS-Allowlist freigeschaltet (siehe config.py).
+    """
+    return "ok", 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
 @misc_bp.route("/changelog")
 def changelog():
     changelog_path = Path(__file__).parent.parent.parent / "CHANGELOG.md"

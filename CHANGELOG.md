@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.4.1] – 2026-06-21
+
+### Behoben
+- **Docker-Healthcheck wieder grün** (`tjs`, Teil): Der Healthcheck pingte `/` und scheiterte am `TRUSTED_HOSTS`-Gate (Host `localhost` → HTTP 400 → Container `unhealthy`), seit der Host-Header-Härtung (`haf`) + Flask 3.1. Neuer leichtgewichtiger `/health`-Endpoint (200 „ok", ohne DB/Login/Rate-Limit) als echte Liveness-Probe; Docker-Healthcheck darauf umgestellt. `config.py` ergänzt `localhost`/`127.0.0.1` automatisch in der `TRUSTED_HOSTS`-Allowlist (nur wenn gesetzt), damit der container-interne Check das Host-Gate passiert – Sicherheits-Impact minimal (Hosts nur container-intern erreichbar, externe Links weiterhin via `PUBLIC_BASE_URL` geschützt). Funktional war die App durchgehend erreichbar; betroffen war nur das Health-Status-Label. 4 neue Tests.
+
 ## [1.4.0] – 2026-06-21
 
 ### Hinzugefügt
