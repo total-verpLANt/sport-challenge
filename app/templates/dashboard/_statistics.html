@@ -1,4 +1,16 @@
-{# Statistik-Karten (Top-3 je Kategorie). Erwartet `stats` = {"stats": [...]}. #}
+{# Statistik-Karten (Ranglisten je Kategorie). Erwartet `stats` = {"stats": [...]}.
+   Medaille richtet sich nach `entry.rank` (0/1/2 = Gold/Silber/Bronze, Ties
+   teilen sich den Rang; None = keine Medaille). Initial 5 Plätze sichtbar,
+   der Rest klappt über <details> auf. #}
+{% macro stat_row(entry, last) -%}
+<li class="d-flex justify-content-between align-items-center {% if not last %}mb-1{% endif %}">
+  <span class="text-truncate me-2">
+    {%- if entry.rank is not none %}{{ ["🥇", "🥈", "🥉"][entry.rank] }} {% endif -%}
+    {{ entry.name }}
+  </span>
+  <span class="badge text-bg-light border">{{ entry.display }}</span>
+</li>
+{%- endmacro %}
 {% if stats and stats.stats %}
 <h4 class="mb-3">Statistiken</h4>
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 mb-4">
@@ -11,15 +23,20 @@
         </h6>
         {% if stat.top %}
         <ol class="list-unstyled mb-0">
-          {% for entry in stat.top %}
-          <li class="d-flex justify-content-between align-items-center {% if not loop.last %}mb-1{% endif %}">
-            <span class="text-truncate me-2">
-              {{ ["🥇", "🥈", "🥉"][loop.index0] }} {{ entry.name }}
-            </span>
-            <span class="badge text-bg-light border">{{ entry.display }}</span>
-          </li>
+          {% for entry in stat.top[:5] %}
+          {{ stat_row(entry, loop.last and stat.top | length <= 5) }}
           {% endfor %}
         </ol>
+        {% if stat.top | length > 5 %}
+        <details class="mt-2">
+          <summary class="small text-muted" style="cursor: pointer;">mehr</summary>
+          <ol class="list-unstyled mb-0 mt-2">
+            {% for entry in stat.top[5:] %}
+            {{ stat_row(entry, loop.last) }}
+            {% endfor %}
+          </ol>
+        </details>
+        {% endif %}
         {% else %}
         <p class="text-muted small mb-0">Noch keine Daten</p>
         {% endif %}

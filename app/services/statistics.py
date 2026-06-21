@@ -1,4 +1,4 @@
-"""Challenge-Statistiken: Top-3-Ranglisten pro Challenge.
+"""Challenge-Statistiken: Ranglisten pro Challenge.
 
 Alle Daten werden in wenigen Bulk-Queries geladen und im Speicher aggregiert
 (kein N+1), analog zum Vorbild ``weekly_summary.get_challenge_summary``.
@@ -101,27 +101,83 @@ def _longest_day_streak(dates: set) -> int:
     return longest
 
 
-def _top3(value_by_uid: dict, user_by_id: dict, fmt, reverse: bool = True) -> list:
-    """Top-3-Rangliste aus {uid: value}; leere/Null-Werte werden ignoriert."""
-    items = [(uid, v) for uid, v in value_by_uid.items() if v]
-    items.sort(key=lambda t: t[1], reverse=reverse)
-    return [
+def _assign_medal_ranks(entries: list) -> list:
+    """Weist absteigend (nach ``value``) sortierten Einträgen Medaillen-Ränge zu.
+
+    Dense-Ranking: gleiche Werte teilen sich denselben ``rank`` (0/1/2 =
+    Gold/Silber/Bronze). Ab dem vierten distinkten Wert ist ``rank`` None
+    (keine Medaille). Mutiert die übergebenen Dicts in place und gibt die
+    Liste zurück.
+    """
+    rank = -1
+    last_value = object()  # Sentinel: garantiert ungleich jedem echten Wert
+    for entry in entries:
+        if entry["value"] != last_value:
+            rank += 1
+            last_value = entry["value"]
+        entry["rank"] = rank if rank <= 2 else None
+    return entries
+
+
+def _ranking(
+    value_by_uid: dict,
+    user_by_id: dict,
+    fmt,
+    participant_ids: list,
+    reverse: bool = True,
+) -> list:
+    """Vollständige Rangliste aller Teilnehmer inkl. Medaillen-Rang.
+
+    Teilnehmer mit echtem Wert werden absteigend (bzw. bei ``reverse=False``
+    aufsteigend) sortiert und per Dense-Ranking mit ``rank`` versehen.
+    Teilnehmer ohne echten Wert (leer/Null) erscheinen ohne Rang (``"–"``)
+    am Ende, alphabetisch nach Anzeigename.
+    """
+    ranked = [
+        (uid, value_by_uid[uid])
+        for uid in participant_ids
+        if uid in user_by_id and value_by_uid.get(uid)
+    ]
+    ranked.sort(key=lambda t: t[1], reverse=reverse)
+    entries = _assign_medal_ranks(
+        [
+            {
+                "name": user_by_id[uid].display_name,
+                "value": v,
+                "display": fmt(v),
+            }
+            for uid, v in ranked
+        ]
+    )
+    rest = sorted(
+        (
+            uid
+            for uid in participant_ids
+            if uid in user_by_id and not value_by_uid.get(uid)
+        ),
+        key=lambda uid: user_by_id[uid].display_name.lower(),
+    )
+    entries.extend(
         {
             "name": user_by_id[uid].display_name,
-            "value": v,
-            "display": fmt(v),
+            "value": 0,
+            "display": "–",
+            "rank": None,
         }
-        for uid, v in items[:3]
-        if uid in user_by_id
-    ]
+        for uid in rest
+    )
+    return entries
 
 
 def get_challenge_statistics(challenge: Challenge) -> dict:
-    """Aggregiert Top-3-Statistiken einer Challenge.
+    """Aggregiert die Ranglisten-Statistiken einer Challenge.
 
     Returns:
         {"stats": [{"key", "title", "icon", "top": [{"name", "value",
-        "display"}, ...]}, ...]}
+        "display", "rank"}, ...]}, ...]}
+
+    ``rank`` ist 0/1/2 (Gold/Silber/Bronze, Gleichstände teilen sich den Rang)
+    oder None ab dem vierten distinkten Wert.
 
     Performance: konstante Anzahl Bulk-Queries (Teilnehmer, Aktivitäten,
     Like-Counts, erfüllte Tage, Krankheitszeiträume) + reine In-Memory-Aggregation.
@@ -248,8 +304,10 @@ def get_challenge_statistics(challenge: Challenge) -> dict:
         key=lambda t: t[1],
         reverse=True,
     )
+    # Beliebteste Aktivität ist aktivitäts- (nicht teilnehmer-)basiert: keine
+    # Vollliste, aber dieselbe Tie-Medaillen-Logik. Auf 5 Plätze begrenzt.
     top_liked = []
-    for aid, count in liked[:3]:
+    for aid, count in liked:
         row = by_id.get(aid)
         if row is None or row.user_id not in user_by_id:
             continue
@@ -263,37 +321,46 @@ def get_challenge_statistics(challenge: Challenge) -> dict:
                 "display": f"{count} ❤️",
             }
         )
+    top_liked = _assign_medal_ranks(top_liked)[:5]
 
     stats = [
         {
             "key": "most_time",
             "title": "Meiste Zeit aktiv",
             "icon": "⏱️",
-            "top": _top3(total_minutes, user_by_id, _fmt_duration),
+            "top": _ranking(total_minutes, user_by_id, _fmt_duration, participant_ids),
         },
         {
             "key": "most_activities",
             "title": "Meiste Aktivitäten",
             "icon": "🔥",
-            "top": _top3(activity_count, user_by_id, lambda v: f"{v}×"),
+            "top": _ranking(
+                activity_count, user_by_id, lambda v: f"{v}×", participant_ids
+            ),
         },
         {
             "key": "week_streak",
             "title": "Durchgezogen (Wochen)",
             "icon": "📅",
-            "top": _top3(week_streak, user_by_id, lambda v: f"{v} Wochen"),
+            "top": _ranking(
+                week_streak, user_by_id, lambda v: f"{v} Wochen", participant_ids
+            ),
         },
         {
             "key": "day_streak",
             "title": "Längste Serie (Tage)",
             "icon": "🔗",
-            "top": _top3(day_streak, user_by_id, lambda v: f"{v} Tage"),
+            "top": _ranking(
+                day_streak, user_by_id, lambda v: f"{v} Tage", participant_ids
+            ),
         },
         {
             "key": "diversity",
             "title": "Vielseitigster Sportler",
             "icon": "🤸",
-            "top": _top3(diversity, user_by_id, lambda v: f"{v} Sportarten"),
+            "top": _ranking(
+                diversity, user_by_id, lambda v: f"{v} Sportarten", participant_ids
+            ),
         },
         {
             "key": "most_liked",
@@ -305,19 +372,23 @@ def get_challenge_statistics(challenge: Challenge) -> dict:
             "key": "early_bird",
             "title": "Frühaufsteher",
             "icon": "🌅",
-            "top": _top3(earliest_start, user_by_id, _fmt_time, reverse=False),
+            "top": _ranking(
+                earliest_start, user_by_id, _fmt_time, participant_ids, reverse=False
+            ),
         },
         {
             "key": "night_owl",
             "title": "Nachteule",
             "icon": "🌙",
-            "top": _top3(latest_start, user_by_id, _fmt_time, reverse=True),
+            "top": _ranking(
+                latest_start, user_by_id, _fmt_time, participant_ids, reverse=True
+            ),
         },
         {
             "key": "longest_session",
             "title": "Längste Einzel-Session",
             "icon": "🏔️",
-            "top": _top3(max_session, user_by_id, _fmt_duration),
+            "top": _ranking(max_session, user_by_id, _fmt_duration, participant_ids),
         },
     ]
 

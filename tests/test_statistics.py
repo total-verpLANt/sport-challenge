@@ -1,9 +1,10 @@
-"""Tests for the challenge statistics service (Top-3 rankings).
+"""Tests for the challenge statistics service (full rankings with medals).
 
 Covers each statistic's ranking, the two streak variants (week-based bridging
-sick periods, strict day-based), edge cases (no activities, NULL started_at,
-ties) and a query-count guard against N+1 regressions — mirroring the approach
-of test_weekly_summary.
+sick periods, strict day-based), the dense medal ranking (ties share a medal,
+gaps skip lower medals, all participants listed), edge cases (no activities,
+NULL started_at) and a query-count guard against N+1 regressions — mirroring
+the approach of test_weekly_summary.
 """
 from datetime import date, datetime, timedelta
 
@@ -312,7 +313,11 @@ def test_empty_challenge_no_crash(app, db):
 
 
 def test_null_started_at_ignored(app, db):
-    """Activities without started_at must not appear in early/night rankings."""
+    """Without started_at a participant earns no early/night medal.
+
+    Seit der Vollliste erscheint der Teilnehmer zwar (alle Teilnehmer werden
+    gelistet), aber ohne Medaillen-Rang und mit Platzhalter "–".
+    """
     with app.app_context():
         admin = _user(db, "null_admin@test.com")
         challenge, start = _challenge(db, admin)
@@ -327,10 +332,98 @@ def test_null_started_at_ignored(app, db):
         _activity(db, u, challenge, start, 30, started_at=None)
 
         result = get_challenge_statistics(challenge)
-        assert _stat(result, "early_bird")["top"] == []
-        assert _stat(result, "night_owl")["top"] == []
-        # but time/count still ranked
-        assert _stat(result, "most_time")["top"][0]["name"] == "NoTime"
+        early = _stat(result, "early_bird")["top"]
+        night = _stat(result, "night_owl")["top"]
+        # Teilnehmer ist gelistet, aber ohne Medaille und mit Platzhalter.
+        assert len(early) == 1 and early[0]["rank"] is None
+        assert early[0]["display"] == "–"
+        assert len(night) == 1 and night[0]["rank"] is None
+        # but time/count still ranked (with a medal)
+        most_time = _stat(result, "most_time")["top"]
+        assert most_time[0]["name"] == "NoTime" and most_time[0]["rank"] == 0
+
+
+def test_ties_share_same_medal(app, db):
+    """Gleichauf liegende Teilnehmer erhalten dieselbe Medaille (Dense-Rank)."""
+    with app.app_context():
+        admin = _user(db, "tie_admin@test.com")
+        challenge, start = _challenge(db, admin)
+        users = [_user(db, f"tie{i}@test.com", f"Tie{i}") for i in range(3)]
+        for u in users:
+            db.session.add(
+                ChallengeParticipation(
+                    user_id=u.id, challenge_id=challenge.id,
+                    status="accepted", weekly_goal=3,
+                )
+            )
+        db.session.commit()
+        # Alle drei: je 4 aufeinanderfolgende Tage erfüllt → day_streak 4
+        for u in users:
+            for off in range(4):
+                _activity(db, u, challenge, start + timedelta(days=off), 30)
+
+        result = get_challenge_statistics(challenge)
+        day_streak = _stat(result, "day_streak")["top"]
+        assert len(day_streak) == 3
+        assert all(e["value"] == 4 for e in day_streak)
+        # Alle drei gleichauf → alle Gold (rank 0), niemand Silber/Bronze.
+        assert all(e["rank"] == 0 for e in day_streak)
+
+
+def test_gap_after_tie_skips_lower_medal(app, db):
+    """Zwei gleichauf (Gold), einer darunter (Silber) → niemand Bronze."""
+    with app.app_context():
+        admin = _user(db, "gap_admin@test.com")
+        challenge, start = _challenge(db, admin)
+        a = _user(db, "gap_a@test.com", "GapA")
+        b = _user(db, "gap_b@test.com", "GapB")
+        c = _user(db, "gap_c@test.com", "GapC")
+        for u in (a, b, c):
+            db.session.add(
+                ChallengeParticipation(
+                    user_id=u.id, challenge_id=challenge.id,
+                    status="accepted", weekly_goal=3,
+                )
+            )
+        db.session.commit()
+        # A und B je 3 Aktivitäten (Gold-Tie), C nur 1 (Silber).
+        for u in (a, b):
+            for off in range(3):
+                _activity(db, u, challenge, start + timedelta(days=off), 30)
+        _activity(db, c, challenge, start, 30)
+
+        result = get_challenge_statistics(challenge)
+        most_act = _stat(result, "most_activities")["top"]
+        ranks = sorted(e["rank"] for e in most_act)
+        # 2× Gold (0), 1× Silber (1), kein Bronze (2).
+        assert ranks == [0, 0, 1]
+        assert 2 not in ranks
+
+
+def test_ranking_lists_all_participants_without_value(app, db):
+    """Teilnehmer ohne Wert erscheinen ohne Rang am Ende mit Platzhalter."""
+    with app.app_context():
+        admin = _user(db, "all_admin@test.com")
+        challenge, start = _challenge(db, admin)
+        active = _user(db, "all_active@test.com", "Aktiv")
+        idle = _user(db, "all_idle@test.com", "Ohne")
+        for u in (active, idle):
+            db.session.add(
+                ChallengeParticipation(
+                    user_id=u.id, challenge_id=challenge.id,
+                    status="accepted", weekly_goal=3,
+                )
+            )
+        db.session.commit()
+        _activity(db, active, challenge, start, 30)
+
+        result = get_challenge_statistics(challenge)
+        most_time = _stat(result, "most_time")["top"]
+        # Beide Teilnehmer gelistet, der Untätige am Ende ohne Medaille.
+        assert [e["name"] for e in most_time] == ["Aktiv", "Ohne"]
+        assert most_time[0]["rank"] == 0
+        assert most_time[1]["rank"] is None
+        assert most_time[1]["display"] == "–"
 
 
 def test_invited_only_excluded(app, db):

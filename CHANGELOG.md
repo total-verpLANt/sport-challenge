@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] – 2026-06-21
+
+### Geändert
+- **Leaderboard-Statistiken: faire Medaillen bei Gleichstand** (`stc`): Gleichauf liegende Teilnehmer erhalten jetzt dieselbe Medaille (Dense-Ranking). Die drei höchsten *distinkten* Werte ergeben Gold/Silber/Bronze – mehrere Teilnehmer mit demselben Wert teilen sich den Rang (z. B. 3× Gold). Liegen zwei gleichauf und der nächste darunter, folgt der nächsthöhere Wert direkt auf die nächste Medaille (z. B. 2× Gold, 1× Silber, kein Bronze). Pro Statistik sind nun 5 Plätze sichtbar; eine aufklappbare „mehr“-Liste zeigt **alle** Teilnehmer (auch ohne Wert, als „–“ ohne Medaille). „Beliebteste Aktivität“ nutzt dieselbe Tie-Logik (aktivitätsbasiert, daher ohne Vollliste).
+
 ## [1.0.1] – 2026-06-15
 
 ### Geändert
