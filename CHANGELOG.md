@@ -1,405 +1,367 @@
 # Changelog
 
-Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
-Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
-Versionierung nach [Semantic Versioning](https://semver.org/).
+Hier siehst du, was sich in jeder Version der App geändert hat.
 
 ## [1.6.0] – 2026-06-21
 
-### Hinzugefügt
-- **Notification bei Challenge-Einladung** (`vj7q`): Wird ein Nutzer zu einer Challenge eingeladen, erhält er eine Benachrichtigung „Du wurdest zur Challenge ‚<Name>' eingeladen" mit Link zum Dashboard (wo seit `7y6` die Einladungs-Karte steht). Greift an beiden Einlade-Wegen: beim Anlegen der Challenge (`create_post` mit `invite_users`) und bei nachträglicher Einladung (`invite`-Route). Erster aktiver Auslöser, der die Navbar-Glocke (`wsco`) füllt. Notification fügt sich in die bestehende Transaktion ein (kein zusätzlicher Roundtrip); `message` wird auto-escaped (kein XSS), `link_url` per `url_for()`. 2 neue Tests.
+### Neu
+- Wirst du zu einer Challenge eingeladen, bekommst du jetzt eine Benachrichtigung über die Glocke oben rechts – ein Klick bringt dich direkt zur Einladung.
 
 ## [1.5.0] – 2026-06-21
 
-### Hinzugefügt
-- **Notification-Glocke in der Navbar** (`wsco`): 🔔-Symbol oben rechts mit rotem Zähler-Badge für ungelesene Benachrichtigungen. Dropdown listet die letzten 8 (neueste zuerst); ungelesene sind hervorgehoben (Fettschrift + Punkt + `bg-primary-subtle`). Klick auf einen Eintrag markiert genau diesen als gelesen (Badge −1) und leitet zum Ziel weiter (serverseitiger Redirect über `/notifications/<id>/go`, mit Open-Redirect-Guard: nur interne Pfade). Pro Eintrag ein **✕** zum Löschen, darunter **„Alle löschen"** – beide via CSRF-geschützte POST-Endpoints, Badge aktualisiert live. Nachrichten bleiben in der Liste, bis aktiv gelöscht (gelesen ≠ gelöscht). Ungelesen-Zähler + Liste kommen aus einem Context-Processor (zwei schlanke, indexierte Queries, kein N+1). IDOR-Schutz: alle Lese-/Löschoperationen filtern auf die eigene `user_id`. Browser-Check (Login, Dropdown, Einzel-/Alle-Löschen) bestätigt. UI-Gerüst steht; füllt sich, sobald die Auslöser (`bqf5`/`vj7q`/`kfzb`/`ngk0`) gebaut sind.
+### Neu
+- Neue Benachrichtigungs-Glocke oben rechts in der Navigationsleiste: Ein roter Badge zeigt dir, wie viele ungelesene Meldungen du hast. Im Dropdown erscheinen deine letzten Benachrichtigungen – ungelesene sind fett hervorgehoben. Du kannst einzelne Einträge per ✕ löschen oder alle auf einmal entfernen. Klickst du auf einen Eintrag, wirst du direkt zum passenden Bereich weitergeleitet und der Eintrag wird als gelesen markiert.
 
 ## [1.4.1] – 2026-06-21
 
 ### Behoben
-- **Docker-Healthcheck wieder grün** (`tjs`, Teil): Der Healthcheck pingte `/` und scheiterte am `TRUSTED_HOSTS`-Gate (Host `localhost` → HTTP 400 → Container `unhealthy`), seit der Host-Header-Härtung (`haf`) + Flask 3.1. Neuer leichtgewichtiger `/health`-Endpoint (200 „ok", ohne DB/Login/Rate-Limit) als echte Liveness-Probe; Docker-Healthcheck darauf umgestellt. `config.py` ergänzt `localhost`/`127.0.0.1` automatisch in der `TRUSTED_HOSTS`-Allowlist (nur wenn gesetzt), damit der container-interne Check das Host-Gate passiert – Sicherheits-Impact minimal (Hosts nur container-intern erreichbar, externe Links weiterhin via `PUBLIC_BASE_URL` geschützt). Funktional war die App durchgehend erreichbar; betroffen war nur das Health-Status-Label. 4 neue Tests.
+- Der Gesundheitsstatus des Servers wurde intern fälschlicherweise als „nicht erreichbar" angezeigt, obwohl die App durchgehend funktionierte. Das ist jetzt korrigiert.
 
 ## [1.4.0] – 2026-06-21
 
-### Hinzugefügt
-- **Notification-Fundament** (`gau4`): Datenmodell `Notification` (Empfänger, Typ, gerenderter Text, internes Ziel-Link, `read_at`-basierte Ungelesen-Logik) samt Service-Layer (`create_notification`, `unread_count`, `list_for_user`, `mark_read`). Basis für Navbar-Glocke und die einzelnen Notification-Auslöser (Registrierung, Einladung, Challenge-Lifecycle, Likes). Sicherheits-Invarianten: `message` wird im Template auto-escaped (kein XSS), `link_url` stets serverseitig per `url_for()` (kein `javascript:`-Vektor), `mark_read` filtert immer auf `user_id` (kein IDOR). 8 neue Tests. **⚠️ Erfordert Migration beim Deploy** (`flask db upgrade`, neue Tabelle `notifications`) – rein additiv/non-destruktiv.
+### Neu
+- Grundlage für das Benachrichtigungssystem gelegt: Die App kann jetzt Meldungen für dich speichern (z. B. Einladungen, Challenge-Ereignisse, Likes). Diese erscheinen demnächst in der Benachrichtigungs-Glocke.
 
 ## [1.3.1] – 2026-06-21
 
 ### Sicherheit
-- **`cryptography` 46.0.7 → 48.0.1**: Schließt **GHSA-537c-gmf6-5ccf** (High, CVSS 7.5) – Out-of-bounds-Read im statisch gelinkten OpenSSL der `cryptography`-Wheels (DoS, ohne Authentifizierung). Die CI-Pipeline („Docker Publish") schlug seit dem 21.06. am `pip-audit`-Gate fehl, da die CVE nach dem letzten grünen Lauf veröffentlicht wurde – ohne Code-Änderung. `cryptography` ist Basis der Fernet-Verschlüsselung der Connector-Tokens; volle Testsuite nach dem Bump grün (279 Tests).
+- Sicherheits-Aktualisierung einer Verschlüsselungs-Komponente, um eine bekannte Schwachstelle zu schließen.
 
 ## [1.3.0] – 2026-06-21
 
-### Hinzugefügt
-- **Challenge-Einladung prominent im Dashboard** (`7y6`): Offene Einladungen (Teilnahme-Status `invited`) werden jetzt ganz oben im Dashboard – noch vor den Leaderboard-Karten – als Einladungs-Karte mit Wochenziel-Auswahl sowie Annehmen-/Ablehnen-Buttons angezeigt, statt nur versteckt unter dem Reiter „Challenges“. Die Karte ist Plural-fähig (mehrere gleichzeitige Einladungen) und verschwindet automatisch nach Annahme/Ablehnung. Rein additiv, keine Migration. 2 neue Tests.
+### Neu
+- Offene Challenge-Einladungen erscheinen jetzt direkt und gut sichtbar ganz oben im Dashboard – mit Wochenziel-Auswahl und Annehmen-/Ablehnen-Buttons. Du musst nicht mehr erst unter „Challenges" suchen. Bei mehreren Einladungen werden alle angezeigt; abgearbeitete Einladungen verschwinden automatisch.
 
 ## [1.2.0] – 2026-06-21
 
-### Hinzugefügt
-- **Leaderboard-Statistik „Meiste Likes verteilt“** (`gbx`): Neue Karte, die pro Teilnehmer die Anzahl der im Social-Feed *vergebenen* Likes zählt – eigene wie fremde Aktivitäten. Nutzt dieselbe Tie-Medaillen-Logik und „mehr“-Liste wie die übrigen Statistiken. Die bestehende Like-Query wurde auf rohe Zeilen umgestellt und aggregiert „Likes pro Aktivität“ und „Likes pro Verteiler“ gemeinsam in-memory – ohne zusätzlichen DB-Roundtrip (N+1-Guard unverändert).
+### Neu
+- Neue Statistik-Karte im Leaderboard: „Meiste Likes verteilt" – du siehst jetzt, wer am großzügigsten Likes an andere (und sich selbst) vergeben hat.
 
 ## [1.1.0] – 2026-06-21
 
-### Geändert
-- **Leaderboard-Statistiken: faire Medaillen bei Gleichstand** (`stc`): Gleichauf liegende Teilnehmer erhalten jetzt dieselbe Medaille (Dense-Ranking). Die drei höchsten *distinkten* Werte ergeben Gold/Silber/Bronze – mehrere Teilnehmer mit demselben Wert teilen sich den Rang (z. B. 3× Gold). Liegen zwei gleichauf und der nächste darunter, folgt der nächsthöhere Wert direkt auf die nächste Medaille (z. B. 2× Gold, 1× Silber, kein Bronze). Pro Statistik sind nun 5 Plätze sichtbar; eine aufklappbare „mehr“-Liste zeigt **alle** Teilnehmer (auch ohne Wert, als „–“ ohne Medaille). „Beliebteste Aktivität“ nutzt dieselbe Tie-Logik (aktivitätsbasiert, daher ohne Vollliste).
+### Verbessert
+- Medaillen im Leaderboard werden jetzt fair verteilt: Wer punktgleich ist, bekommt dieselbe Medaille (z. B. 3× Gold). Es werden jetzt 5 Plätze angezeigt; über eine aufklappbare Liste kannst du alle Teilnehmer sehen – auch die ohne Wert.
 
 ## [1.0.1] – 2026-06-15
 
-### Geändert
-- **Log-Rotation komprimiert Archive** (`8ag`): Der `RotatingFileHandler` archiviert rotierte Logdateien jetzt als gzip (`access.log.1.gz` …) statt sie unkomprimiert vorzuhalten und beim Überlauf zu verwerfen. `backupCount` von 5 auf 10 erhöht (gzip spart ~90 %, mehr Historie bei geringerem Platzbedarf). Warnhinweis im Code ergänzt: bei `GUNICORN_WORKERS > 1` ist auf `concurrent-log-handler` umzustellen.
+### Verbessert
+- Interne Verbesserungen und Wartungsarbeiten (Protokolldateien werden jetzt platzsparender archiviert).
 
 ## [1.0.0] – 2026-06-15
 
-### Hinzugefügt
-- **v1.0-Release**: Alle Blocker abgearbeitet. App ist bereit für den produktiven Einsatz in geschlossenen Gruppen.
+### Neu
+- Offizielles v1.0-Release: Die App ist bereit für den produktiven Einsatz in geschlossenen Gruppen.
 
 ### Behoben
-- **Härtung `sick_period_submit`** (`9fh`): Update-Pfad prüft jetzt auch `challenge_id` der SickPeriod gegen die verifizierte Participation (Defense-in-depth, konsistent mit IDOR-Modell aus 0bv.1).
+- Interne Sicherheitsverbesserung beim Bearbeiten von Abwesenheitsmeldungen.
 
 ## [0.19.0] – 2026-06-15
 
-### Hinzugefügt
-- **DSGVO: Self-Service Account-Löschung** (`myv`): Eingeloggte User können ihr eigenes Konto im Profil mit Passwort-Bestätigung endgültig löschen. Alle abhängigen Daten (Aktivitäten, Medien, Challenge-Teilnahmen, Bonus-Einträge, Penalties, Krankperioden) werden cascade-gelöscht. Last-Admin- und Challenge-Creator-Guard verhindern destruktive Sonderfälle.
+### Neu
+- Du kannst dein Konto jetzt selbst löschen: Im Profil findest du eine Konto-Löschung mit Passwort-Bestätigung. Alle deine Daten (Aktivitäten, Medien, Teilnahmen usw.) werden dabei vollständig entfernt.
 
 ## [0.18.3] – 2026-06-15
 
 ### Behoben
-- **Multi-Challenge-Bonus: richtige Challenge in Anzeige und Anlage** (Epic `0bv.3`, schließt Epic `0bv` ab): `bonus.index()` zeigte über `_get_active_challenge()` nur die *global neueste* Challenge – bei mehreren parallelen Challenges sah ein Teilnehmer die Bonus-Challenges der anderen nicht (bzw. eine, an der er gar nicht teilnimmt). Die Bonus-Übersicht richtet sich jetzt nach den **eigenen akzeptierten Challenges** (Selektor, Default = erste, deterministisch); Nicht-Teilnehmer behalten als Fallback die Lese-Sicht auf die neueste Challenge. Die Admin-Anlage (`create`) band neue Bonus-Challenges fix an die neueste Challenge – jetzt wählt der Admin die Ziel-Challenge explizit (verifiziert), sodass auch ältere parallele Challenges bestückt werden können. `add_entry()` war bereits korrekt (Challenge stammt aus der Bonus-Challenge selbst)
+- Bonus-Challenges zeigten bei mehreren gleichzeitig laufenden Challenges manchmal die falsche Challenge an. Das ist jetzt korrigiert – du siehst nur die Bonus-Challenges, an deren Challenge du auch teilnimmst.
+- Admins können beim Erstellen einer Bonus-Challenge nun die Ziel-Challenge gezielt auswählen.
 
-### Hinzugefügt
-- **Challenge-Selektor (Dropdown) im Bonus-Bereich**: `bonus/index.html` (eigene Challenges) und `bonus/create.html` (alle Challenges, Admin) zeigen bei mehreren Challenges ein Auswahl-Dropdown; bei genau einer bleibt es ausgeblendet (kein UX-Regress)
+### Neu
+- Bei mehreren aktiven Challenges gibt es in der Bonus-Übersicht jetzt ein Auswahl-Dropdown, um zwischen den Challenges zu wechseln. Bei nur einer Challenge bleibt die Ansicht wie gewohnt.
 
 ## [0.18.2] – 2026-06-15
 
 ### Behoben
-- **Multi-Challenge-Anzeige: getrennte Sicht je Challenge** (Epic `0bv.2`): Die Anzeige-Routen `my_week` und `user_activities` hingen an `_active_participation().first()` und zeigten bei zwei parallel aktiven Challenges nur **eine** davon – Aktivitäten und Abwesenheiten der anderen „verschwanden" optisch. Beide Routen bestimmen die anzuzeigende Challenge jetzt über einen Selektor (`?challenge_id`, Default = erste, deterministisch); manipulierte/fremde Werte fallen sauber auf den Default zurück. `user_activities` berücksichtigt **alle** gemeinsamen Challenges von Betrachter und Ziel-Person (Sichtbarkeit bleibt auf gemeinsame Challenges beschränkt). Die Abwesenheits-Formulare in `my_week` binden nun an die gewählte Challenge (schließt `kkz`/M-1)
+- „Meine Woche" und die Aktivitäten-Ansicht zeigten bei mehreren gleichzeitig aktiven Challenges manchmal nur eine davon an. Aktivitäten der anderen „verschwanden" optisch. Das ist jetzt behoben.
 
-### Hinzugefügt
-- **Challenge-Selektor (Dropdown) in der Anzeige**: `my_week.html` und `user_activities.html` zeigen bei mehreren (gemeinsamen) Challenges ein Auswahl-Dropdown; bei genau einer Teilnahme bleibt es ausgeblendet (kein UX-Regress). Die Eingabe-Formulare `log.html`/`import.html` belegen ihr Challenge-Select aus `?challenge_id` vor, sodass der Wechsel-Kontext aus „Meine Woche" erhalten bleibt
+### Neu
+- Bei mehreren aktiven Challenges erscheint in „Meine Woche" und der Aktivitäten-Ansicht ein Dropdown, mit dem du zwischen den Challenges wechseln kannst. Bei nur einer Teilnahme bleibt die Ansicht unverändert.
 
 ## [0.18.1] – 2026-06-15
 
 ### Behoben
-- **Multi-Challenge-Eingabe: stiller Daten-Bug + IDOR** (Epic `0bv.1`): Bei zwei parallel aktiven Challenges zog die Eingabe (`log_submit`, `sick_period_submit`, `import_submit`) die Ziel-Challenge aus `_active_participation().first()` (ohne `ORDER BY`) — Aktivitäten, Importe und Abwesenheiten konnten so in der **falschen** Challenge landen. Außerdem wurde die Datums-Validierung gegen die zufällig gewählte statt die tatsächliche Challenge geprüft. Die Schreibpfade leiten die `challenge_id` jetzt ausschließlich aus einer per `_resolve_participation()` gegen `(current_user, challenge_id, status=accepted)` **verifizierten** Teilnahme ab. Damit ist zugleich ein IDOR/BOLA-Pfad geschlossen: Schreibzugriffe auf fremde oder nur „invited“/„bailed_out“ Challenges werden abgewiesen, und bei mehreren Teilnahmen ohne gültige Auswahl erfolgt **kein** stiller Schreibzugriff. Rückwärtskompatibel: bei genau einer akzeptierten Teilnahme greift weiterhin der Default
+- Bei mehreren gleichzeitig aktiven Challenges konnten eingetragene Aktivitäten, Importe und Abwesenheiten versehentlich in der falschen Challenge landen. Das ist jetzt behoben – die App merkt sich, für welche Challenge du gerade etwas einträgst, und schreibt es korrekt zu.
 
-### Hinzugefügt
-- **Challenge-Auswahl in den Eingabe-Formularen**: `log.html` (beide Tabs), `import.html` und die Abwesenheits-Form zeigen bei mehreren akzeptierten Teilnahmen ein Challenge-Select; bei genau einer Teilnahme bleibt das Feld implizit (kein UI-Regress)
+### Neu
+- Beim Eintragen einer Aktivität oder Abwesenheit siehst du bei mehreren Teilnahmen jetzt ein Challenge-Auswahlfeld, um sicherzugehen, dass alles in der richtigen Challenge landet.
 
 ## [0.18.0] – 2026-06-13
 
-### Hinzugefügt
-- **Teilnehmer-Übersicht mit Durchschnittswerten** auf der Challenge-Statistik-Seite: Neue Tabelle „Durchschnittswerte je Teilnehmer" unter den Top-3-Karten listet **alle** akzeptierten Teilnehmer (auch ohne Aktivität) mit ihrer **Ø Start-Uhrzeit**, **Ø Trainingsdauer** und der Anzahl Aktivitäten. Fehlende Werte erscheinen als „–". Rein additiv aus den bereits geladenen Aggregaten abgeleitet – keine zusätzliche DB-Query
+### Neu
+- Neue Tabelle auf der Challenge-Statistik-Seite: „Durchschnittswerte je Teilnehmer" zeigt für alle Teilnehmer die durchschnittliche Startzeit, die durchschnittliche Trainingsdauer und die Anzahl der Aktivitäten. Wer noch keine Aktivität hat, erscheint mit „–".
 
 ## [0.17.1] – 2026-06-13
 
-### Geändert
-- **Frühaufsteher/Nachteule auf früheste/späteste Startzeit umgestellt** (Option B): Beide Ranglisten basierten auf der **durchschnittlichen** Startzeit pro Teilnehmer. Bei gemischten Trainingszeiten (z. B. früh + spät) landete der Schnitt irreführend in der Tagesmitte – ein Sportler mit echten 06:00-Einheiten erschien als „Frühaufsteher" erst gegen 10:00. „Frühaufsteher" wertet jetzt die **früheste** je erreichte Startzeit (`min`), „Nachteule" die **späteste** (`max`). Keine DB-/Query-Änderung, rein additive In-Memory-Ableitung aus den bereits geladenen Startzeiten
+### Verbessert
+- „Frühaufsteher" und „Nachteule" im Leaderboard schauen jetzt auf die früheste bzw. späteste Trainingszeit überhaupt – nicht mehr auf den Durchschnitt. Wer wirklich früh trainiert, wird jetzt auch korrekt als Frühaufsteher erkannt.
 
 ## [0.17.0] – 2026-06-13
 
-### Hinzugefügt
-- **Statistiken pro Challenge** (Issue `dqn`): Neuer Service `app/services/statistics.py` berechnet neun Top-3-Ranglisten je Challenge – meiste Zeit aktiv, meiste Aktivitäten, längste Wochen-Streak (eine Krankheit/Abwesenheit **bricht** die Serie), längste Tages-Streak, vielseitigster Sportler, beliebteste Aktivität (Likes), Frühaufsteher, Nachteule, längste Einzel-Session. Strikt Bulk-Load (kein N+1, per Query-Count-Wächter abgesichert). Anzeige als Karten-Grid unter dem Leaderboard (`dashboard/_statistics.html`)
-- **Leaderboard pro Challenge** (`/dashboard/leaderboard/<public_id>`): Jedes Leaderboard ist über ein neues **Navbar-Dropdown** (Context-Processor `inject_nav_challenges`) erreichbar, das alle Challenges listet
-- **Globaler News-Feed**: Der Dashboard-Feed zeigt jetzt Aktivitäten und Abwesenheiten **aller** Challenges (auch fremder), jeweils mit verlinktem Challenge-Badge
-- **Mehrere Top-5-Blöcke**: Bei mehreren gleichzeitig aktiven Challenges erhält jede einen eigenen Top-5-Block und Spendentopf; beendete Challenges erscheinen als kompakte Abschluss-Karte (finale Spendensumme + Leaderboard-Link)
+### Neu
+- Neue Statistik-Seite pro Challenge mit neun Ranglisten: meiste Trainingszeit, meiste Aktivitäten, längste Wochen-Streak, längste Tages-Streak, vielseitigster Sportler, beliebteste Aktivität, Frühaufsteher, Nachteule und längste Einzelsession.
+- Jedes Leaderboard ist jetzt über ein Dropdown in der Navigationsleiste direkt erreichbar.
+- Der Dashboard-Feed zeigt Aktivitäten und Abwesenheiten aus allen Challenges, jeweils mit einem Challenge-Badge.
+- Bei mehreren gleichzeitig aktiven Challenges hat jede einen eigenen Top-5-Block und Spendentopf. Beendete Challenges erscheinen als kompakte Abschluss-Karte.
 
-### Geändert
-- **Offenes Lesemodell „alle sehen alles"**: Jeder eingeloggte Nutzer kann jedes Leaderboard, jede Aktivität und jeden Feed-Eintrag sehen – auch ohne Teilnahme an der Challenge. Das Like-Gate (vormals nur Teilnehmer) wurde entfernt; `login_required` und `is_approved` bleiben überall Pflicht (kein anonymer Zugriff)
+### Verbessert
+- Alle eingeloggten Nutzer können jetzt jedes Leaderboard und jeden Feed-Eintrag sehen – auch ohne selbst an der jeweiligen Challenge teilzunehmen.
 
 ## [0.16.7] – 2026-06-08
 
-### Geändert
-- **Dashboard-Leaderboard entlastet** (Issue `5gh`): `get_challenge_summary` löste die Strafberechnung bisher über pro-Zelle-Queries (~`Teilnehmer × Wochen × 7` SQL-Abfragen je Dashboard-Aufruf). Die benötigten Daten werden jetzt über drei Bulk-Queries (erfüllte Tage via `GROUP BY`, Krankheitszeiträume, Strafüberschreibungen) vorgeladen und rein im Speicher verrechnet; die Teilnehmer-User werden via `joinedload` eager geladen. Der Query-Aufwand ist dadurch **konstant** (≈3–4 Abfragen, unabhängig von Teilnehmer- und Wochenzahl) statt quadratisch zu wachsen. **Verhalten unverändert** – die berechneten Zellen- und Gesamtstrafen sind byte-genau identisch (durch Regressionstest gegen die kanonischen `penalty.py`-Funktionen abgesichert)
-
-### Hinzugefügt
-- Regressionstests `tests/test_weekly_summary.py`: Bulk-Pfad == `penalty.py`-Pfad über ein gemischtes Szenario (Aktivitäten, Krankheit, Override, Bailout) sowie ein Query-Count-Wächter gegen erneute N+1-Regressionen
+### Verbessert
+- Das Dashboard lädt deutlich schneller: Die Strafberechnung für das Leaderboard wurde von vielen kleinen Einzelabfragen auf wenige gebündelte Datenbankabfragen umgestellt. Das Ergebnis ist dasselbe, aber die Ladezeit sinkt spürbar – besonders bei vielen Teilnehmern und langen Challenges.
 
 ## [0.16.6] – 2026-06-08
 
 ### Sicherheit
-- **Upload-Inhalte serverseitig validieren** (Issue `43k`): Hochgeladene Medien werden nicht mehr allein anhand der Dateiendung akzeptiert, sondern ihr **Inhalt** wird geprüft. **Bilder** müssen via Pillow als gültiges JPEG/PNG/WEBP dekodierbar sein (inkl. Schutz vor Decompression-Bombs über `MAX_IMAGE_PIXELS`); **Videos** müssen via ffprobe einen echten Video-Stream in einem erlaubten Container (mp4/mov/webm) enthalten. Eine Datei mit erlaubter Endung aber gefälschtem Inhalt (z. B. HTML als `.jpg`, Text als `.mp4`, oder ein Bild mit `.mp4`-Endung) wird abgelehnt und hinterlässt **keine Orphan-Datei**. Der vom Client gelieferte Content-Type wird nicht als Wahrheit verwendet. Validierung zentral in `save_upload()` – alle Aufrufstellen (Activity-Medien, Bonus-Beweisvideo) profitieren ohne Routenänderung
-
-### Hinzugefügt
-- Neue Laufzeit-Abhängigkeit **Pillow** (`requirements.txt`) für die Bild-Inhaltsvalidierung. ffmpeg/ffprobe ist im Docker-Image bereits vorhanden
+- Hochgeladene Bilder und Videos werden jetzt inhaltlich geprüft: Eine Datei mit falscher Endung oder manipuliertem Inhalt wird abgelehnt. Damit wird verhindert, dass getarnte Dateien hochgeladen werden können.
 
 ## [0.16.5] – 2026-06-08
 
 ### Sicherheit
-- **Secure-Cookies env-gesteuert erzwingen** (Issue `26x`): Session- **und** Remember-Me-Cookie werden über die neue Variable `SECURE_COOKIES=1` als `Secure` markiert, sodass Browser sie nur über HTTPS senden (Cloudflare/HTTPS-Setup). Bislang sicherte Flask-Talisman nur das Session-Cookie (request-zeit-abhängig, an `app.debug` gekoppelt) – das **Remember-Me-Cookie war ungeschützt**. Zusätzlich werden `HttpOnly` (XSS-Härtung) und `SameSite=Lax` (CSRF-Härtung) für beide Cookies explizit gesetzt. Default `0` lässt lokale HTTP-Dev funktionsfähig; keine hardcoded Domain. Neue Var in `.env.example` dokumentiert
+- Der „Angemeldet bleiben"-Cookie wird jetzt genauso sicher übertragen wie der Anmelde-Cookie – ausschließlich über verschlüsselte HTTPS-Verbindungen.
 
 ## [0.16.4] – 2026-06-08
 
 ### Sicherheit
-- **Login-Lockout-DoS entschärft** (Issue `znn`): Ein Angreifer konnte ein fremdes Konto durch wenige absichtlich falsche Passwörter temporär aussperren (Account-DoS gegen Verfügbarkeit). Ein **korrektes Passwort durchbricht jetzt immer** eine eventuelle Lockout-Markierung – legitime Nutzer können sich nicht mehr aussperren lassen. Der Brute-Force-Schutz wandert auf ein **IP-Rate-Limit** (`10/min; 60/h`) am Login-POST (Client-IP via `CF-Connecting-IP` unter Cloudflare). `failed_login_attempts`/`locked_until` bleiben als Monitoring-Signal erhalten und werden beim Erreichen der Schwelle geloggt (inkl. IP). Fehlermeldungen unverändert generisch – keine zusätzliche User-Enumeration
+- Es war möglich, ein fremdes Konto durch absichtlich falsche Login-Versuche temporär zu sperren. Das ist jetzt behoben: Ein korrektes Passwort entsperrt das Konto immer. Der Brute-Force-Schutz greift jetzt auf IP-Ebene, nicht mehr auf Konto-Ebene.
 
 ## [0.16.3] – 2026-06-08
 
 ### Behoben
-- **Medien-Lightbox** zeigte nach der Zugriffsschutz-Umstellung (v0.16.2) statt des Bildes ein leeres Scroll-Fenster mit Dateiname: Die geschützten Medien-URLs (`/media/activity/<id>`) haben keine Datei-Endung mehr, an der GLightbox den Typ erkennt. Behoben durch explizites `data-type="image"` an den Bild-Anchors (Dashboard-Feed + Activity-Details)
-- **Bild-Vorschau in den Activity-Details** wurde durch `object-fit:cover` in der breiten Box mittig zugeschnitten (Großteil unsichtbar); jetzt `object-fit:contain` – das ganze Bild ist sichtbar, konsistent zur Video-Vorschau
+- Bilder im Dashboard-Feed und in der Aktivitätsdetailansicht ließen sich nach dem letzten Sicherheits-Update nicht mehr in der Lightbox öffnen – stattdessen war nur ein leeres Fenster zu sehen. Das ist jetzt behoben.
+- Bilder in der Aktivitätsdetailansicht wurden mittig abgeschnitten angezeigt. Jetzt ist immer das vollständige Bild sichtbar, einheitlich mit der Video-Darstellung.
 
 ## [0.16.2] – 2026-06-08
 
 ### Sicherheit
-- **Medien-Uploads gegen anonymen Direktzugriff geschützt** (Issue `1ye`): Hochgeladene Bilder/Videos liegen nicht mehr unter `app/static/uploads` und sind damit nicht länger über geratene Direkt-URLs ohne Login abrufbar. Die Auslieferung erfolgt jetzt ausschließlich über eine login-geschützte Route (`/media/activity/<id>`, `/media/screenshot/<id>`) mit `X-Content-Type-Options: nosniff` und `Cache-Control: private`. Anonyme Requests erhalten 302 zum Login; HTML/JSON enthalten keine `static/uploads`-Direktlinks mehr
+- Hochgeladene Bilder und Videos sind jetzt nicht mehr über eine direkte URL ohne Login abrufbar. Medien werden ausschließlich an eingeloggte Nutzer ausgeliefert.
 
-### Geändert
-- Default-`UPLOAD_FOLDER` zeigt jetzt auf `<root>/data/uploads` (außerhalb von `static`); leeres `UPLOAD_FOLDER=` fällt sicher auf den Default zurück statt ins Arbeitsverzeichnis zu schreiben. Docker-Volume entsprechend auf `./data/uploads:/app/data/uploads` umgestellt (Host-Pfad unverändert – keine Datei-Migration nötig). DB-Spalten (`file_path`, `screenshot_path`) bleiben unverändert
+### Verbessert
+- Hochgeladene Dateien werden an einem sichereren Speicherort abgelegt (außerhalb des öffentlich zugänglichen Bereichs der App).
 
 ## [0.16.1] – 2026-06-08
 
 ### Sicherheit
-- **Host-Header-Poisoning gehärtet** (Issue `haf`): Externe Links in Passwort-Reset-, Admin-/Approval-Mails und der Strava-OAuth-`redirect_uri` werden nicht mehr aus dem (fälschbaren) Request-Host abgeleitet, sondern aus einer kontrolliert konfigurierten `PUBLIC_BASE_URL`. Damit kann ein Angreifer keinen Reset-Link mehr auf eine Fremddomain umlenken
-- Neue, konfigurierbare Host-Policy (keine hartkodierte Domain): `PUBLIC_BASE_URL` (kanonische Basis externer Links), `TRUSTED_HOSTS` (Allowlist — Flask weist fremde Host-Header mit HTTP 400 ab) und `PROXY_X_HOST` (ProxyFix vertraut `X-Forwarded-Host` nur noch, wenn explizit aktiviert; Default `0`)
+- Links in E-Mails (z. B. Passwort-Reset, Freischaltung) werden nicht mehr aus dem Browser-Anfrage-Header abgeleitet, den ein Angreifer manipulieren könnte. Stattdessen wird immer die konfigurierte App-Adresse verwendet.
+- Neue Einstellung für erlaubte Hostnamen: Anfragen von fremden Domains werden mit einem Fehler abgewiesen.
 
 ## [0.16.0] – 2026-06-08
 
-### Geändert
-- Die bisherige **Krankmeldung** ist jetzt eine allgemeine **Abwesenheit**: Wording und Emojis (🤒 → 🚫) im gesamten UI neutralisiert, da es auch andere Gründe gibt, zeitweise nicht teilzunehmen (Urlaub, Dienstreise …). Die Strafberechnung bleibt unverändert (pro 2 Abwesenheitstage wird eine benötigte Aktivität abgezogen)
+### Verbessert
+- Die „Krankmeldung" heißt jetzt „Abwesenheit" – denn es gibt mehr Gründe, mal nicht dabei zu sein (z. B. Urlaub oder Dienstreise). Die Strafberechnung bleibt unverändert.
 
 ### Neu
-- Beim Eintragen einer Abwesenheit kann ein **optionaler Grund** angegeben werden (Textfeld, max. 500 Zeichen)
-- Eingetragene Abwesenheiten erscheinen jetzt im **Dashboard-Feed** (Zeitraum + Grund, ohne Motivationsspruch) und können wie Aktivitäten **gelikt** werden
+- Beim Eintragen einer Abwesenheit kannst du jetzt optional einen Grund angeben (bis zu 500 Zeichen).
+- Abwesenheiten erscheinen jetzt im Dashboard-Feed und können von anderen geliket werden.
 
 ### Behoben
-- `/dashboard/feed`: fehlender `url_for`-Import behoben, der den Endpunkt bei Aktivitäten mit hochgeladenen Medien zum Absturz gebracht hätte
+- Ein Fehler, der den Dashboard-Feed bei Aktivitäten mit hochgeladenen Medien zum Absturz gebracht hätte, wurde behoben.
 
 ## [0.15.2] – 2026-06-05
 
-### Geändert
-- Admin-Benachrichtigung bei Neuregistrierung wird jetzt als **ein einziger BCC-Request** an alle Admins versendet (statt N Einzel-Requests): spart Mailgun-Requests/Rate-Limit und verbirgt die Admin-Adressen voreinander (kein PII-Leak im To-Feld). `MailgunService.send()` unterstützt dafür einen neuen `bcc`-Parameter
+### Verbessert
+- Interne Verbesserung beim E-Mail-Versand an Admins bei Neuregistrierungen (effizienter, ohne Auswirkung auf Nutzererlebnis).
 
 ## [0.15.1] – 2026-06-05
 
 ### Behoben
-- Admin-Benachrichtigung bei Neuregistrierung: Schlägt der Mailversand an einen Admin fehl (z.B. Rate-Limit), werden die übrigen Admins jetzt trotzdem benachrichtigt (Teilausfall-Härtung — Versand pro Admin isoliert)
+- Schlägt die Benachrichtigungs-E-Mail an einen Admin bei einer Neuregistrierung fehl, werden die anderen Admins jetzt trotzdem benachrichtigt.
 
 ## [0.15.0] – 2026-05-27
 
 ### Neu
-- Dashboard zeigt neben dem Like-Herz die Spitznamen der Liker an (z.B. „Tick, Trick und Track gefällt das"); ab 6 Likern wird abgekürzt
+- Im Dashboard siehst du jetzt neben dem Like-Herz die Spitznamen der Personen, denen deine Aktivität gefällt (z. B. „Tick, Trick und Track gefällt das"). Ab 6 Likern wird abgekürzt.
 
 ## [0.14.0] – 2026-05-19
 
 ### Neu
-- "Meine Woche" zeigt jetzt **mehrere Krankmeldungen** derselben Woche gleichzeitig: jede Periode hat eine eigene Edit-Form und einen eigenen Löschen-Button; ein separates Eingabefeld erlaubt das Anlegen einer weiteren Krankmeldung
-- Karten-Header zeigt bei mehreren Perioden eine Kompakt-Übersicht aller Zeiträume
+- „Meine Woche" unterstützt jetzt mehrere Abwesenheitsmeldungen in derselben Woche: Jede Meldung hat eine eigene Bearbeiten- und Löschen-Funktion, und du kannst weitere Meldungen direkt hinzufügen.
+- Der Karten-Header zeigt bei mehreren Meldungen eine kompakte Übersicht aller Zeiträume.
 
 ## [0.13.2] – 2026-05-19
 
 ### Behoben
-- "Meine Woche": Krankgemeldete Tage werden jetzt pro Tag mit Badge (🤒 Krank) und farbiger Karten-Markierung sichtbar gemacht — Aktivitäten an Krank-Tagen werden weiterhin korrekt angezeigt
-- "Meine Woche" stürzt nicht mehr ab, wenn mehrere Krankmeldungen in dieselbe Woche fallen (`scalar_one_or_none` → Liste)
+- In „Meine Woche" werden Tage mit Abwesenheitsmeldung jetzt mit einem Badge markiert und farbig hervorgehoben. Aktivitäten an diesen Tagen werden weiterhin korrekt angezeigt.
+- „Meine Woche" stürzte nicht mehr ab, wenn mehrere Abwesenheitsmeldungen in dieselbe Woche fallen.
 
 ## [0.13.1] – 2026-05-11
 
 ### Sicherheit
-- Passwort-Reset-Token sind jetzt **One-Time-Use**: Nach erfolgreichem Passwort-Wechsel wird der Link automatisch ungültig (stateless via Hash-Suffix im Token-Payload, keine Migration nötig)
+- Passwort-Reset-Links können jetzt nur noch einmal verwendet werden. Nach erfolgreichem Passwortwechsel ist der Link automatisch ungültig.
 
 ## [0.13.0] – 2026-05-06
 
 ### Neu
-- Krankmeldungen nutzen jetzt ein Von/Bis-Datumsmodell (`SickPeriod`) statt dem wochenbasierten `SickWeek`-Modell
-- Zukunftsdaten erlaubt: Krankmeldungen für bevorstehende Zeiträume können vorab eingetragen werden
-- Krankmeldung kürzen: Enddatum nachträglich anpassbar (Frühgenesungs-Flow)
-- Krankmeldungen werden auf Challenge-Grenzen geclampt
-- Overlap-Prüfung: Überschneidende Perioden pro Teilnehmer werden abgelehnt
+- Abwesenheitsmeldungen funktionieren jetzt mit einem Von/Bis-Datumsmodell – du kannst genaue Zeiträume angeben statt nur ganze Wochen.
+- Abwesenheiten für zukünftige Zeiträume können vorab eingetragen werden.
+- Das Enddatum einer Abwesenheit lässt sich nachträglich anpassen (z. B. bei Frühgenesung).
+- Sich überschneidende Abwesenheitsmeldungen desselben Teilnehmers werden abgelehnt.
 
-### Geändert
-- Datenbankschema: `sick_weeks`-Tabelle durch `sick_periods` ersetzt (Migration `a3f7e2b9c1d5`)
-- Route `/challenge-activities/sick-period` (POST) ersetzt `/challenge-activities/sick-week`
-- Penalty-Berechnung nutzt Tage-Überschneidung statt Wochenstartdatum
+### Verbessert
+- Abwesenheitsmeldungen werden auf die Laufzeit der Challenge begrenzt.
 
 ## [0.12.1] – 2026-05-02
 
 ### Neu
-- Trainingsnotiz nachträglich bearbeitbar: Die "Medien hinzufügen"-Seite enthält jetzt eine Textarea, über die Notizen auch nach dem initialen Erfassen gesetzt, geändert oder gelöscht werden können
-- Trainingsnotiz direkt auf der Aktivitäts-Detailseite bearbeitbar (kein Umweg über "Medien hinzufügen")
+- Trainingsnotizen lassen sich jetzt auch nachträglich über die „Medien hinzufügen"-Seite oder direkt auf der Aktivitäts-Detailseite bearbeiten oder löschen.
 
 ### Behoben
-- Passwort-vergessen: Rate-Limit greift jetzt nur auf POST-Anfragen, nicht mehr auf die GET-Seite
-- Rate-Limiter liest echte Client-IP aus dem `CF-Connecting-IP`-Header (korrekte Sperrung hinter Cloudflare-Tunnel)
+- Die Seite „Passwort vergessen" war durch eine falsch gesetzte Zugriffsbeschränkung nicht mehr aufrufbar. Das ist jetzt behoben.
+- Das Zugriffs-Limit greift jetzt korrekt auch hinter dem Cloudflare-Schutz.
 
 ## [0.12.0] – 2026-05-02
 
 ### Neu
-- E-Mail-Integration via Mailgun REST API (`app/services/mailer.py`)
-- Passwort-vergessen-Flow: Link im Login, Route `/auth/forgot-password`, Reset-Link per E-Mail mit signiertem Token (itsdangerous, 1h TTL, timing-sicher)
-- Admin-Benachrichtigung per E-Mail bei jeder Neuregistrierung
-- Bestätigungsmail an User bei Admin-Freischaltung
-- 24 neue Tests (Mailer-Unit-Tests + Password-Reset-Integrationstests)
-
-### Konfiguration
-- Neue Env-Variablen: `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_SENDER`, `MAILGUN_BASE_URL` (EU-Region: `https://api.eu.mailgun.net/v3`)
-- App startet ohne Mailgun-Config, Mailversand schlägt dann erst beim Senden fehl (kein Crash beim Start)
+- Passwort vergessen? Über den Link auf der Login-Seite kannst du einen Reset-Link per E-Mail anfordern. Der Link ist eine Stunde gültig.
+- Admins erhalten bei jeder Neuregistrierung eine E-Mail-Benachrichtigung.
+- Nach der Freischaltung durch einen Admin erhältst du eine Bestätigungs-E-Mail.
 
 ## [0.11.0] – 2026-05-02
 
-### Neu
-- Containerisierung: Docker-Image mit Gunicorn, Docker Compose für Prod-Deployment
-- CI/CD: GitHub Actions-Pipeline baut und pusht Docker-Image automatisch zu Docker Hub (`stoertebeker2k/sport-challenge`)
-- Access-Log: HTTP-Zugriffe werden in `logs/access.log` geschrieben (RotatingFileHandler, 10 MB, 5 Backups)
-- ProxyFix-Middleware für echte Client-IP hinter cloudflared-Tunnel (Rate-Limiting + Logging korrekt)
+### Verbessert
+- Die App läuft jetzt in einem Docker-Container und kann damit zuverlässiger und einfacher auf einem Server betrieben werden.
+- Automatische Bereitstellung neuer Versionen über eine CI/CD-Pipeline.
+- HTTP-Zugriffe werden protokolliert (für die Administration des Servers).
 
 ### Behoben
-- Docker Hub Username in CI-Pipeline von `changeme` auf `stoertebeker2k` korrigiert
-- CI: Version wird direkt aus `app/version.py` per `grep` ausgelesen statt per App-Import (verhindert Import-Fehler ohne DB)
+- Interne Korrekturen an der Bereitstellungskonfiguration.
 
 ## [0.10.0] – 2026-05-01
 
 ### Neu
-- Bonus-Challenge: Video-Beweis-Upload (MP4, MOV, WebM, max. 50 MB) beim Zeiteintragen verpflichtend
-- Bonus-Challenge: Aufnahmedatum wird automatisch aus Video-Metadaten (ffprobe `creation_time`) ausgelesen und in der Rangliste angezeigt
-- Bonus-Challenge: Wanderpokal-Gesamtwertung – beste Einzelzeit pro Nutzer über alle Datums-Runden
-- Bonus-Challenge: Admin kann beim Erstellen mehrere Termine auf einmal eingeben (dynamische Datumsfelder)
-- Bonus-Challenge: Einsendungen jederzeit möglich (kein Datum-Limit), Vertrauen auf Ehrlichkeit
+- Beim Eintragen einer Bonus-Challenge-Zeit ist jetzt ein Video-Beweis erforderlich (MP4, MOV oder WebM, max. 50 MB).
+- Das Aufnahmedatum wird automatisch aus den Video-Metadaten ausgelesen und in der Rangliste angezeigt.
+- Neue Gesamtwertung über alle Bonus-Runden: Die beste Einzelzeit pro Person zählt (Wanderpokal-Prinzip).
+- Admins können beim Erstellen einer Bonus-Challenge mehrere Termine auf einmal festlegen.
+- Einsendungen sind jederzeit möglich, nicht nur bis zu einem Stichtag.
 
 ### Behoben
-- `delete_upload()` verwendete `static_folder` statt `UPLOAD_FOLDER` – Video-Orphans blieben in Tests und potenziell auch in Produktionsumgebungen mit abweichendem Upload-Pfad zurück
+- Gelöschte Videos wurden nicht immer vollständig vom Server entfernt. Das ist jetzt korrigiert.
 
 ## [0.9.0] – 2026-04-30
 
 ### Neu
-- Benutzer können eigene Krankmeldungen löschen (mit Bestätigungs-Dialog)
-- Admin kann Krankmeldungen aller Nutzer löschen
-- Admin kann Aktivitäten aller Nutzer löschen
-- Admin kann Bonus-Challenges inkl. aller Einträge löschen
-- Admin kann Challenges inkl. aller Aktivitäten, Krankmeldungen und Bonus-Challenges löschen (vollständige 7-stufige Cascade)
+- Teilnehmer können eigene Abwesenheitsmeldungen selbst löschen (mit Bestätigungsdialog).
+- Admins können Abwesenheitsmeldungen, Aktivitäten, Bonus-Challenges und ganze Challenges inkl. aller zugehörigen Daten löschen.
 
 ### Behoben
-- Filesystem-Leak beim Löschen eines Nutzers: ActivityMedia-Dateien blieben physisch auf dem Server, weil Bulk-Delete keine ORM-Cascades auslöst
+- Beim Löschen eines Nutzers blieben hochgeladene Mediendateien auf dem Server zurück. Das wird jetzt vollständig bereinigt.
 
 ## [0.8.2] – 2026-04-29
 
 ### Neu
-- Partielle Krankmeldung: 1–7 einzelne Krankentage pro Woche meldbar (statt nur ganze Woche)
-- Rückwirkende Krankmeldung über Wochen-Navigation in „Meine Woche" (beliebige Vorwochen)
-- Krankmeldung auch direkt über „Eintragen" (Tab „Krankmeldung") mit freier Datumswahl erreichbar
-- Formel: je 2 Krankentage = 1 Aktivitäts-Abzug vom Wochenziel (`deductions = sick_days // 2`); ab 6 Tagen keine Strafe
-- Effektives Wochenziel wird in der Fortschrittsanzeige ausgewiesen
-- Bestehende Krankmeldung kann über dasselbe Formular korrigiert werden
+- Partielle Abwesenheit: Du kannst jetzt 1 bis 7 einzelne Tage pro Woche als krank melden (statt immer die gesamte Woche).
+- Abwesenheitsmeldungen können rückwirkend für vergangene Wochen eingetragen werden.
+- Abwesenheitsmeldung auch direkt über den „Eintragen"-Tab mit freier Datumswahl erreichbar.
+- Formel: Je 2 Krankentage zählt ein Aktivitäts-Abzug vom Wochenziel; ab 6 Tagen entfällt die Strafe komplett. Das effektive Wochenziel wird in der Fortschrittsanzeige ausgewiesen.
+- Eine bestehende Abwesenheitsmeldung kann über dasselbe Formular korrigiert werden.
 
 ## [0.8.1] – 2026-04-29
 
 ### Sicherheit
-- fix(security): Stored XSS via `original_filename` im AJAX-Feed-Card-Builder behoben: Media-Elemente werden jetzt per DOM-API (`createElement`/Property-Set) erzeugt statt via innerHTML-String-Konkatenation (kein Attribut-Breakout mehr möglich)
-- Defense-in-Depth: `werkzeug.utils.secure_filename()` wird auf Dateinamen vor der Persistierung angewendet, eliminiert `"`, `<`, `>` und Pfad-Separatoren aus `original_filename`
+- Sicherheitslücke behoben: Dateinamen von hochgeladenen Medien konnten theoretisch schadhaften Code enthalten. Die Anzeige ist jetzt sicher, und Dateinamen werden beim Speichern bereinigt.
 
 ## [0.8.0] – 2026-04-29
 
 ### Neu
-- Social-Media-Timeline im Dashboard: Activity-Feed mit den 10 neuesten Aktivitäten aller Challenge-Teilnehmer (AJAX-Nachladen, je 10 weitere)
-- Jede Feed-Karte zeigt Sport-Typ, Dauer, Datum/Uhrzeit, zufälligen Motivationsspruch (100 deutsche Quotes), Medien (Fotos/Videos) und Trainingsnotiz
-- Like/Heart-Button pro Aktivität (AJAX-Toggle, CSRF-geschützt, Rate-Limit 30/min, Teilnahme-Guard)
-- Top-5-Leaderboard auf der Dashboard-Startseite; vollständiges Leaderboard unter `/dashboard/leaderboard` erreichbar
-- „Leaderboard"-Link in der Navbar
-- ActivityComment-Model als Code-Stub für spätere Implementierung (kein UI)
-- GLightbox-Instanz bleibt nach AJAX-Nachladen funktionsfähig (`lightbox.reload()`)
+- Neuer Social-Feed im Dashboard: Die 10 neuesten Aktivitäten aller Challenge-Teilnehmer werden angezeigt – mit Sport-Typ, Dauer, Datum, einem zufälligen Motivationsspruch, Fotos/Videos und Trainingsnotiz. Über „mehr laden" kannst du weitere Einträge nachladen.
+- Like-Button pro Aktivität: Herz anklicken, um eine Aktivität zu liken (und wieder zu entliken).
+- Top-5-Leaderboard direkt auf der Dashboard-Startseite; vollständiges Leaderboard über den Navbar-Link erreichbar.
 
 ## [0.7.7] – 2026-04-29
 
 ### Neu
-- Optionales Freitextfeld „Trainingsnotiz" (max. 2000 Zeichen) beim Aktivitäten-Eintragen; Notiz wird in der Detail-Ansicht und als Kurzvorschau in der Wochenansicht angezeigt
+- Beim Eintragen einer Aktivität kannst du jetzt eine optionale Trainingsnotiz hinzufügen (bis zu 2000 Zeichen). Die Notiz erscheint in der Detailansicht und als Kurzvorschau in der Wochenansicht.
 
 ## [0.7.6] – 2026-04-29
 
 ### Neu
-- Benutzer können ihr Passwort im Profil (`/settings/`) selbst ändern (altes Passwort als Bestätigung, Sichtbarkeits-Toggle, Rate-Limit 5/min)
+- Du kannst dein Passwort jetzt direkt in deinem Profil selbst ändern – mit Eingabe des alten Passworts als Bestätigung.
 
 ## [0.7.5] – 2026-04-29
 
-### Geändert
-- `migrations/env.py`: veralteten `db.get_engine()`-Aufruf durch `db.engine` ersetzt (Flask-SQLAlchemy >= 3)
+### Verbessert
+- Interne Verbesserungen und Wartungsarbeiten.
 
 ## [0.7.4] – 2026-04-29
 
-### Geändert
-- Produktions-Webserver von Flask Dev-Server auf Gunicorn umgestellt (3 Worker, graceful reload via SIGHUP)
+### Verbessert
+- Interne Verbesserungen am Server-Setup für stabileren Betrieb.
 
 ## [0.7.3] – 2026-04-29
 
 ### Neu
-- Admin: User-Detailseite (`/admin/users/<id>`) mit E-Mail, Nickname, Rolle, Approval-Status und eingerichteten Integrationen (nur `provider_type`)
-- Admin: Konto sperren/entsperren (setzt `is_approved` – gesperrte User können sich nicht einloggen)
-- Admin: Passwort eines Users direkt zurücksetzen (serverseitige Mindestlängen-Validierung)
-- Admin: User löschen mit zweistufiger Bestätigung (Bootstrap-Modal + E-Mail-Eingabe) und manuellem Cascade-Delete
+- Admin: Neue Detailseite pro Nutzer mit E-Mail, Spitzname, Rolle, Freischaltungsstatus und verbundenen Integrationen.
+- Admin: Konten sperren und entsperren (gesperrte Nutzer können sich nicht einloggen).
+- Admin: Passwort eines Nutzers direkt zurücksetzen.
+- Admin: Nutzerkonto mit zweistufiger Bestätigung löschen (inkl. aller zugehörigen Daten).
 
 ### Sicherheit
-- Löschen blockiert wenn User Challenges erstellt hat (Datenverlust-Schutz)
-- E-Mail-Bestätigung serverseitig geprüft (Defense in depth, kein Verlass auf JS)
-- Self-Delete und Self-Suspend blockiert
+- Löschen ist blockiert, wenn der Nutzer Challenges erstellt hat (Datenverlust-Schutz). Admins können sich selbst nicht sperren oder löschen.
 
 ## [0.7.2] – 2026-04-29
 
 ### Neu
-- Toggle-Admin-Funktion in Benutzerverwaltung (Admin ↔ User)
+- Admins können andere Nutzer in der Benutzerverwaltung zum Admin machen (und umgekehrt).
 
 ### Sicherheit
-- Last-Admin-Guard verhindert Null-Admin-Zustand (Defense-in-depth)
+- Es ist nicht mehr möglich, den letzten Admin zu entfernen.
 
 ## [0.7.1] – 2026-04-29
 
 ### Neu
-- SVG-Favicon (Läufer-Icon, Darkmode-responsiv via `prefers-color-scheme`)
+- Neues App-Icon (Läufer-Symbol) – passt sich automatisch an Hell- und Dunkelmodus an.
 
 ## [0.7.0] – 2026-04-29
 
 ### Neu
-- Darkmode-Toggle in der Navbar (🌙/☀️), Persistenz via localStorage
-- FOUC-Prevention: Theme wird vor Bootstrap-CSS-Load gesetzt
-- Bootstrap 5.3 `data-bs-theme` auf `<html>` für natives Dark-Mode-Switching
+- Dunkelmodus: Ein Klick auf den 🌙/☀️-Button in der Navigationsleiste wechselt zwischen hellem und dunklem Design. Die Einstellung wird gespeichert und gilt auch beim nächsten Besuch.
 
 ## [0.6.0] – 2026-04-28
 
 ### Neu
-- Versionsnummer in der Navbar (klickbar → Changelog)
-- Changelog-Seite unter `/changelog`
+- Die aktuelle Versionsnummer wird in der Navigationsleiste angezeigt – ein Klick öffnet diese Changelog-Seite.
 
 ## [0.5.0] – 2026-04-27
 
 ### Neu
-- Lightbox-Medienansicht via GLightbox 3.3.1
-- Einzelnes Medium aus Aktivität löschen (Owner-Guard)
+- Bilder und Videos lassen sich jetzt in einer Lightbox-Vollbild-Ansicht öffnen.
+- Einzelne Medien können aus einer Aktivität gelöscht werden.
 
 ## [0.4.0] – 2026-04-27
 
 ### Neu
-- Multi-File-Upload für Fotos und Videos (bis 50 MB) pro Aktivität
-- Drag-and-Drop-Interface für Medien-Upload
-- Retroaktiver Upload via Route `/challenge-activities/<id>/media/add`
-- Medien-Galerie in Aktivitätsdetail-Ansicht (Video + Bild)
-- Thumbnails in Wochen- und Benutzeransichten
+- Mehrere Fotos und Videos (bis je 50 MB) können per Drag-and-Drop oder Datei-Auswahl zu einer Aktivität hochgeladen werden.
+- Medien können auch nachträglich zu einer bestehenden Aktivität hinzugefügt werden.
+- Medien-Galerie in der Aktivitätsdetailansicht sowie Thumbnails in der Wochen- und Nutzeransicht.
 
 ### Sicherheit
-- Path-Traversal-Guard (`is_relative_to`) in Upload-Lösch-Route
-- `media-src 'self'` explizit in CSP gesetzt
+- Schutz gegen manipulierte Dateipfade beim Löschen von Medien.
 
 ## [0.3.0] – 2026-04-27
 
 ### Neu
-- Öffentliche Challenge-URLs via UUID (`public_id`)
-- Challenge auf öffentlich/privat stellbar (`is_public`)
+- Challenges können eine öffentliche URL erhalten und als öffentlich oder privat markiert werden.
 
 ## [0.2.0] – 2026-04-26
 
 ### Neu
-- Challenge-System mit Leaderboard und Strafpunkten
-- Wochenziele (2 oder 3 Tage), Krankheitswochen, Penalty-Override
-- Bonus-Challenges mit Zeitwertung und Ranking
-- Aktivitäten-Eintragung (manuell, Garmin-Import, Strava-Import)
-- Screenshot-Upload pro Aktivität
+- Challenge-System mit Leaderboard und Strafpunkten.
+- Wochenziele (2 oder 3 Tage), Abwesenheitsmeldungen und manuelle Strafanpassungen durch Admins.
+- Bonus-Challenges mit Zeitwertung und Ranking.
+- Aktivitäten eintragen: manuell, per Garmin-Import oder Strava-Import.
+- Screenshot-Upload pro Aktivität.
 
 ## [0.1.0] – 2026-04-24
 
 ### Neu
-- Multi-User-Unterstützung mit Flask-Login (scrypt-Passwort-Hashing)
-- Connector-Architektur: Garmin Connect + Strava OAuth
-- Fernet-verschlüsselte Token-Speicherung in der Datenbank
-- Admin-Bereich für Benutzerverwaltung
+- Mehrere Nutzer können sich registrieren und einloggen.
+- Verbindung zu Garmin Connect und Strava (OAuth).
+- Sicher verschlüsselte Speicherung von Zugangsdaten.
+- Admin-Bereich zur Benutzerverwaltung.
 
 ## [0.0.1] – 2026-04-01
 
 ### Neu
-- Single-User Flask-App mit Garmin-Aktivitätsübersicht
-- Wochenansicht mit 30-Minuten-Filter
+- Erste Version: Aktivitätsübersicht aus Garmin Connect mit Wochenansicht und 30-Minuten-Filter.

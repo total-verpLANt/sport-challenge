@@ -149,3 +149,4 @@ Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `
 - **Migrationen:** `irreversible / requires-approval` – vor Wave 2 und Wave 4 SQLite-Backup
 - **Tests:** Playwright-Aufgaben immer via Haiku-Sub-Agent (siehe user-global CLAUDE.md)
 - **Git-Remote:** `github.com/total-verpLANt/sport-challenge` – `git push` nach jedem Commit
+- **CHANGELOG endnutzerfreundlich:** `CHANGELOG.md` wird auf der Webseite unter `/changelog` für die **App-Nutzer (Nicht-Techniker)** angezeigt. Einträge daher in einfacher Alltagssprache aus Nutzersicht schreiben – KEINE Ticket-IDs, Parameter, Funktions-/Datei-/Tabellennamen, Test-/Zeilenzahlen oder Implementierungsdetails (kein „N+1", „Migration", „Fernet" etc.). Kategorien: `### Neu`, `### Verbessert`, `### Behoben`, `### Sicherheit`. Versions-Überschrift bleibt `## [x.y.z] – JJJJ-MM-TT`. Technische Details gehören in die **Commit-Message** (für Entwickler/Agenten), nicht ins CHANGELOG.
