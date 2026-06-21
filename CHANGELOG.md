@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] – 2026-06-21
+
+### Hinzugefügt
+- **Challenge-Einladung prominent im Dashboard** (`7y6`): Offene Einladungen (Teilnahme-Status `invited`) werden jetzt ganz oben im Dashboard – noch vor den Leaderboard-Karten – als Einladungs-Karte mit Wochenziel-Auswahl sowie Annehmen-/Ablehnen-Buttons angezeigt, statt nur versteckt unter dem Reiter „Challenges“. Die Karte ist Plural-fähig (mehrere gleichzeitige Einladungen) und verschwindet automatisch nach Annahme/Ablehnung. Rein additiv, keine Migration. 2 neue Tests.
+
 ## [1.2.0] – 2026-06-21
 
 ### Hinzugefügt

@@ -760,3 +760,28 @@ def test_user_activities_multi_challenge_selector(client, db):
     body = resp.get_data(as_text=True)
     assert "rad_cb" in body
     assert "lauf_ca" not in body
+
+
+def test_dashboard_shows_pending_invitation(client, db):
+    """User mit offener Einladung sieht die Einladungs-Karte oben im Dashboard."""
+    user = _create_and_login(client, db, email="invitee@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id, status="invited")
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Einladung ausstehend" in body
+    assert challenge.name in body
+    # Annehmen-/Ablehnen-Formulare zeigen auf die Challenge-Routen
+    assert f"/challenges/{challenge.public_id}/accept" in body
+    assert f"/challenges/{challenge.public_id}/decline" in body
+
+
+def test_dashboard_no_invitation_no_card(client, db):
+    """Ohne offene Einladung (nur accepted) erscheint keine Einladungs-Karte."""
+    user = _create_and_login(client, db, email="member@test.com")
+    _create_challenge_with_participation(db, user.id, status="accepted")
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    assert "Einladung ausstehend" not in resp.get_data(as_text=True)

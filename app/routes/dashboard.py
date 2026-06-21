@@ -217,12 +217,26 @@ def index():
 
     boards = _build_dashboard_boards(today)
 
+    # Offene Challenge-Einladungen des Users → prominente Karte oben im Dashboard.
+    # Bewusst Plural-fähig (alle 'invited'): ein User kann zu mehreren Challenges
+    # gleichzeitig eingeladen sein. Challenge wird eager geladen (kein N+1).
+    pending_invitations = db.session.scalars(
+        db.select(ChallengeParticipation)
+        .where(
+            ChallengeParticipation.user_id == current_user.id,
+            ChallengeParticipation.status == "invited",
+        )
+        .options(selectinload(ChallengeParticipation.challenge))
+        .order_by(ChallengeParticipation.invited_at.desc())
+    ).all()
+
     # Globaler Feed über ALLE Challenges (alle sehen alles)
     feed_items, feed_has_more = _build_feed_items(current_user.id, page=0)
 
     return render_template(
         "dashboard/index.html",
         boards=boards,
+        pending_invitations=pending_invitations,
         timedelta=timedelta,
         feed_items=feed_items,
         feed_has_more=feed_has_more,

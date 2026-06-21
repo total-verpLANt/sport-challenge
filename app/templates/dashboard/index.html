@@ -26,6 +26,50 @@
 
 {% block content %}
 
+{% if pending_invitations %}
+{% for inv in pending_invitations %}
+{% set ch = inv.challenge %}
+<div class="card border-warning mb-4">
+  <div class="card-header bg-warning text-dark">
+    <strong>📨 Einladung ausstehend</strong>
+  </div>
+  <div class="card-body">
+    <p class="card-text">
+      Du wurdest zur Challenge <strong>{{ ch.name }}</strong>
+      ({{ ch.start_date.strftime('%d.%m.%Y') }} –
+      {{ ch.end_date.strftime('%d.%m.%Y') }}) eingeladen.
+    </p>
+    <p class="card-text">
+      Strafe pro Versäumnis: <strong>{{ "%.2f"|format(ch.penalty_per_miss) }} €</strong> &nbsp;|&nbsp;
+      Bailout-Gebühr: <strong>{{ "%.2f"|format(ch.bailout_fee) }} €</strong>
+    </p>
+
+    <div class="row g-2 mt-2">
+      <div class="col-12 col-md-6">
+        <form method="post" action="{{ url_for('challenges.accept', public_id=ch.public_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-2">
+            <label for="weekly_goal_{{ ch.public_id }}" class="form-label">Wochenziel (Trainingseinheiten)</label>
+            <select name="weekly_goal" id="weekly_goal_{{ ch.public_id }}" class="form-select">
+              <option value="3" selected>3 Einheiten pro Woche</option>
+              <option value="2">2 Einheiten pro Woche</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-success w-100">Einladung annehmen</button>
+        </form>
+      </div>
+      <div class="col-12 col-md-6 d-flex align-items-end">
+        <form method="post" action="{{ url_for('challenges.decline', public_id=ch.public_id) }}" class="w-100">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-secondary w-100">Einladung ablehnen</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
 {% if not boards %}
 <div class="alert alert-info">
   <strong>Keine aktive Challenge</strong> – aktuell gibt es keine Challenge, die angezeigt werden kann.
