@@ -4,6 +4,8 @@ from app.models.user import User
 from app.services.notifications import (
     NotificationType,
     create_notification,
+    delete_all,
+    delete_notification,
     list_for_user,
     mark_read,
     unread_count,
@@ -101,3 +103,29 @@ def test_mark_read_empty_ids_noop(db):
     affected = mark_read(user.id, ids=[])
     assert affected == 0
     assert unread_count(user.id) == 1
+
+
+def test_delete_notification_only_own(db):
+    """delete_notification löscht nur die eigene Notification (kein IDOR)."""
+    a = _make_user(db, "a@test.com")
+    b = _make_user(db, "b@test.com")
+    na = create_notification(a.id, NotificationType.ACTIVITY_LIKED, "a-msg", commit=True)
+    nb = create_notification(b.id, NotificationType.ACTIVITY_LIKED, "b-msg", commit=True)
+    # a darf b's Notification NICHT löschen:
+    assert delete_notification(a.id, nb.id) is False
+    assert db.session.get(Notification, nb.id) is not None
+    # a darf die eigene löschen:
+    assert delete_notification(a.id, na.id) is True
+    assert db.session.get(Notification, na.id) is None
+
+
+def test_delete_all_only_own(db):
+    a = _make_user(db, "a@test.com")
+    b = _make_user(db, "b@test.com")
+    create_notification(a.id, NotificationType.ACTIVITY_LIKED, "a1", commit=True)
+    create_notification(a.id, NotificationType.ACTIVITY_LIKED, "a2", commit=True)
+    create_notification(b.id, NotificationType.ACTIVITY_LIKED, "b1", commit=True)
+    deleted = delete_all(a.id)
+    assert deleted == 2
+    assert unread_count(a.id) == 0
+    assert unread_count(b.id) == 1

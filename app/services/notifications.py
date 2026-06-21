@@ -69,6 +69,32 @@ def list_for_user(user_id: int, limit: int = 10) -> list[Notification]:
     )
 
 
+def delete_notification(user_id: int, notification_id: int, commit: bool = True) -> bool:
+    """Löscht EINE Notification – nur wenn sie dem User gehört (kein IDOR).
+
+    Gibt True zurück, wenn etwas gelöscht wurde, sonst False.
+    """
+    result = db.session.execute(
+        db.delete(Notification).where(
+            Notification.id == notification_id,
+            Notification.user_id == user_id,
+        )
+    )
+    if commit:
+        db.session.commit()
+    return (result.rowcount or 0) > 0
+
+
+def delete_all(user_id: int, commit: bool = True) -> int:
+    """Löscht ALLE Notifications eines Users. Gibt die Anzahl zurück."""
+    result = db.session.execute(
+        db.delete(Notification).where(Notification.user_id == user_id)
+    )
+    if commit:
+        db.session.commit()
+    return result.rowcount or 0
+
+
 def mark_read(user_id: int, ids: list[int] | None = None, commit: bool = True) -> int:
     """Markiert Notifications als gelesen (setzt read_at).
 

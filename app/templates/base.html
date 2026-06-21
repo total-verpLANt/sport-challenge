@@ -62,6 +62,51 @@
         {% endif %}
       </div>
       <div class="ms-auto d-flex align-items-center gap-3">
+        {% if current_user.is_authenticated %}
+        <div class="dropdown" id="notif-center">
+          <button class="btn btn-outline-light btn-sm position-relative" type="button"
+                  data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+                  title="Benachrichtigungen" aria-label="Benachrichtigungen">
+            🔔
+            <span id="notif-badge"
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger{% if notif_unread_count == 0 %} d-none{% endif %}">
+              {{ notif_unread_count }}
+              <span class="visually-hidden">ungelesene Benachrichtigungen</span>
+            </span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow" id="notif-menu"
+              style="min-width: 320px; max-width: 92vw;"
+              data-csrf="{{ csrf_token() }}"
+              data-delete-all-url="{{ url_for('notifications.delete_all') }}">
+            <li><h6 class="dropdown-header">Benachrichtigungen</h6></li>
+            {% for n in notif_items %}
+            <li class="notif-item{% if not n.read_at %} bg-primary-subtle{% endif %}" data-id="{{ n.id }}">
+              <div class="d-flex align-items-start">
+                <a class="dropdown-item text-wrap flex-grow-1{% if not n.read_at %} fw-bold{% endif %}"
+                   href="{{ url_for('notifications.go', notification_id=n.id) }}">
+                  {% if not n.read_at %}<span class="text-primary me-1" aria-hidden="true">●</span>{% endif %}
+                  {{ n.message }}
+                  <span class="d-block small text-muted fw-normal">{{ n.created_at.strftime('%d.%m. %H:%M') }}</span>
+                </a>
+                <button type="button"
+                        class="btn btn-sm btn-link text-muted notif-delete px-2"
+                        data-delete-url="{{ url_for('notifications.delete', notification_id=n.id) }}"
+                        aria-label="Benachrichtigung entfernen">✕</button>
+              </div>
+            </li>
+            {% else %}
+            <li id="notif-empty"><span class="dropdown-item-text text-muted small">Keine Benachrichtigungen</span></li>
+            {% endfor %}
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <button type="button" id="notif-delete-all"
+                      class="dropdown-item text-center text-danger{% if not notif_items %} d-none{% endif %}">
+                Alle löschen
+              </button>
+            </li>
+          </ul>
+        </div>
+        {% endif %}
         <button id="theme-toggle" type="button" class="btn btn-outline-light btn-sm"
                 title="Dunkelmodus aktivieren" aria-label="Dunkelmodus aktivieren">🌙</button>
         {% if current_user.is_authenticated %}
@@ -132,6 +177,9 @@
   });
   </script>
   <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  {% if current_user.is_authenticated %}
+  <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+  {% endif %}
   {% block scripts %}{% endblock %}
 </body>
 </html>

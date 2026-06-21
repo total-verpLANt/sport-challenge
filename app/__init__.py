@@ -154,6 +154,9 @@ def create_app(config_class=Config):
     from app.routes.media import media_bp
     app.register_blueprint(media_bp, url_prefix="/media")
 
+    from app.routes.notifications import notifications_bp
+    app.register_blueprint(notifications_bp, url_prefix="/notifications")
+
     from app.version import __version__
 
     @app.context_processor
@@ -184,6 +187,27 @@ def create_app(config_class=Config):
             "nav_challenges": [
                 {"public_id": str(pid), "name": name} for pid, name in rows
             ]
+        }
+
+    @app.context_processor
+    def inject_notifications():
+        """Stellt allen Templates Glocken-Daten bereit (Ticket wsco).
+
+        Zwei schlanke, indexierte Queries (Ungelesen-Count + letzte 8) – nur
+        für eingeloggte Nutzer. Kein N+1: das Template liest nur message/
+        link_url/created_at/read_at, keine Relationship.
+        """
+        from flask_login import current_user
+
+        if not current_user.is_authenticated:
+            return {"notif_unread_count": 0, "notif_items": []}
+
+        from app.services import notifications as notif_service
+
+        items = notif_service.list_for_user(current_user.id, limit=8)
+        return {
+            "notif_unread_count": notif_service.unread_count(current_user.id),
+            "notif_items": items,
         }
 
     @app.route("/")
