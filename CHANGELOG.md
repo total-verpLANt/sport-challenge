@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] – 2026-06-21
+
+### Hinzugefügt
+- **Notification bei Challenge-Einladung** (`vj7q`): Wird ein Nutzer zu einer Challenge eingeladen, erhält er eine Benachrichtigung „Du wurdest zur Challenge ‚<Name>' eingeladen" mit Link zum Dashboard (wo seit `7y6` die Einladungs-Karte steht). Greift an beiden Einlade-Wegen: beim Anlegen der Challenge (`create_post` mit `invite_users`) und bei nachträglicher Einladung (`invite`-Route). Erster aktiver Auslöser, der die Navbar-Glocke (`wsco`) füllt. Notification fügt sich in die bestehende Transaktion ein (kein zusätzlicher Roundtrip); `message` wird auto-escaped (kein XSS), `link_url` per `url_for()`. 2 neue Tests.
+
 ## [1.5.0] – 2026-06-21
 
 ### Hinzugefügt

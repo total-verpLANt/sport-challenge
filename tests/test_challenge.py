@@ -731,3 +731,66 @@ def test_sick_period_with_reason(client, db):
     })
     db.session.refresh(sp)
     assert sp.reason is None
+
+
+def test_invite_creates_notification(client, db):
+    """Eine nachträgliche Einladung (invite-Route) erzeugt eine Notification."""
+    from app.models.notification import Notification
+    from app.services.notifications import NotificationType, unread_count
+
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id, name="Sommer-Challenge")
+    invitee = User(email="invitee@test.com", is_approved=True)
+    invitee.set_password("pass123")
+    db.session.add(invitee)
+    db.session.commit()
+
+    client.post(
+        f"/challenges/{challenge.public_id}/invite",
+        data={"user_ids": [invitee.id]},
+        follow_redirects=False,
+    )
+
+    notif = db.session.execute(
+        db.select(Notification).where(Notification.user_id == invitee.id)
+    ).scalar_one_or_none()
+    assert notif is not None
+    assert notif.type == NotificationType.CHALLENGE_INVITE
+    assert "Sommer-Challenge" in notif.message
+    assert notif.link_url == "/dashboard/"
+    assert unread_count(invitee.id) == 1
+    # Der Admin selbst bekommt keine Einladungs-Notification
+    assert unread_count(admin.id) == 0
+
+
+def test_create_challenge_invites_create_notification(client, db):
+    """Beim Anlegen mit invite_users erhalten die Eingeladenen eine Notification."""
+    from app.models.notification import Notification
+    from app.services.notifications import NotificationType
+
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+    invitee = User(email="invitee@test.com", is_approved=True)
+    invitee.set_password("pass123")
+    db.session.add(invitee)
+    db.session.commit()
+
+    today = date.today()
+    client.post(
+        "/challenges/create",
+        data={
+            "name": "Winter-Challenge",
+            "start_date": today.isoformat(),
+            "end_date": (today + timedelta(days=30)).isoformat(),
+            "penalty_per_miss": "5",
+            "bailout_fee": "25",
+            "invite_users": [invitee.id],
+        },
+        follow_redirects=False,
+    )
+
+    notif = db.session.execute(
+        db.select(Notification).where(Notification.user_id == invitee.id)
+    ).scalar_one_or_none()
+    assert notif is not None
+    assert notif.type == NotificationType.CHALLENGE_INVITE
+    assert "Winter-Challenge" in notif.message

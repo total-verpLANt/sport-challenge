@@ -11,6 +11,8 @@ from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.penalty import PenaltyOverride
 from app.models.sick_period import SickPeriod, SickPeriodLike
 from app.models.user import User
+from app.services import notifications as notif_service
+from app.services.notifications import NotificationType
 from app.utils.decorators import admin_required
 from app.utils.uploads import delete_media_files, delete_upload
 
@@ -176,6 +178,12 @@ def create_post():
                 status="invited",
             )
             db.session.add(participation)
+            notif_service.create_notification(
+                user.id,
+                NotificationType.CHALLENGE_INVITE,
+                f"Du wurdest zur Challenge „{challenge.name}“ eingeladen",
+                link_url=url_for("dashboard.index"),
+            )
             invited_count += 1
     if invited_count:
         db.session.commit()
@@ -262,6 +270,12 @@ def invite(public_id):
             status="invited",
         )
         db.session.add(participation)
+        notif_service.create_notification(
+            user_id,
+            NotificationType.CHALLENGE_INVITE,
+            f"Du wurdest zur Challenge „{challenge.name}“ eingeladen",
+            link_url=url_for("dashboard.index"),
+        )
         invited_count += 1
 
     if invited_count:
