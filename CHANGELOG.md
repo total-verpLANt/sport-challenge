@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 Versionierung nach [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] – 2026-06-21
+
+### Sicherheit
+- **`cryptography` 46.0.7 → 48.0.1**: Schließt **GHSA-537c-gmf6-5ccf** (High, CVSS 7.5) – Out-of-bounds-Read im statisch gelinkten OpenSSL der `cryptography`-Wheels (DoS, ohne Authentifizierung). Die CI-Pipeline („Docker Publish") schlug seit dem 21.06. am `pip-audit`-Gate fehl, da die CVE nach dem letzten grünen Lauf veröffentlicht wurde – ohne Code-Änderung. `cryptography` ist Basis der Fernet-Verschlüsselung der Connector-Tokens; volle Testsuite nach dem Bump grün (279 Tests).
+
 ## [1.3.0] – 2026-06-21
 
 ### Hinzugefügt
