@@ -366,3 +366,27 @@ def test_admin_create_bonus_for_selected_challenge(client, db):
     assert bc is not None
     assert bc.challenge_id == ca.id
     assert bc.challenge_id != cb.id
+
+
+def test_bonus_selector_is_csp_compliant(client, db):
+    """oa6n: Der Challenge-Selektor darf KEINEN inline-onchange nutzen (von der
+    CSP blockiert → Dropdown-Wechsel ohne Wirkung). Stattdessen ein
+    nonce-signierter change-Listener, der das Submit auslöst."""
+    user = _create_and_login(client, db, email="csp_bonus@test.com")
+    c1 = _create_challenge(db, user.id)
+    c2 = _create_challenge(db, user.id)
+    for c in (c1, c2):
+        db.session.add(ChallengeParticipation(
+            user_id=user.id, challenge_id=c.id, status="accepted", weekly_goal=3))
+    db.session.commit()
+
+    resp = client.get("/bonus/")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # Selektor erscheint (zwei akzeptierte Challenges)
+    assert 'id="challenge_select"' in html
+    # KEIN inline-onchange (CSP-Verstoß) ...
+    assert "onchange=" not in html
+    # ... sondern ein nonce'd Change-Listener, der submittet
+    assert "addEventListener('change'" in html

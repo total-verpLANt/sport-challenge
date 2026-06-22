@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.5] – 2026-06-22
+
+### Behoben
+- Das Wechseln zwischen Challenges über das Klappmenü (im Bonus-Bereich sowie in den Wochen- und Teilnehmer-Ansichten) hatte keine Wirkung – beim Auswählen passierte nichts. Die Ansicht wechselt jetzt wieder zuverlässig zur gewählten Challenge.
+
 ## [1.7.4] – 2026-06-22
 
 ### Behoben

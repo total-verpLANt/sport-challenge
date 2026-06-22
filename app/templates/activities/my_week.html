@@ -17,8 +17,7 @@
 <form method="get" action="{{ url_for('challenge_activities.my_week') }}" class="mb-3" style="max-width: 22rem;">
   <input type="hidden" name="offset" value="{{ offset }}">
   <label for="challenge_select" class="form-label mb-1 small text-muted">Challenge</label>
-  <select name="challenge_id" id="challenge_select" class="form-select form-select-sm"
-          onchange="this.form.submit()">
+  <select name="challenge_id" id="challenge_select" class="form-select form-select-sm">
     {% for p in participations %}
       <option value="{{ p.challenge_id }}"
               {% if participation and p.challenge_id == participation.challenge_id %}selected{% endif %}>
@@ -27,6 +26,11 @@
     {% endfor %}
   </select>
 </form>
+<script nonce="{{ csp_nonce() }}">
+  document.getElementById('challenge_select').addEventListener('change', function () {
+    this.form.submit();
+  });
+</script>
 {% endif %}
 
 {# Week navigation #}
