@@ -315,18 +315,25 @@ def like_activity(activity_id: int):
         )
     ).scalars().first()
 
+    feed_link = url_for("dashboard.index") + f"#feed-post-activity-{activity.id}"
+    is_foreign = activity.user_id != current_user.id
     if existing_like:
         db.session.delete(existing_like)
+        if is_foreign:
+            notif_service.remove_unread_like(activity.user_id, feed_link, current_user.id)
         db.session.commit()
         liked = False
     else:
         db.session.add(ActivityLike(activity_id=activity_id, user_id=current_user.id))
-        if activity.user_id != current_user.id:
+        if is_foreign and not notif_service.has_unread_like(
+            activity.user_id, feed_link, current_user.id
+        ):
             notif_service.create_notification(
                 activity.user_id,
                 NotificationType.ACTIVITY_LIKED,
                 f"{current_user.display_name} hat deinen Beitrag geliked",
-                link_url=url_for("dashboard.index") + f"#feed-post-activity-{activity.id}",
+                link_url=feed_link,
+                actor_id=current_user.id,
             )
         db.session.commit()
         liked = True
@@ -360,18 +367,25 @@ def like_sick_period(sick_period_id: int):
         )
     ).scalars().first()
 
+    feed_link = url_for("dashboard.index") + f"#feed-post-absence-{period.id}"
+    is_foreign = period.user_id != current_user.id
     if existing_like:
         db.session.delete(existing_like)
+        if is_foreign:
+            notif_service.remove_unread_like(period.user_id, feed_link, current_user.id)
         db.session.commit()
         liked = False
     else:
         db.session.add(SickPeriodLike(sick_period_id=sick_period_id, user_id=current_user.id))
-        if period.user_id != current_user.id:
+        if is_foreign and not notif_service.has_unread_like(
+            period.user_id, feed_link, current_user.id
+        ):
             notif_service.create_notification(
                 period.user_id,
                 NotificationType.ACTIVITY_LIKED,
                 f"{current_user.display_name} hat deinen Beitrag geliked",
-                link_url=url_for("dashboard.index") + f"#feed-post-absence-{period.id}",
+                link_url=feed_link,
+                actor_id=current_user.id,
             )
         db.session.commit()
         liked = True

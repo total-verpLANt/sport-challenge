@@ -866,4 +866,67 @@ def test_unlike_creates_no_additional_notification(client, db):
     resp = client.post(f"/dashboard/activities/{activity.id}/like")
     assert resp.status_code == 200
     assert resp.get_json()["liked"] is False
+    # ua3l: die ungelesene Like-Notification wird beim Un-Like zurückgenommen
+    assert _count_like_notifications(db, owner.id) == 0
+
+
+# --- ua3l: Dedup + Un-Like-Rücknahme von Like-Notifications ---------------
+
+def _count_unread_like_notifications(db, user_id):
+    from app.models.notification import Notification
+
+    return db.session.scalar(
+        db.select(db.func.count())
+        .select_from(Notification)
+        .where(
+            Notification.user_id == user_id,
+            Notification.type == "activity_liked",
+            Notification.read_at.is_(None),
+        )
+    )
+
+
+def test_relike_after_unlike_yields_single_notification(client, db):
+    """like → unlike → like erzeugt genau EINE ungelesene Notification (kein Spam)."""
+    owner, activity = _setup_owner_with_activity(client, db)
+    _create_and_login(client, db, email="relike_friend@test.com")
+
+    client.post(f"/dashboard/activities/{activity.id}/like")    # like
+    client.post(f"/dashboard/activities/{activity.id}/like")    # unlike → zurückgenommen
+    client.post(f"/dashboard/activities/{activity.id}/like")    # re-like
+
+    assert _count_unread_like_notifications(db, owner.id) == 1
+
+
+def test_two_different_likers_two_notifications(client, db):
+    """Zwei verschiedene Liker → zwei Notifications (kein fälschliches Dedup)."""
+    owner, activity = _setup_owner_with_activity(client, db)
+
+    _create_and_login(client, db, email="liker_one@test.com")
+    client.post(f"/dashboard/activities/{activity.id}/like")
+    client.post("/auth/logout")
+
+    _create_and_login(client, db, email="liker_two@test.com")
+    client.post(f"/dashboard/activities/{activity.id}/like")
+
+    assert _count_unread_like_notifications(db, owner.id) == 2
+
+
+def test_unlike_keeps_already_read_notification(client, db):
+    """Eine bereits GELESENE Like-Notification bleibt beim Un-Like erhalten (historisch)."""
+    from app.services import notifications as notif_service
+
+    owner, activity = _setup_owner_with_activity(client, db)
+    _create_and_login(client, db, email="readlike_friend@test.com")
+
+    client.post(f"/dashboard/activities/{activity.id}/like")
+    assert _count_unread_like_notifications(db, owner.id) == 1
+
+    # Urheber liest die Notification → read_at gesetzt
+    notif_service.mark_read(owner.id)
+    assert _count_unread_like_notifications(db, owner.id) == 0
+
+    # Un-Like darf die gelesene Notification NICHT löschen
+    client.post(f"/dashboard/activities/{activity.id}/like")
     assert _count_like_notifications(db, owner.id) == 1
+    assert _count_unread_like_notifications(db, owner.id) == 0

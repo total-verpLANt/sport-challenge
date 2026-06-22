@@ -28,24 +28,65 @@ def create_notification(
     type: str,
     message: str,
     link_url: str | None = None,
+    actor_id: int | None = None,
     commit: bool = False,
 ) -> Notification:
     """Legt eine Notification an (ungelesen).
 
-    `commit=False` (Default): nur `add()` – fügt sich in die bestehende
-    Transaktion des Auslösers ein, der ohnehin committet. `commit=True`
-    committet sofort (für isolierte Aufrufe).
+    `actor_id` benennt den Auslöser (z.B. den Liker) – optional, da nicht
+    jeder Typ einen hat. `commit=False` (Default): nur `add()` – fügt sich
+    in die bestehende Transaktion des Auslösers ein, der ohnehin committet.
+    `commit=True` committet sofort (für isolierte Aufrufe).
     """
     notification = Notification(
         user_id=user_id,
         type=type,
         message=message,
         link_url=link_url,
+        actor_id=actor_id,
     )
     db.session.add(notification)
     if commit:
         db.session.commit()
     return notification
+
+
+def has_unread_like(user_id: int, link_url: str, actor_id: int) -> bool:
+    """True, wenn für (Empfänger, Beitrag, Liker) bereits eine UNGELESENE
+    Like-Notification existiert – verhindert Doppel bei Re-Like (Toggle).
+    """
+    return db.session.scalar(
+        db.select(Notification.id)
+        .where(
+            Notification.user_id == user_id,
+            Notification.type == NotificationType.ACTIVITY_LIKED,
+            Notification.link_url == link_url,
+            Notification.actor_id == actor_id,
+            Notification.read_at.is_(None),
+        )
+        .limit(1)
+    ) is not None
+
+
+def remove_unread_like(
+    user_id: int, link_url: str, actor_id: int, commit: bool = False
+) -> int:
+    """Nimmt die UNGELESENE Like-Notification eines Likers für einen Beitrag
+    beim Un-Like zurück. Bereits gelesene Notifications bleiben unberührt
+    (historisch). Gibt die Anzahl gelöschter Zeilen zurück.
+    """
+    result = db.session.execute(
+        db.delete(Notification).where(
+            Notification.user_id == user_id,
+            Notification.type == NotificationType.ACTIVITY_LIKED,
+            Notification.link_url == link_url,
+            Notification.actor_id == actor_id,
+            Notification.read_at.is_(None),
+        )
+    )
+    if commit:
+        db.session.commit()
+    return result.rowcount or 0
 
 
 def unread_count(user_id: int) -> int:

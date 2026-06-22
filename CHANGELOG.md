@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.2] – 2026-06-22
+
+### Verbessert
+- „Gefällt mir"-Benachrichtigungen sind jetzt aufgeräumter: Du bekommst pro Person nur eine Benachrichtigung, auch wenn sie mehrfach klickt. Nimmt jemand sein „Gefällt mir" wieder zurück, verschwindet die noch ungelesene Benachrichtigung dazu automatisch.
+
 ## [1.7.1] – 2026-06-22
 
 ### Neu
