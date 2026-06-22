@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.1] – 2026-06-22
+
+### Neu
+- Wenn jemand deinen Beitrag im Feed mit „Gefällt mir" markiert, bekommst du jetzt eine Benachrichtigung über die Glocke oben rechts – ein Klick bringt dich direkt zum Beitrag.
+
 ## [1.7.0] – 2026-06-22
 
 ### Neu

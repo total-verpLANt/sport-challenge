@@ -11,6 +11,8 @@ from app.models.activity import Activity, ActivityLike
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.sick_period import SickPeriod, SickPeriodLike
 from app.models.user import User
+from app.services import notifications as notif_service
+from app.services.notifications import NotificationType
 from app.services.statistics import get_challenge_statistics
 from app.services.weekly_summary import get_challenge_summary
 from app.utils.motivational_quotes import get_random_quote
@@ -319,6 +321,13 @@ def like_activity(activity_id: int):
         liked = False
     else:
         db.session.add(ActivityLike(activity_id=activity_id, user_id=current_user.id))
+        if activity.user_id != current_user.id:
+            notif_service.create_notification(
+                activity.user_id,
+                NotificationType.ACTIVITY_LIKED,
+                f"{current_user.display_name} hat deinen Beitrag geliked",
+                link_url=url_for("dashboard.index") + f"#feed-post-activity-{activity.id}",
+            )
         db.session.commit()
         liked = True
 
@@ -357,6 +366,13 @@ def like_sick_period(sick_period_id: int):
         liked = False
     else:
         db.session.add(SickPeriodLike(sick_period_id=sick_period_id, user_id=current_user.id))
+        if period.user_id != current_user.id:
+            notif_service.create_notification(
+                period.user_id,
+                NotificationType.ACTIVITY_LIKED,
+                f"{current_user.display_name} hat deinen Beitrag geliked",
+                link_url=url_for("dashboard.index") + f"#feed-post-absence-{period.id}",
+            )
         db.session.commit()
         liked = True
 

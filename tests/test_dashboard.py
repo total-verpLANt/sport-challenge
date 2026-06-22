@@ -785,3 +785,85 @@ def test_dashboard_no_invitation_no_card(client, db):
     resp = client.get("/dashboard/")
     assert resp.status_code == 200
     assert "Einladung ausstehend" not in resp.get_data(as_text=True)
+
+
+# --- ngk0: Notification bei Like auf fremden Beitrag ----------------------
+
+def _count_like_notifications(db, user_id):
+    from app.models.notification import Notification
+
+    return db.session.scalar(
+        db.select(db.func.count())
+        .select_from(Notification)
+        .where(
+            Notification.user_id == user_id,
+            Notification.type == "activity_liked",
+        )
+    )
+
+
+def _setup_owner_with_activity(client, db):
+    """Owner A mit Aktivität anlegen, danach ausloggen. Gibt (owner, activity) zurück."""
+    today = date.today()
+    owner = _create_and_login(client, db, email="like_owner@test.com")
+    challenge, _ = _create_challenge_with_participation(db, owner.id, status="accepted")
+    activity = Activity(
+        user_id=owner.id,
+        challenge_id=challenge.id,
+        activity_date=today,
+        duration_minutes=45,
+        sport_type="running",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+    client.post("/auth/logout")
+    return owner, activity
+
+
+def test_like_foreign_activity_creates_notification(client, db):
+    """Like auf fremden Beitrag → Urheber bekommt genau eine Notification."""
+    owner, activity = _setup_owner_with_activity(client, db)
+    _create_and_login(client, db, email="like_friend@test.com")
+
+    resp = client.post(f"/dashboard/activities/{activity.id}/like")
+    assert resp.status_code == 200
+    assert resp.get_json()["liked"] is True
+    assert _count_like_notifications(db, owner.id) == 1
+
+
+def test_self_like_creates_no_notification(client, db):
+    """Self-Like löst keine Notification aus."""
+    today = date.today()
+    owner = _create_and_login(client, db, email="self_like@test.com")
+    challenge, _ = _create_challenge_with_participation(db, owner.id, status="accepted")
+    activity = Activity(
+        user_id=owner.id,
+        challenge_id=challenge.id,
+        activity_date=today,
+        duration_minutes=45,
+        sport_type="running",
+        source="manual",
+    )
+    db.session.add(activity)
+    db.session.commit()
+
+    resp = client.post(f"/dashboard/activities/{activity.id}/like")
+    assert resp.status_code == 200
+    assert _count_like_notifications(db, owner.id) == 0
+
+
+def test_unlike_creates_no_additional_notification(client, db):
+    """Un-Like (Toggle aus) erzeugt keine zusätzliche Notification."""
+    owner, activity = _setup_owner_with_activity(client, db)
+    _create_and_login(client, db, email="unlike_friend@test.com")
+
+    # 1. Like → eine Notification
+    client.post(f"/dashboard/activities/{activity.id}/like")
+    assert _count_like_notifications(db, owner.id) == 1
+
+    # 2. erneuter POST = Un-Like → keine zusätzliche Notification
+    resp = client.post(f"/dashboard/activities/{activity.id}/like")
+    assert resp.status_code == 200
+    assert resp.get_json()["liked"] is False
+    assert _count_like_notifications(db, owner.id) == 1
