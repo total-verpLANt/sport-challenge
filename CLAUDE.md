@@ -50,35 +50,50 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-21, Wachwechsel #16)
+## Aktueller Stand (2026-06-22, Wachwechsel #17)
 
-**Aktive Arbeit:** Keine. **v1.2.0**, gepusht auf `origin/main`.
+**Aktive Arbeit:** Keine. **v1.7.0**, gepusht auf `origin/main`.
 
-- **Version:** 1.2.0 (gepusht auf `origin/main`; letzter milestone-Tag: `milestone-v1.2.0` auf `8b24f34`)
-- **277 Tests grün.**
-- **Kein** `.env`-/Migrations-/Dependency-Eingriff erforderlich (rein additiv).
+- **Version:** 1.7.0 (gepusht; milestone-Tag `milestone-v1.7.0` auf `1137837`)
+- **304 Tests grün**, bandit + pip-audit + CI grün.
+- **Kein offener** `.env`-/Migrations-/Dependency-Eingriff. Die einzige Migration dieser Wache (Tabelle `notifications`) ist **bereits deployed**.
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abgeschlossen diese Wache:**
-- `stc` → **v1.1.0**: Leaderboard-Statistiken vergeben Medaillen fair bei Gleichstand (Dense-Ranking). Gleiche Werte teilen sich Gold/Silber/Bronze; eine Lücke nach einem Tie überspringt die nächste Medaille (z. B. 2× Gold, 1× Silber, kein Bronze). 5 Plätze sichtbar + native `<details>`-„mehr"-Liste mit **allen** Teilnehmern (ranglose als „–"). `_top3` → `_assign_medal_ranks` + `_ranking` in `app/services/statistics.py`; Template `app/templates/dashboard/_statistics.html`. 3 neue Tests.
-- `gbx` → **v1.2.0**: Neue Statistik „Meiste Likes verteilt" (vergebene Likes je Teilnehmer, eigene wie fremde). Die Like-Query lädt jetzt Roh-Zeilen und aggregiert `like_counts` (pro Aktivität) **und** `likes_given` (pro Verteiler) in einem Roundtrip → **kein** zusätzlicher DB-Query (N+1-Guard unverändert). 1 neuer Test.
+**Abgeschlossen diese Wache (Notification-System + Hygiene):**
+- `7y6` → Dashboard zeigt offene Challenge-Einladungen prominent ganz oben (vor dem Leaderboard), plural-fähig.
+- crypto-CVE → `cryptography` 46.0.7→48.0.1 (CI-Gate `pip-audit` war durch GHSA-537c-gmf6-5ccf rot).
+- `gau4` → **Notification-Fundament**: Modell `Notification` (app/models/notification.py), Service (app/services/notifications.py), Migration `notifications`-Tabelle. **deployed**.
+- `tjs` (Teil) → Docker-Healthcheck grün: `/health`-Endpoint (app/routes/misc.py) + `localhost`/`127.0.0.1` automatisch in `TRUSTED_HOSTS` (config.py). **deployed**.
+- `wsco` → **Navbar-Glocke**: Badge (Ungelesen-Zähler), Dropdown, ungelesene hervorgehoben, Einzel-/Alle-Löschen (app/routes/notifications.py, app/static/js/notifications.js). Klick liest einzeln.
+- `vj7q` → Notification bei Challenge-Einladung (erster aktiver Auslöser; auth in challenges.py create_post + invite).
+- `bqf5` → Notification an Admins bei Neuregistrierung (in `_notify_admins_new_user`, auth.py).
+- CHANGELOG.md **komplett endnutzerfreundlich** umgeschrieben (es ist die `/changelog`-Webseite für Nutzer).
 
-**Bestehender Grenzfall (unverändert):** Aktivität exakt um 00:00 Uhr fällt im `_ranking`-Filter (`if v`) beim Frühaufsteher raus – bewusst nicht gefixt (siehe `docs/lessons-learned.md`). Hinweis: Die Funktion hieß früher `_top3`.
+**Neue Konventionen (diese Wache, in CLAUDE.md Conventions & Patterns + lessons-learned):**
+- **CHANGELOG endnutzerfreundlich:** keine Ticket-IDs/Parameter/Funktionsnamen; Technik gehört in die Commit-Message.
+- **SemVer:** Anschluss-Tickets an einem bestehenden Feature → **Patch** (3. Stelle); nur neue eigenständige Features → Minor. HINWEIS: Die Notification-Auslöser dieser Wache wurden noch fälschlich als Minors (1.6.0/1.7.0) gezählt – ab jetzt korrekt als Patch.
+- **Subagenten:** Test-/Recherche-Späher dürfen **nie** committen/pushen (ein general-purpose-Subagent tat es eigenmächtig). Read-only/git-Verbot im Prompt; Berichte gegen echte Artefakte verifizieren.
 
-**Deploy-Hinweis:** Live war zuletzt **v1.0.0** auf `stonbgsport01` – **v1.1.0/v1.2.0 sind noch nicht deployed**. Beide rein additiv (UI/Statistik), daher Prod-Update ohne Migration/`.env`-Änderung: `git pull && docker compose pull && docker compose up -d`.
+**Deploy-Stand:** Live ≈ **v1.4.1** auf `stonbgsport01` (zuletzt nach Healthcheck-Fix deployed, Container „healthy"). **v1.5.0–1.7.0 ausstehend** – rein additiv (UI + Auslöser), **keine** Migration/`.env`: `git pull && docker compose pull && docker compose up -d`. (Die `notifications`-Migration lief bereits beim `gau4`-Deploy.)
 
-**Nächste Queue (`bd ready`) – alle P3, kein Blocker:**
-- `tjs` – Release-Hygiene: 404/500-Fehlerseiten, Health-Check, Limiter-Backend, robots.txt
-- `4t4` – KI: Kalorien aus Screenshot schätzen (kcal-Auswertung)
-- `18t` – KI: Sportart aus Screenshot extrahieren (sport_type-Autofill)
+**Offene Queue (`bd ready`):**
+- `oa6n` (P2, **Bug**) – Bonus-Challenge fehlerhaft im Multi-Challenge-Kontext (Repro/Diagnose vom Kapitän noch offen)
+- `co52` (P2, **Bug**) – `challenges.index` crasht bei >1 gleichzeitiger Einladung (`scalar_one_or_none`)
+- `ngk0` (P2) – Notification: „X hat deinen Beitrag geliked" (Lärm-Risiko bedacht)
+- `kfzb` (P2) – Notification: Challenge startet/endet (**ZEITbasiert, kein Scheduler** → Mechanik-Entscheidung nötig)
+- `2ar3` (P2) – PayPal-Spendenlink (**braucht Migration**: `donation_url`-Spalte!)
+- `tjs` (P3, Rest) – 404/500-Seiten, Limiter-Backend, robots.txt
+- `4t4` / `18t` (P3) – KI-Screenshot-Features (Kalorien / Sportart)
+
+**Bestehender Grenzfall (unverändert):** Aktivität exakt um 00:00 Uhr fällt im `_ranking`-Filter (`if v`) beim Frühaufsteher raus – bewusst nicht gefixt (siehe `docs/lessons-learned.md`).
 
 ### Einstieg für neue Sessions
 
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories handover                  # Pointer für diesen Wachwechsel (#16)
+bd memories handover                  # Pointer für diesen Wachwechsel (#17)
 bd ready                              # nächste Issues
 ```
 

@@ -9,6 +9,7 @@ Flask-Webanwendung für Fitness-Challenges mit Leaderboard, Strafberechnung und 
 - **Aktivitäts-Tracking:** Manuelles Eintragen (mit Foto-/Video-Upload) oder Import aus Garmin/Strava. Bei mehreren parallel aktiven Challenges wählt ein Challenge-Selektor (in Eingabe wie Anzeige) das Ziel – Aktivitäten, Abwesenheiten und Importe landen verlässlich in der gewählten Challenge
 - **Automatische Strafberechnung:** 5 €/verpasster Tag, Admin-Override möglich; Abwesenheit (mit optionalem Grund) reduziert das Wochenziel anteilig (pro 2 Tage −1 Aktivität)
 - **Bonus-Challenges:** Admin-definierte Termine (z.B. 50 Squat Jumps), Zeiterfassung mit Ranking und Video-Beweis
+- **Benachrichtigungen:** Glocke in der Navbar mit Ungelesen-Zähler und Dropdown (Einladungen, neue Registrierungen für Admins u. a.); einzeln oder alle löschbar
 - **Bailout-Option:** Teilnehmer können aussteigen (+25 € Gebühr), werden im Leaderboard ausgegraut
 - **Connector-Architektur:** Garmin (Credentials-Form) und Strava (OAuth2) integriert; weitere Provider erweiterbar
 - Credentials werden Fernet-verschlüsselt in der DB gespeichert; Passwörter mit scrypt N=2^17 gehasht
@@ -115,7 +116,7 @@ SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 .venv/bin/pytest -v
 ```
 
-263 Tests (Auth, Connector, Challenge, Aktivitäten, Penalty, Dashboard, Statistiken, Bonus) – kein externer Service nötig.
+304 Tests (Auth, Connector, Challenge, Aktivitäten, Penalty, Dashboard, Statistiken, Bonus, Notifications) – kein externer Service nötig.
 
 ---
 
@@ -123,7 +124,7 @@ SECRET_KEY=dev FLASK_DEBUG=1 .venv/bin/python run.py
 
 ```
 app/
-├── __init__.py          # App Factory, 10 Blueprints
+├── __init__.py          # App Factory, 11 Blueprints
 ├── extensions.py        # db, migrate, login_manager, csrf, limiter
 ├── models/
 │   ├── user.py          # User + UserMixin, scrypt-Hashing
@@ -165,7 +166,7 @@ app/
     ├── dashboard/        # Leaderboard-Tabelle, _statistics.html (Top-3-Karten)
     └── bonus/            # Bonus-Challenges + Ranking
 migrations/              # Alembic-Migrationen (17 Versionen, 10 Tabellen)
-tests/                   # 242 pytest-Tests, In-Memory-SQLite
+tests/                   # 304 pytest-Tests, In-Memory-SQLite
 ```
 
 **Datenfluss Challenge-System:**
