@@ -435,3 +435,35 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wo sichtbar:** `app/routes/misc.py`, `config.py`, `docker-compose.yml`. Ticket `tjs` (Teil).
 
 **Quelle:** Wachwechsel #17, Session 2026-06-21
+
+---
+
+## Frontend / CSP
+
+### 2026-06-22: Content-Security-Policy blockiert inline-Event-Handler (onchange/onclick)
+
+**Erkenntnis:** Die App erzwingt via flask-talisman eine strikte CSP (`script-src 'self' cdn.jsdelivr.net`, **ohne** `unsafe-inline`, nonce-basiert). Inline-Event-Handler im HTML (`onchange="this.form.submit()"`, `onclick=…`) werden vom Browser **stumm blockiert** – Nonces gelten nur für `<script>`-Tags, nicht für Handler-Attribute. Die Aktion läuft wirkungslos ins Leere, ohne Fehlermeldung.
+
+**Warum relevant:** Genau das brach `oa6n` – drei Challenge-Selektoren (Bonus, `my_week`, `user_activities`) reagierten nicht auf die Auswahl. Der direkte URL-Aufruf (`?challenge_id=…`) funktionierte, weil er kein JS braucht – das verschleierte die Ursache und machte es zu einer langen Fehlersuche (das Symptom „alte Bonus-Challenge nicht sichtbar" sah wie ein Daten-/Logik-Bug aus). **pytest fängt diese Klasse nicht** (kein JS-Runtime); sichtbar nur im echten Browser.
+
+**Wie gelöst:** inline-`onchange` entfernt, durch nonce-signiertes `<script nonce="{{ csp_nonce() }}">…addEventListener('change', submit)…</script>` ersetzt. CSP **nicht** aufgeweicht (kein `unsafe-inline` → XSS-Schutz erhalten). Folge-Ticket `b2u0`: Audit auf weitere CSP-Verstöße + automatischer Regression-Check (pytest/Lint), da pytest diese Brüche prinzipiell nicht sieht.
+
+**Wo sichtbar:** `app/templates/bonus/index.html`, `app/templates/activities/my_week.html`, `app/templates/activities/user_activities.html`, CSP in `app/__init__.py`. Ticket `oa6n`, Memory `feedback_no_inline_event_handlers`.
+
+**Quelle:** Wachwechsel #18, Session 2026-06-22
+
+---
+
+## Datenbank / Queries
+
+### 2026-06-22: scalar_one_or_none() crasht bei mehreren Treffern (Multi-Challenge)
+
+**Erkenntnis:** `db.session.execute(…).scalar_one_or_none()` verträgt **genau 0 oder 1** Zeile – bei ≥2 Treffern wirft es `MultipleResultsFound` (HTTP 500). In `challenges.index` lief das zweimal auf „accepted"- bzw. „invited"-Participations, basierend auf der veralteten Annahme, ein User sei in **genau einer** Challenge aktiv.
+
+**Warum relevant:** Seit Multi-Challenge-Support (mehrere parallele Challenges) ist diese Annahme falsch – sobald ein User in >1 Challenge `accepted` ist oder >1 offene Einladung hat, crasht die ganze `/challenges`-Seite (`co52`). Latenter Bug, der erst im realen Multi-Challenge-Betrieb auffiel. Es können **weitere** `scalar_one_or_none`/`.one()`-Stellen mit derselben Altannahme existieren → Audit-Ticket `fzku`.
+
+**Wie gelöst:** `scalar_one_or_none()` → `scalars()…first()` mit deterministischer Sortierung (neuester Eintrag). Zusätzlich toten Code (`active_participation`, nirgends im Template genutzt) entfernt.
+
+**Wo sichtbar:** `app/routes/challenges.py` (index). Ticket `co52`, Audit-Folge `fzku`. Verwandt: Route-Smoke-Test `r96z` hätte den 500er sofort gefangen.
+
+**Quelle:** Wachwechsel #18, Session 2026-06-22

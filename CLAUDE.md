@@ -50,41 +50,35 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-22, Wachwechsel #17)
+## Aktueller Stand (2026-06-22, Wachwechsel #18)
 
-**Aktive Arbeit:** Keine. **v1.7.0**, gepusht auf `origin/main`.
+**Aktive Arbeit:** Keine. **v1.7.5**, gepusht auf `origin/main`.
 
-- **Version:** 1.7.0 (gepusht; milestone-Tag `milestone-v1.7.0` auf `1137837`)
-- **304 Tests grün**, bandit + pip-audit + CI grün.
-- **Kein offener** `.env`-/Migrations-/Dependency-Eingriff. Die einzige Migration dieser Wache (Tabelle `notifications`) ist **bereits deployed**.
+- **Version:** 1.7.5 (gepusht; milestone-Tag `milestone-v1.7.5` auf `cc347f7`)
+- **314 Tests grün**, bandit + pip-audit + CI grün.
+- **Kein** `.env`-/Dependency-Eingriff. **Eine** Migration diese Wache (`notifications.actor_id`, ua3l) – additiv/nullable, läuft beim Deploy automatisch via `entrypoint.sh` (`flask db upgrade`).
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abgeschlossen diese Wache (Notification-System + Hygiene):**
-- `7y6` → Dashboard zeigt offene Challenge-Einladungen prominent ganz oben (vor dem Leaderboard), plural-fähig.
-- crypto-CVE → `cryptography` 46.0.7→48.0.1 (CI-Gate `pip-audit` war durch GHSA-537c-gmf6-5ccf rot).
-- `gau4` → **Notification-Fundament**: Modell `Notification` (app/models/notification.py), Service (app/services/notifications.py), Migration `notifications`-Tabelle. **deployed**.
-- `tjs` (Teil) → Docker-Healthcheck grün: `/health`-Endpoint (app/routes/misc.py) + `localhost`/`127.0.0.1` automatisch in `TRUSTED_HOSTS` (config.py). **deployed**.
-- `wsco` → **Navbar-Glocke**: Badge (Ungelesen-Zähler), Dropdown, ungelesene hervorgehoben, Einzel-/Alle-Löschen (app/routes/notifications.py, app/static/js/notifications.js). Klick liest einzeln.
-- `vj7q` → Notification bei Challenge-Einladung (erster aktiver Auslöser; auth in challenges.py create_post + invite).
-- `bqf5` → Notification an Admins bei Neuregistrierung (in `_notify_admins_new_user`, auth.py).
-- CHANGELOG.md **komplett endnutzerfreundlich** umgeschrieben (es ist die `/changelog`-Webseite für Nutzer).
+**Abgeschlossen diese Wache (Like-Notification-Auslöser + Multi-Challenge-Bugfixes):**
+- `ngk0` → Notification bei Like auf fremden Beitrag (Self-/Un-Like beachtet). **v1.7.1**
+- `ua3l` → Like-Notif-Dedup + Un-Like-Rücknahme via neuer Spalte `notifications.actor_id` (Migration, `ON DELETE SET NULL`). **v1.7.2**
+- `s779` → Like-Notifs je Beitrag **gebündelt** („A und N weitere"), Text dynamisch aus der Like-Tabelle (kein Badge-Drift). **v1.7.3**
+- `co52` → **Bug behoben:** `/challenges` crashte (500) bei >1 accepted Challenge / >1 Einladung (`scalar_one_or_none` → `MultipleResultsFound`; toter `active_participation`-Code entfernt). **v1.7.4**
+- `oa6n` → **Bug behoben:** Challenge-Dropdowns (Bonus + `my_week` + `user_activities`) wirkungslos, weil die Talisman-CSP den inline-`onchange` blockierte → nonce'd `addEventListener`. **v1.7.5**
+- Diagnose-Werkzeug `scripts/diagnose_bonus.py` (read-only) für Teilnahme-/Bonus-Analyse (`docker compose exec -T web python - <email> < scripts/diagnose_bonus.py`).
 
-**Neue Konventionen (diese Wache, in CLAUDE.md Conventions & Patterns + lessons-learned):**
-- **CHANGELOG endnutzerfreundlich:** keine Ticket-IDs/Parameter/Funktionsnamen; Technik gehört in die Commit-Message.
-- **SemVer:** Anschluss-Tickets an einem bestehenden Feature → **Patch** (3. Stelle); nur neue eigenständige Features → Minor. HINWEIS: Die Notification-Auslöser dieser Wache wurden noch fälschlich als Minors (1.6.0/1.7.0) gezählt – ab jetzt korrekt als Patch.
-- **Subagenten:** Test-/Recherche-Späher dürfen **nie** committen/pushen (ein general-purpose-Subagent tat es eigenmächtig). Read-only/git-Verbot im Prompt; Berichte gegen echte Artefakte verifizieren.
+**Neue Konvention (diese Wache, in Conventions & Patterns + lessons-learned + Memory `feedback_no_inline_event_handlers`):**
+- **Keine inline-Event-Handler** (`onchange`/`onclick`/…) in Templates – die CSP (`script-src` ohne `unsafe-inline`, nonce-basiert) blockiert sie. Stattdessen nonce-signiertes `<script>` mit `addEventListener`. CSP **nie** mit `unsafe-inline` aufweichen.
 
-**Deploy-Stand:** Live ≈ **v1.4.1** auf `stonbgsport01` (zuletzt nach Healthcheck-Fix deployed, Container „healthy"). **v1.5.0–1.7.0 ausstehend** – rein additiv (UI + Auslöser), **keine** Migration/`.env`: `git pull && docker compose pull && docker compose up -d`. (Die `notifications`-Migration lief bereits beim `gau4`-Deploy.)
+**Deploy-Stand:** Live ≈ **v1.4.1** auf `stonbgsport01`. **v1.5.0–1.7.5 ausstehend.** Deploy: `git pull && docker compose pull && docker compose up -d`. Enthält **eine** Migration (`notifications.actor_id`) → läuft **automatisch** beim Container-Start (entrypoint.sh). **Hinweis:** Der `oa6n`-Fix ist eine Template-/Image-Änderung → braucht ein **frisches Image** (CI-Build nach Push), damit die Dropdowns live funktionieren.
 
-**Offene Queue (`bd ready`):**
-- `oa6n` (P2, **Bug**) – Bonus-Challenge fehlerhaft im Multi-Challenge-Kontext (Repro/Diagnose vom Kapitän noch offen)
-- `co52` (P2, **Bug**) – `challenges.index` crasht bei >1 gleichzeitiger Einladung (`scalar_one_or_none`)
-- `ngk0` (P2) – Notification: „X hat deinen Beitrag geliked" (Lärm-Risiko bedacht)
-- `kfzb` (P2) – Notification: Challenge startet/endet (**ZEITbasiert, kein Scheduler** → Mechanik-Entscheidung nötig)
-- `2ar3` (P2) – PayPal-Spendenlink (**braucht Migration**: `donation_url`-Spalte!)
-- `tjs` (P3, Rest) – 404/500-Seiten, Limiter-Backend, robots.txt
-- `4t4` / `18t` (P3) – KI-Screenshot-Features (Kalorien / Sportart)
+**Optimierungs-Backlog (neu angelegt, für die geplante große Runde):**
+- **Tests/Quality:** `r96z` (Route-Smoke ≠ 500) · `w7e1` (Playwright-E2E in CI) · `fzku` (`scalar_one_or_none`-Audit) · `wkvn` (Migrations-Drift) · `w5os` (vulture+mypy+coverage) · `iofv` (Security-Header-Test)
+- **Performance:** `379m` (Slow-Endpoints, N+1, Profiling) · `qt72` (DB-Index-Audit)
+- **Security:** `izas` (IDOR/Autorisierung) · `b2u0` (CSP-Audit) · `j0b5` (Upload-Härtung) · `ytum` (Dependency/Secret-Hygiene)
+
+**Restliche offene Queue:** `kfzb` (Notif Challenge start/ende – **ZEITbasiert, kein Scheduler** → Mechanik offen) · `2ar3` (PayPal-Spendenlink – **braucht Migration** `donation_url`) · `g6lz` (/challenges alle Einladungen, Plural) · `na54` (Menü-Link `/challenges` fehlt) · `tjs` (Rest: 404/500-Seiten, Limiter-Backend, robots.txt) · `4t4`/`18t` (KI-Screenshot).
 
 **Bestehender Grenzfall (unverändert):** Aktivität exakt um 00:00 Uhr fällt im `_ranking`-Filter (`if v`) beim Frühaufsteher raus – bewusst nicht gefixt (siehe `docs/lessons-learned.md`).
 
@@ -93,7 +87,7 @@ bd close <id>         # Complete work
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories "wachwechsel-17"          # Pointer für diesen Wachwechsel (#17)
+bd memories "wachwechsel-18"          # Pointer für diesen Wachwechsel (#18)
 bd ready                              # nächste Issues
 ```
 
@@ -165,3 +159,4 @@ Falls das venv nach einem Projektumzug gebrochen ist (Shebang-Fehler), einfach `
 - **Tests:** Playwright-Aufgaben immer via Haiku-Sub-Agent (siehe user-global CLAUDE.md)
 - **Git-Remote:** `github.com/total-verpLANt/sport-challenge` – `git push` nach jedem Commit
 - **CHANGELOG endnutzerfreundlich:** `CHANGELOG.md` wird auf der Webseite unter `/changelog` für die **App-Nutzer (Nicht-Techniker)** angezeigt. Einträge daher in einfacher Alltagssprache aus Nutzersicht schreiben – KEINE Ticket-IDs, Parameter, Funktions-/Datei-/Tabellennamen, Test-/Zeilenzahlen oder Implementierungsdetails (kein „N+1", „Migration", „Fernet" etc.). Kategorien: `### Neu`, `### Verbessert`, `### Behoben`, `### Sicherheit`. Versions-Überschrift bleibt `## [x.y.z] – JJJJ-MM-TT`. Technische Details gehören in die **Commit-Message** (für Entwickler/Agenten), nicht ins CHANGELOG.
+- **Keine inline-Event-Handler in Templates:** `onchange`/`onclick`/`onsubmit`/… werden von der Talisman-CSP (`script-src` ohne `unsafe-inline`, nonce-basiert) **blockiert** – die Aktion läuft stumm ins Leere und pytest sieht es nicht. Stattdessen ein nonce-signiertes Script (`<script nonce="{{ csp_nonce() }}">…addEventListener(...)…</script>`). Die CSP **niemals** mit `unsafe-inline` aufweichen (XSS-Schutz). Siehe `oa6n` / lessons-learned / Memory `feedback_no_inline_event_handlers`.
