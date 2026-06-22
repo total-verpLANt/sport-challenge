@@ -392,3 +392,49 @@ def test_register_survives_mailer_error(client, db):
     ).scalar_one_or_none()
     assert new_user is not None
     assert new_user.is_approved is False
+
+
+def test_register_creates_inapp_notification_for_admins(client, db):
+    """Neuregistrierung erzeugt eine In-App-Notification (Glocke) für jeden Admin."""
+    from app.models.notification import Notification
+    from app.services.notifications import NotificationType, unread_count
+
+    admins = []
+    for i in (1, 2):
+        admin = User(email=f"admin{i}@example.com", role="admin", is_approved=True)
+        admin.set_password("admin_passwort")
+        db.session.add(admin)
+        admins.append(admin)
+    db.session.commit()
+
+    with patch("app.routes.auth.get_mailer"):
+        client.post(
+            "/auth/register",
+            data={"email": "neuling@example.com", "password": "sicheresPasswort1"},
+            follow_redirects=False,
+        )
+
+    for admin in admins:
+        notif = db.session.execute(
+            db.select(Notification).where(Notification.user_id == admin.id)
+        ).scalar_one_or_none()
+        assert notif is not None
+        assert notif.type == NotificationType.NEW_REGISTRATION
+        assert "neuling@example.com" in notif.message
+        assert notif.link_url == "/admin/users"
+        assert unread_count(admin.id) == 1
+
+
+def test_first_user_registration_creates_no_notification(client, db):
+    """Der erste User wird selbst Admin/approved – niemand muss benachrichtigt werden."""
+    from app.models.notification import Notification
+
+    with patch("app.routes.auth.get_mailer"):
+        client.post(
+            "/auth/register",
+            data={"email": "erster@example.com", "password": "sicheresPasswort1"},
+            follow_redirects=False,
+        )
+
+    notifications = db.session.scalars(db.select(Notification)).all()
+    assert notifications == []

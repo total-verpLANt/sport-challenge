@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.0] – 2026-06-22
+
+### Neu
+- Registriert sich ein neuer Nutzer und wartet auf Freischaltung, werden die Admins jetzt auch über die Benachrichtigungs-Glocke informiert (zusätzlich zur E-Mail) – ein Klick führt direkt zur Benutzerverwaltung.
+
 ## [1.6.0] – 2026-06-21
 
 ### Neu

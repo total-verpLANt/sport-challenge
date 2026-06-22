@@ -10,7 +10,9 @@ from email_validator import validate_email, EmailNotValidError
 
 from app.extensions import _get_real_ip, db, limiter
 from app.models.user import User
+from app.services import notifications as notif_service
 from app.services.mailer import MailgunError, get_mailer
+from app.services.notifications import NotificationType
 from app.utils.urls import external_url_for
 
 logger = logging.getLogger(__name__)
@@ -233,6 +235,17 @@ def _notify_admins_new_user(new_user: User) -> None:
     ).scalars().all()
     if not admins:
         return
+
+    # In-App-Notification (Glocke) zuerst – robust, unabhängig vom E-Mail-Versand,
+    # der unten fehlschlagen kann und nur geloggt wird.
+    for admin in admins:
+        notif_service.create_notification(
+            admin.id,
+            NotificationType.NEW_REGISTRATION,
+            f"Neue Registrierung: {new_user.email} wartet auf Freischaltung",
+            link_url=url_for("admin.users"),
+        )
+    db.session.commit()
 
     admin_url = external_url_for("admin.users")
     registered_at = new_user.created_at.strftime("%d.%m.%Y %H:%M UTC") if new_user.created_at else "unbekannt"
