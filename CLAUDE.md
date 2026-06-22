@@ -93,7 +93,7 @@ bd close <id>         # Complete work
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories handover                  # Pointer für diesen Wachwechsel (#17)
+bd memories "wachwechsel-17"          # Pointer für diesen Wachwechsel (#17)
 bd ready                              # nächste Issues
 ```
 
