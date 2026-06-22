@@ -12,7 +12,6 @@ from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.sick_period import SickPeriod, SickPeriodLike
 from app.models.user import User
 from app.services import notifications as notif_service
-from app.services.notifications import NotificationType
 from app.services.statistics import get_challenge_statistics
 from app.services.weekly_summary import get_challenge_summary
 from app.utils.motivational_quotes import get_random_quote
@@ -316,33 +315,30 @@ def like_activity(activity_id: int):
     ).scalars().first()
 
     feed_link = url_for("dashboard.index") + f"#feed-post-activity-{activity.id}"
-    is_foreign = activity.user_id != current_user.id
     if existing_like:
         db.session.delete(existing_like)
-        if is_foreign:
-            notif_service.remove_unread_like(activity.user_id, feed_link, current_user.id)
-        db.session.commit()
         liked = False
     else:
         db.session.add(ActivityLike(activity_id=activity_id, user_id=current_user.id))
-        if is_foreign and not notif_service.has_unread_like(
-            activity.user_id, feed_link, current_user.id
-        ):
-            notif_service.create_notification(
-                activity.user_id,
-                NotificationType.ACTIVITY_LIKED,
-                f"{current_user.display_name} hat deinen Beitrag geliked",
-                link_url=feed_link,
-                actor_id=current_user.id,
-            )
-        db.session.commit()
         liked = True
+    db.session.flush()
 
     likes = db.session.scalars(
         db.select(ActivityLike)
         .where(ActivityLike.activity_id == activity_id)
         .options(selectinload(ActivityLike.user))
+        .order_by(ActivityLike.id.desc())
     ).all()
+
+    # Gebündelte Like-Notification: fremde Liker (ohne Urheber), neueste zuerst.
+    foreign = [lk for lk in likes if lk.user_id != activity.user_id]
+    notif_service.upsert_like_notification(
+        activity.user_id,
+        feed_link,
+        [lk.user.display_name for lk in foreign],
+        foreign[0].user_id if foreign else None,
+    )
+    db.session.commit()
 
     liked_by = [like.user.display_name for like in likes]
     return jsonify({"liked": liked, "count": len(likes), "liked_by": liked_by})
@@ -368,33 +364,30 @@ def like_sick_period(sick_period_id: int):
     ).scalars().first()
 
     feed_link = url_for("dashboard.index") + f"#feed-post-absence-{period.id}"
-    is_foreign = period.user_id != current_user.id
     if existing_like:
         db.session.delete(existing_like)
-        if is_foreign:
-            notif_service.remove_unread_like(period.user_id, feed_link, current_user.id)
-        db.session.commit()
         liked = False
     else:
         db.session.add(SickPeriodLike(sick_period_id=sick_period_id, user_id=current_user.id))
-        if is_foreign and not notif_service.has_unread_like(
-            period.user_id, feed_link, current_user.id
-        ):
-            notif_service.create_notification(
-                period.user_id,
-                NotificationType.ACTIVITY_LIKED,
-                f"{current_user.display_name} hat deinen Beitrag geliked",
-                link_url=feed_link,
-                actor_id=current_user.id,
-            )
-        db.session.commit()
         liked = True
+    db.session.flush()
 
     likes = db.session.scalars(
         db.select(SickPeriodLike)
         .where(SickPeriodLike.sick_period_id == sick_period_id)
         .options(selectinload(SickPeriodLike.user))
+        .order_by(SickPeriodLike.id.desc())
     ).all()
+
+    # Gebündelte Like-Notification: fremde Liker (ohne Urheber), neueste zuerst.
+    foreign = [lk for lk in likes if lk.user_id != period.user_id]
+    notif_service.upsert_like_notification(
+        period.user_id,
+        feed_link,
+        [lk.user.display_name for lk in foreign],
+        foreign[0].user_id if foreign else None,
+    )
+    db.session.commit()
 
     liked_by = [like.user.display_name for like in likes]
     return jsonify({"liked": liked, "count": len(likes), "liked_by": liked_by})

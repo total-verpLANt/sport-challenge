@@ -886,6 +886,22 @@ def _count_unread_like_notifications(db, user_id):
     )
 
 
+def _latest_like_message(db, user_id):
+    """Text der neuesten ungelesenen (gebündelten) Like-Notification."""
+    from app.models.notification import Notification
+
+    return db.session.scalar(
+        db.select(Notification.message)
+        .where(
+            Notification.user_id == user_id,
+            Notification.type == "activity_liked",
+            Notification.read_at.is_(None),
+        )
+        .order_by(Notification.created_at.desc())
+        .limit(1)
+    )
+
+
 def test_relike_after_unlike_yields_single_notification(client, db):
     """like → unlike → like erzeugt genau EINE ungelesene Notification (kein Spam)."""
     owner, activity = _setup_owner_with_activity(client, db)
@@ -898,8 +914,8 @@ def test_relike_after_unlike_yields_single_notification(client, db):
     assert _count_unread_like_notifications(db, owner.id) == 1
 
 
-def test_two_different_likers_two_notifications(client, db):
-    """Zwei verschiedene Liker → zwei Notifications (kein fälschliches Dedup)."""
+def test_two_different_likers_bundled_into_one(client, db):
+    """s779: Zwei verschiedene Liker → EINE gebündelte Notification ('A und B')."""
     owner, activity = _setup_owner_with_activity(client, db)
 
     _create_and_login(client, db, email="liker_one@test.com")
@@ -909,7 +925,39 @@ def test_two_different_likers_two_notifications(client, db):
     _create_and_login(client, db, email="liker_two@test.com")
     client.post(f"/dashboard/activities/{activity.id}/like")
 
-    assert _count_unread_like_notifications(db, owner.id) == 2
+    assert _count_unread_like_notifications(db, owner.id) == 1
+    msg = _latest_like_message(db, owner.id)
+    assert " und " in msg and msg.endswith("haben deinen Beitrag geliked")
+
+
+def test_three_likers_bundled_message(client, db):
+    """s779: Drei Liker → eine Notification 'X und 2 weitere'."""
+    owner, activity = _setup_owner_with_activity(client, db)
+    for email in ("liker_a@test.com", "liker_b@test.com", "liker_c@test.com"):
+        _create_and_login(client, db, email=email)
+        client.post(f"/dashboard/activities/{activity.id}/like")
+        client.post("/auth/logout")
+
+    assert _count_unread_like_notifications(db, owner.id) == 1
+    assert "2 weitere haben deinen Beitrag geliked" in _latest_like_message(db, owner.id)
+
+
+def test_unlike_one_of_two_shrinks_message(client, db):
+    """s779: Un-Like eines von zwei Likern → Text schrumpft auf den Verbliebenen."""
+    owner, activity = _setup_owner_with_activity(client, db)
+
+    stayer = _create_and_login(client, db, email="stayer@test.com")
+    stay_name = stayer.display_name
+    client.post(f"/dashboard/activities/{activity.id}/like")
+    client.post("/auth/logout")
+
+    _create_and_login(client, db, email="leaver@test.com")
+    client.post(f"/dashboard/activities/{activity.id}/like")    # like → 'leaver und stayer'
+    assert _count_unread_like_notifications(db, owner.id) == 1
+    client.post(f"/dashboard/activities/{activity.id}/like")    # un-like leaver
+
+    assert _count_unread_like_notifications(db, owner.id) == 1
+    assert _latest_like_message(db, owner.id) == f"{stay_name} hat deinen Beitrag geliked"
 
 
 def test_unlike_keeps_already_read_notification(client, db):

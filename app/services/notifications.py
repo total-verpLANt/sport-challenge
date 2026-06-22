@@ -51,42 +51,73 @@ def create_notification(
     return notification
 
 
-def has_unread_like(user_id: int, link_url: str, actor_id: int) -> bool:
-    """True, wenn für (Empfänger, Beitrag, Liker) bereits eine UNGELESENE
-    Like-Notification existiert – verhindert Doppel bei Re-Like (Toggle).
+def render_like_message(liker_names: list[str]) -> str:
+    """Baut den gebündelten Like-Text. `liker_names`: neueste zuerst.
+
+    1 → „A hat …", 2 → „A und B haben …", >2 → „A und N weitere haben …".
     """
-    return db.session.scalar(
-        db.select(Notification.id)
-        .where(
+    n = len(liker_names)
+    if n == 1:
+        return f"{liker_names[0]} hat deinen Beitrag geliked"
+    if n == 2:
+        return f"{liker_names[0]} und {liker_names[1]} haben deinen Beitrag geliked"
+    return f"{liker_names[0]} und {n - 1} weitere haben deinen Beitrag geliked"
+
+
+def upsert_like_notification(
+    user_id: int,
+    link_url: str,
+    liker_names: list[str],
+    latest_actor_id: int | None = None,
+    commit: bool = False,
+) -> Notification | None:
+    """Pflegt die EINE gebündelte, ungelesene Like-Notification je Beitrag.
+
+    `liker_names` = aktuelle fremde Liker (ohne Urheber), neueste zuerst.
+    - Leere Liste → vorhandene UNGELESENE Bündel-Notif entfernen (Un-Like
+      des letzten Likers), Rückgabe None.
+    - Sonst: existierende ungelesene Bündel-Notif aktualisieren (Text,
+      Actor, created_at → wieder nach oben) oder neu anlegen.
+    Bereits GELESENE Notifications bleiben unberührt (historisch); ein neuer
+    Like nach dem Lesen erzeugt so eine frische ungelesene Bündel-Notif.
+    Notif-Identität: (Empfänger, Typ activity_liked, Beitrag, read_at NULL) –
+    stets auf `user_id` gefiltert (kein IDOR).
+    """
+    existing = db.session.scalar(
+        db.select(Notification).where(
             Notification.user_id == user_id,
             Notification.type == NotificationType.ACTIVITY_LIKED,
             Notification.link_url == link_url,
-            Notification.actor_id == actor_id,
-            Notification.read_at.is_(None),
-        )
-        .limit(1)
-    ) is not None
-
-
-def remove_unread_like(
-    user_id: int, link_url: str, actor_id: int, commit: bool = False
-) -> int:
-    """Nimmt die UNGELESENE Like-Notification eines Likers für einen Beitrag
-    beim Un-Like zurück. Bereits gelesene Notifications bleiben unberührt
-    (historisch). Gibt die Anzahl gelöschter Zeilen zurück.
-    """
-    result = db.session.execute(
-        db.delete(Notification).where(
-            Notification.user_id == user_id,
-            Notification.type == NotificationType.ACTIVITY_LIKED,
-            Notification.link_url == link_url,
-            Notification.actor_id == actor_id,
             Notification.read_at.is_(None),
         )
     )
+
+    if not liker_names:
+        if existing is not None:
+            db.session.delete(existing)
+        if commit:
+            db.session.commit()
+        return None
+
+    message = render_like_message(liker_names)
+    if existing is not None:
+        existing.message = message
+        existing.actor_id = latest_actor_id
+        existing.created_at = datetime.now(timezone.utc)
+        notification = existing
+    else:
+        notification = Notification(
+            user_id=user_id,
+            type=NotificationType.ACTIVITY_LIKED,
+            message=message,
+            link_url=link_url,
+            actor_id=latest_actor_id,
+        )
+        db.session.add(notification)
+
     if commit:
         db.session.commit()
-    return result.rowcount or 0
+    return notification
 
 
 def unread_count(user_id: int) -> int:

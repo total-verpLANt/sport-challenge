@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.3] – 2026-06-22
+
+### Verbessert
+- Wenn mehrere Leute denselben Beitrag mit „Gefällt mir" markieren, bekommst du dafür nur noch **eine** gesammelte Benachrichtigung („Anna und 2 weitere haben deinen Beitrag geliked") statt vieler einzelner. Sie aktualisiert sich automatisch, wenn weitere dazukommen oder ihr „Gefällt mir" zurücknehmen.
+
 ## [1.7.2] – 2026-06-22
 
 ### Verbessert
