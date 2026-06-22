@@ -60,21 +60,17 @@ def index():
             db.select(Challenge).order_by(Challenge.created_at.desc())
         ).all()
 
-    # Aktive Participation des Users (für schnellen Zugriff)
-    active_participation = db.session.execute(
-        db.select(ChallengeParticipation).where(
-            ChallengeParticipation.user_id == current_user.id,
-            ChallengeParticipation.status == "accepted",
-        )
-    ).scalar_one_or_none()
-
-    # Ausstehende Einladung
-    pending_invitation = db.session.execute(
-        db.select(ChallengeParticipation).where(
+    # Ausstehende Einladung (neueste). scalars().first() statt
+    # scalar_one_or_none(): im Multi-Challenge-Betrieb kann es MEHRERE offene
+    # Einladungen geben – scalar_one_or_none() würde dann crashen (co52).
+    pending_invitation = db.session.scalars(
+        db.select(ChallengeParticipation)
+        .where(
             ChallengeParticipation.user_id == current_user.id,
             ChallengeParticipation.status == "invited",
         )
-    ).scalar_one_or_none()
+        .order_by(ChallengeParticipation.id.desc())
+    ).first()
 
     # Teilnahme-Status-Map: challenge_id → participation (für Template-Kennzeichnung)
     participation_by_challenge = {
@@ -90,7 +86,6 @@ def index():
         "challenges/index.html",
         visible_challenges=visible_challenges,
         pending_invitation=pending_invitation,
-        active_participation=active_participation,
         participation_by_challenge=participation_by_challenge,
     )
 

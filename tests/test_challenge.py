@@ -794,3 +794,24 @@ def test_create_challenge_invites_create_notification(client, db):
     assert notif is not None
     assert notif.type == NotificationType.CHALLENGE_INVITE
     assert "Winter-Challenge" in notif.message
+
+
+def test_challenges_index_multi_accepted_and_invited_no_crash(client, db):
+    """co52: /challenges crasht nicht mehr bei >1 akzeptierter Teilnahme
+    bzw. >1 offener Einladung (vorher scalar_one_or_none → 500)."""
+    user = _create_and_login(client, db, email="multi_co52@test.com")
+
+    # 2 akzeptierte + 2 eingeladene Challenges → beide alte scalar_one_or_none-
+    # Aufrufe hätten MultipleResultsFound geworfen.
+    for i in range(2):
+        c = _create_challenge(db, user.id, name=f"Accepted {i}")
+        db.session.add(ChallengeParticipation(
+            user_id=user.id, challenge_id=c.id, status="accepted"))
+    for i in range(2):
+        c = _create_challenge(db, user.id, name=f"Invited {i}")
+        db.session.add(ChallengeParticipation(
+            user_id=user.id, challenge_id=c.id, status="invited"))
+    db.session.commit()
+
+    resp = client.get("/challenges/")
+    assert resp.status_code == 200

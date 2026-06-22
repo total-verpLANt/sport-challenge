@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.4] – 2026-06-22
+
+### Behoben
+- Die Challenge-Übersicht ließ sich nicht mehr öffnen (Fehlerseite), sobald man gleichzeitig an mehreren Challenges teilnahm oder mehrere offene Einladungen hatte. Sie lädt jetzt wieder zuverlässig.
+
 ## [1.7.3] – 2026-06-22
 
 ### Verbessert
