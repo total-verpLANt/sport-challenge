@@ -13,8 +13,14 @@ Aufruf (im Container):
 import os
 import sys
 
-# Projekt-Root in den Pfad, damit `app` importierbar ist (Script liegt in scripts/).
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Projekt-Root in den Pfad, damit `app` importierbar ist. Bei normalem Aufruf
+# über das Script-File; bei `python - < script` (stdin-Pipe) fehlt __file__ →
+# Fallback auf das aktuelle Verzeichnis (im Container ist das WORKDIR /app).
+try:
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+except NameError:
+    _root = os.getcwd()
+sys.path.insert(0, _root)
 
 from app import create_app
 from app.extensions import db
