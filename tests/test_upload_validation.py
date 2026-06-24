@@ -122,6 +122,20 @@ def test_valid_mp4_accepted(upload_dir, sample_mp4_bytes):
     assert len(_files_in(upload_dir)) == 1
 
 
+def test_valid_heic_accepted(upload_dir):
+    """HEIC (iPhone-Standard) wird akzeptiert, sofern pillow-heif verfügbar ist."""
+    from app.utils.uploads import _HEIF_SUPPORTED
+
+    if not _HEIF_SUPPORTED:
+        pytest.skip("pillow-heif nicht verfügbar")
+    buf = io.BytesIO()
+    Image.new("RGB", (16, 16), "red").save(buf, format="HEIF")
+    path, reason = save_upload(_fs(buf.getvalue(), "photo.heic"))
+    assert reason is None
+    assert path.startswith("uploads/")
+    assert len(_files_in(upload_dir)) == 1
+
+
 # ---------------------------------------------------------------------------
 # Bestehendes Verhalten: unerlaubte Endung wird vor jeder Inhaltsprüfung abgewiesen
 # ---------------------------------------------------------------------------

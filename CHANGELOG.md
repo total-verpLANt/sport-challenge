@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.7] – 2026-06-24
+
+### Neu
+- Du kannst jetzt auch **HEIC-Fotos vom iPhone** direkt hochladen – das Standardformat neuerer iPhones musste vorher erst umgewandelt werden.
+
 ## [1.7.6] – 2026-06-24
 
 ### Verbessert

@@ -7,12 +7,31 @@ from pathlib import Path
 from flask import current_app
 from PIL import Image
 
+# HEIC/HEIF (iPhone-Standardformat) via pillow-heif. Defensiver Import: fehlt die
+# Lib (oder libheif) im laufenden Image, bleibt die App lauffähig und HEIC wird
+# einfach nicht erlaubt – statt die ganze App beim Start zu brechen.
+try:
+    from pillow_heif import register_heif_opener
+
+    register_heif_opener()
+    _HEIF_SUPPORTED = True
+except Exception:  # pragma: no cover - Fallback bei fehlender pillow-heif/libheif
+    _HEIF_SUPPORTED = False
+
 IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 VIDEO_EXTENSIONS = {"mp4", "mov", "webm"}
-ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 
 # Pillow-Format-Namen, die zu den erlaubten Bild-Endungen passen (Inhalts-Allowlist).
 ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
+
+# HEIC/HEIF nur freigeben, wenn der Decoder wirklich da ist. Pillow meldet HEIC
+# unter dem Format-Namen "HEIF". Ist die Lib nicht verfügbar, erhält ein
+# heic-Upload die ehrliche "nicht unterstützt"-Meldung statt "beschädigt".
+if _HEIF_SUPPORTED:
+    IMAGE_EXTENSIONS |= {"heic", "heif"}
+    ALLOWED_IMAGE_FORMATS |= {"HEIF"}
+
+ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 # ffprobe-Container-Tokens echter Video-Container. Wichtig: ffprobe meldet auch für
 # Einzelbilder (z. B. PNG → "png_pipe") einen codec_type=video-Stream. Erst der
 # Container-Abgleich verhindert, dass ein Bild mit .mp4-Endung als Video durchrutscht.
