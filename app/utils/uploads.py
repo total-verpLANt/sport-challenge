@@ -84,16 +84,27 @@ def get_media_type(filename: str) -> str:
     return "video" if ext in VIDEO_EXTENSIONS else "image"
 
 
-def save_upload(file) -> str | None:
-    if not file or not file.filename or not allowed_file(file.filename):
-        return None
+def save_upload(file) -> tuple[str | None, str | None]:
+    """Speichert einen Upload. Rückgabe: ``(relativer_pfad, fehlergrund)``.
+
+    Bei Erfolg ``(pfad, None)``, bei Ablehnung ``(None, grund)``. Der Grund ist
+    kurz und nutzerfreundlich formuliert und kann direkt geflasht werden, damit
+    der Nutzer erfährt, *warum* der Upload scheiterte (falsche Endung vs.
+    beschädigter/unlesbarer Inhalt) – ohne interne Details preiszugeben.
+    """
+    if not file or not file.filename:
+        return None, "Keine Datei ausgewählt."
+    if not allowed_file(file.filename):
+        ext = file.filename.rsplit(".", 1)[1].lower() if "." in file.filename else ""
+        detail = f".{ext}" if ext else "ohne Endung"
+        return None, f"Dateiformat {detail} wird nicht unterstützt."
     media_type = get_media_type(file.filename)
 
     # Bilder VOR dem Speichern aus dem Stream validieren → eine abgelehnte Datei
     # landet gar nicht erst auf der Disk (kein Orphan möglich).
     if media_type == "image" and not _is_valid_image(file.stream):
         current_app.logger.warning("save_upload: Bild-Inhalt ungültig, abgelehnt: %s", file.filename)
-        return None
+        return None, "Bild beschädigt oder unlesbar."
 
     ext = file.filename.rsplit(".", 1)[1].lower()
     filename = f"{uuid.uuid4().hex}.{ext}"
@@ -107,9 +118,9 @@ def save_upload(file) -> str | None:
     if media_type == "video" and not _is_valid_video(filepath):
         filepath.unlink(missing_ok=True)
         current_app.logger.warning("save_upload: Video-Inhalt ungültig, abgelehnt: %s", file.filename)
-        return None
+        return None, "Video beschädigt oder unlesbar."
 
-    return f"uploads/{filename}"
+    return f"uploads/{filename}", None
 
 
 def delete_upload(relative_path: str) -> None:

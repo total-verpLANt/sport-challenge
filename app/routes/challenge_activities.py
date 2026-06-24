@@ -174,9 +174,9 @@ def log_submit():
     saved_media = []
     for f in media_files:
         if f and f.filename:
-            path = save_upload(f)
+            path, reason = save_upload(f)
             if path is None:
-                flash("Ungültiges Dateiformat (erlaubt: JPG, PNG, WebP, MP4, MOV, WebM, max. 50 MB).")
+                flash(reason)
                 return redirect(url_for("challenge_activities.log_form"))
             saved_media.append((path, get_media_type(f.filename), secure_filename(f.filename)))
 
@@ -730,9 +730,9 @@ def add_media(activity_id: int):
         any_saved = False
         for f in media_files:
             if f and f.filename:
-                path = save_upload(f)
+                path, reason = save_upload(f)
                 if path is None:
-                    flash("Ungültiges Dateiformat (erlaubt: JPG, PNG, WebP, MP4, MOV, WebM, max. 50 MB).", "danger")
+                    flash(reason, "danger")
                     return redirect(request.url)
                 db.session.add(ActivityMedia(
                     activity_id=activity.id,

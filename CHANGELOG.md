@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.6] – 2026-06-24
+
+### Verbessert
+- Wenn ein Foto oder Video nicht hochgeladen werden kann, sagt dir die App jetzt **warum** – zum Beispiel, dass das Dateiformat nicht unterstützt wird oder die Datei beschädigt ist. Vorher gab es nur eine allgemeine Fehlermeldung.
+
 ## [1.7.5] – 2026-06-22
 
 ### Behoben

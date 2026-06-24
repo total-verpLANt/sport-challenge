@@ -69,22 +69,25 @@ def sample_mp4_bytes(tmp_path_factory) -> bytes:
 # ---------------------------------------------------------------------------
 
 def test_html_as_jpg_rejected(upload_dir):
-    result = save_upload(_fs(b"<html><script>alert(1)</script></html>", "evil.jpg"))
-    assert result is None
+    path, reason = save_upload(_fs(b"<html><script>alert(1)</script></html>", "evil.jpg"))
+    assert path is None
+    assert "beschädigt" in reason  # sprechender Grund statt Pauschaltext
     assert _files_in(upload_dir) == []  # kein Orphan
 
 
 def test_text_as_png_rejected(upload_dir):
-    result = save_upload(_fs(b"definitely not a png", "fake.png"))
-    assert result is None
+    path, reason = save_upload(_fs(b"definitely not a png", "fake.png"))
+    assert path is None
+    assert "Bild" in reason
     assert _files_in(upload_dir) == []
 
 
 def test_text_as_mp4_rejected(upload_dir):
     if shutil.which("ffprobe") is None:
         pytest.skip("ffprobe nicht verfügbar")
-    result = save_upload(_fs(b"this is plain text, not a video", "fake.mp4"))
-    assert result is None
+    path, reason = save_upload(_fs(b"this is plain text, not a video", "fake.mp4"))
+    assert path is None
+    assert "Video" in reason
     # Video wird erst gespeichert, dann via ffprobe geprüft → Datei muss wieder weg sein
     assert _files_in(upload_dir) == []
 
@@ -94,8 +97,9 @@ def test_image_content_as_mp4_rejected(upload_dir):
     aber der Container (png_pipe) ist kein erlaubter Video-Container → abgelehnt."""
     if shutil.which("ffprobe") is None:
         pytest.skip("ffprobe nicht verfügbar")
-    result = save_upload(_fs(_image_bytes("PNG"), "image.mp4"))
-    assert result is None
+    path, reason = save_upload(_fs(_image_bytes("PNG"), "image.mp4"))
+    assert path is None
+    assert reason
     assert _files_in(upload_dir) == []
 
 
@@ -105,16 +109,16 @@ def test_image_content_as_mp4_rejected(upload_dir):
 
 @pytest.mark.parametrize("fmt,ext", [("PNG", "png"), ("JPEG", "jpg"), ("WEBP", "webp")])
 def test_valid_image_accepted(upload_dir, fmt, ext):
-    result = save_upload(_fs(_image_bytes(fmt), f"good.{ext}"))
-    assert result is not None
-    assert result.startswith("uploads/")
+    path, reason = save_upload(_fs(_image_bytes(fmt), f"good.{ext}"))
+    assert reason is None
+    assert path.startswith("uploads/")
     assert len(_files_in(upload_dir)) == 1
 
 
 def test_valid_mp4_accepted(upload_dir, sample_mp4_bytes):
-    result = save_upload(_fs(sample_mp4_bytes, "clip.mp4"))
-    assert result is not None
-    assert result.startswith("uploads/")
+    path, reason = save_upload(_fs(sample_mp4_bytes, "clip.mp4"))
+    assert reason is None
+    assert path.startswith("uploads/")
     assert len(_files_in(upload_dir)) == 1
 
 
@@ -123,6 +127,8 @@ def test_valid_mp4_accepted(upload_dir, sample_mp4_bytes):
 # ---------------------------------------------------------------------------
 
 def test_disallowed_extension_rejected(upload_dir):
-    result = save_upload(_fs(_image_bytes("PNG"), "sneaky.svg"))
-    assert result is None
+    path, reason = save_upload(_fs(_image_bytes("PNG"), "sneaky.svg"))
+    assert path is None
+    # Grund nennt die konkrete Endung → Nutzer weiß, warum
+    assert ".svg" in reason
     assert _files_in(upload_dir) == []

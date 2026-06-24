@@ -301,9 +301,9 @@ def add_entry(bonus_id):
         flash("Bitte ein Beweisvideo hochladen.")
         return redirect(url_for("bonus.index"))
 
-    video_path = save_upload(video_file)
+    video_path, reason = save_upload(video_file)
     if video_path is None:
-        flash("Ungültiges Videoformat (erlaubt: MP4, MOV, WebM, max. 50 MB).")
+        flash(reason)
         return redirect(url_for("bonus.index"))
 
     if get_media_type(video_file.filename) != "video":
