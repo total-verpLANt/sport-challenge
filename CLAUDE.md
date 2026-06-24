@@ -50,28 +50,25 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-22, Wachwechsel #18)
+## Aktueller Stand (2026-06-24, Wachwechsel #19)
 
-**Aktive Arbeit:** Keine. **v1.7.5**, gepusht auf `origin/main`.
+**Aktive Arbeit:** Keine. **v1.7.7**, gepusht auf `origin/main`.
 
-- **Version:** 1.7.5 (gepusht; milestone-Tag `milestone-v1.7.5` auf `cc347f7`)
-- **314 Tests grün**, bandit + pip-audit + CI grün.
-- **Kein** `.env`-/Dependency-Eingriff. **Eine** Migration diese Wache (`notifications.actor_id`, ua3l) – additiv/nullable, läuft beim Deploy automatisch via `entrypoint.sh` (`flask db upgrade`).
+- **Version:** 1.7.7 (gepusht; kein Tag diese Wache).
+- **315 Tests grün**.
+- **Dependency-Eingriff:** `pillow-heif` neu (HEIC). **Keine** Migration diese Wache.
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abgeschlossen diese Wache (Like-Notification-Auslöser + Multi-Challenge-Bugfixes):**
-- `ngk0` → Notification bei Like auf fremden Beitrag (Self-/Un-Like beachtet). **v1.7.1**
-- `ua3l` → Like-Notif-Dedup + Un-Like-Rücknahme via neuer Spalte `notifications.actor_id` (Migration, `ON DELETE SET NULL`). **v1.7.2**
-- `s779` → Like-Notifs je Beitrag **gebündelt** („A und N weitere"), Text dynamisch aus der Like-Tabelle (kein Badge-Drift). **v1.7.3**
-- `co52` → **Bug behoben:** `/challenges` crashte (500) bei >1 accepted Challenge / >1 Einladung (`scalar_one_or_none` → `MultipleResultsFound`; toter `active_participation`-Code entfernt). **v1.7.4**
-- `oa6n` → **Bug behoben:** Challenge-Dropdowns (Bonus + `my_week` + `user_activities`) wirkungslos, weil die Talisman-CSP den inline-`onchange` blockierte → nonce'd `addEventListener`. **v1.7.5**
-- Diagnose-Werkzeug `scripts/diagnose_bonus.py` (read-only) für Teilnahme-/Bonus-Analyse (`docker compose exec -T web python - <email> < scripts/diagnose_bonus.py`).
+**Abgeschlossen diese Wache (Upload-Härtung):**
+- `54qr` → `save_upload()` liefert `(pfad, grund)` statt nur `str|None`; Nutzer erhält sprechende Fehlermeldung (Endung nicht unterstützt vs. Inhalt beschädigt) statt Pauschaltext. 3 Aufrufer nachgezogen. **v1.7.6**
+- `s86z` → **HEIC/HEIF-Upload** (iPhone) via `pillow-heif`. Defensiver Import (`_HEIF_SUPPORTED`): fehlt die Lib, bleibt App lauffähig + HEIC schlicht nicht erlaubt. Pillow meldet HEIC als Format `HEIF`. **v1.7.7**
+- Aufräumen: Duplikat-Issues `e8zi`/`2h71` (gleicher Titel, vorbestehend) mitgeschlossen.
 
 **Neue Konvention (diese Wache, in Conventions & Patterns + lessons-learned + Memory `feedback_no_inline_event_handlers`):**
 - **Keine inline-Event-Handler** (`onchange`/`onclick`/…) in Templates – die CSP (`script-src` ohne `unsafe-inline`, nonce-basiert) blockiert sie. Stattdessen nonce-signiertes `<script>` mit `addEventListener`. CSP **nie** mit `unsafe-inline` aufweichen.
 
-**Deploy-Stand:** Live ≈ **v1.4.1** auf `stonbgsport01`. **v1.5.0–1.7.5 ausstehend.** Deploy: `git pull && docker compose pull && docker compose up -d`. Enthält **eine** Migration (`notifications.actor_id`) → läuft **automatisch** beim Container-Start (entrypoint.sh). **Hinweis:** Der `oa6n`-Fix ist eine Template-/Image-Änderung → braucht ein **frisches Image** (CI-Build nach Push), damit die Dropdowns live funktionieren.
+**Deploy-Stand:** Live ≈ **v1.4.1** auf `stonbgsport01`. **v1.5.0–1.7.7 ausstehend.** Deploy: `git pull && docker compose pull && docker compose up -d`. Enthält **eine** Migration (`notifications.actor_id`, v1.7.2) → läuft **automatisch** beim Container-Start (entrypoint.sh). **Hinweis HEIC (v1.7.7):** neue Dependency `pillow-heif` → braucht ein **frisches Image** (CI-Build nach Push). Kein Dockerfile-Eingriff nötig: das cp313/`manylinux_2_28`-Wheel bündelt `libheif`.
 
 **Optimierungs-Backlog (neu angelegt, für die geplante große Runde):**
 - **Tests/Quality:** `r96z` (Route-Smoke ≠ 500) · `w7e1` (Playwright-E2E in CI) · `fzku` (`scalar_one_or_none`-Audit) · `wkvn` (Migrations-Drift) · `w5os` (vulture+mypy+coverage) · `iofv` (Security-Header-Test)
