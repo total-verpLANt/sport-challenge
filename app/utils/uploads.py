@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import current_app
-from PIL import Image
+from PIL import Image, ImageOps
 
 # HEIC/HEIF (iPhone-Standardformat) via pillow-heif. Defensiver Import: fehlt die
 # Lib (oder libheif) im laufenden Image, bleibt die App lauffähig und HEIC wird
@@ -126,9 +126,27 @@ def save_upload(file) -> tuple[str | None, str | None]:
         return None, "Bild beschädigt oder unlesbar."
 
     ext = file.filename.rsplit(".", 1)[1].lower()
-    filename = f"{uuid.uuid4().hex}.{ext}"
     upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
     upload_dir.mkdir(parents=True, exist_ok=True)
+
+    # HEIC/HEIF serverseitig in web-kompatibles JPEG umwandeln: kein verbreiteter
+    # Browser rendert HEIC nativ. Pillow liest HEIC dank pillow-heif; wir schreiben
+    # JPEG. exif_transpose zieht die iPhone-Aufnahme-Orientierung gerade, convert
+    # ("RGB") verhindert Fehler bei Alpha (JPEG kann kein Alpha).
+    if ext in {"heic", "heif"}:
+        filename = f"{uuid.uuid4().hex}.jpg"
+        filepath = upload_dir / filename
+        try:
+            img = Image.open(file.stream)
+            img = ImageOps.exif_transpose(img)
+            img.convert("RGB").save(filepath, "JPEG", quality=90)
+        except Exception:
+            filepath.unlink(missing_ok=True)
+            current_app.logger.warning("save_upload: HEIC-Konvertierung fehlgeschlagen: %s", file.filename)
+            return None, "Bild beschädigt oder unlesbar."
+        return f"uploads/{filename}", None
+
+    filename = f"{uuid.uuid4().hex}.{ext}"
     filepath = upload_dir / filename
     file.save(filepath)
 

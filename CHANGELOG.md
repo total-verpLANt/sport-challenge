@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.8] – 2026-06-24
+
+### Behoben
+- HEIC-Fotos vom iPhone ließen sich zwar hochladen, wurden im Browser aber nicht angezeigt. Sie werden beim Hochladen jetzt automatisch in ein anzeigbares Format umgewandelt – inklusive korrekter Bildausrichtung.
+
 ## [1.7.7] – 2026-06-24
 
 ### Neu

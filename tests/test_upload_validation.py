@@ -123,7 +123,7 @@ def test_valid_mp4_accepted(upload_dir, sample_mp4_bytes):
 
 
 def test_valid_heic_accepted(upload_dir):
-    """HEIC (iPhone-Standard) wird akzeptiert, sofern pillow-heif verfügbar ist."""
+    """HEIC (iPhone-Standard) wird akzeptiert und in web-kompatibles JPEG gewandelt."""
     from app.utils.uploads import _HEIF_SUPPORTED
 
     if not _HEIF_SUPPORTED:
@@ -132,8 +132,13 @@ def test_valid_heic_accepted(upload_dir):
     Image.new("RGB", (16, 16), "red").save(buf, format="HEIF")
     path, reason = save_upload(_fs(buf.getvalue(), "photo.heic"))
     assert reason is None
-    assert path.startswith("uploads/")
-    assert len(_files_in(upload_dir)) == 1
+    # HEIC wird zu .jpg konvertiert, weil Browser HEIC nicht rendern
+    assert path.endswith(".jpg")
+    stored = _files_in(upload_dir)
+    assert len(stored) == 1
+    # Die abgelegte Datei ist wirklich ein dekodierbares JPEG
+    with Image.open(stored[0]) as out:
+        assert out.format == "JPEG"
 
 
 # ---------------------------------------------------------------------------
