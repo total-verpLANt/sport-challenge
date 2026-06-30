@@ -50,25 +50,23 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-24, Wachwechsel #19)
+## Aktueller Stand (2026-06-30, Wachwechsel #20)
 
-**Aktive Arbeit:** Keine. **v1.7.7**, gepusht auf `origin/main`.
-
-- **Version:** 1.7.7 (gepusht; kein Tag diese Wache).
-- **315 Tests grün**.
-- **Dependency-Eingriff:** `pillow-heif` neu (HEIC). **Keine** Migration diese Wache.
+**Aktive Arbeit:** Keine. **v1.7.9**, gepusht auf `origin/main`. **315 Tests grün.**
+**Keine** Migration, **keine** neue Dependency, **kein** Env-Eingriff diese Wache (reiner Template-/CSS-Fix).
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abgeschlossen diese Wache (Upload-Härtung):**
-- `54qr` → `save_upload()` liefert `(pfad, grund)` statt nur `str|None`; Nutzer erhält sprechende Fehlermeldung (Endung nicht unterstützt vs. Inhalt beschädigt) statt Pauschaltext. 3 Aufrufer nachgezogen. **v1.7.6**
-- `s86z` → **HEIC/HEIF-Upload** (iPhone) via `pillow-heif`. Defensiver Import (`_HEIF_SUPPORTED`): fehlt die Lib, bleibt App lauffähig + HEIC schlicht nicht erlaubt. Pillow meldet HEIC als Format `HEIF`. **v1.7.7**
-- Aufräumen: Duplikat-Issues `e8zi`/`2h71` (gleicher Titel, vorbestehend) mitgeschlossen.
+**Abgeschlossen diese Wache:**
+- `sysk` → **Notif-Dropdown ragte auf Smartphones links aus dem Bild.** Fix: Media-Query (`<576px`) in `base.html` löst `#notif-menu` vom Glockenbutton → `position:fixed` über volle Breite (.5rem Rand, scrollbar). CSP unberührt (`style-src` erlaubt `'unsafe-inline'`). **v1.7.9**
+- Seit Wache #19 zusätzlich gepusht: `kbja` → HEIC-Upload serverseitig in web-kompatibles JPEG konvertieren. **v1.7.8**
+- Neues Ticket `qggk` (P3): Custom-CSS aus Inline-`<style>` in eigene `static/css/app.css` auslagern (erst sinnvoll bei mehr Custom-CSS).
 
-**Neue Konvention (diese Wache, in Conventions & Patterns + lessons-learned + Memory `feedback_no_inline_event_handlers`):**
-- **Keine inline-Event-Handler** (`onchange`/`onclick`/…) in Templates – die CSP (`script-src` ohne `unsafe-inline`, nonce-basiert) blockiert sie. Stattdessen nonce-signiertes `<script>` mit `addEventListener`. CSP **nie** mit `unsafe-inline` aufweichen.
+**Stolperstein diese Wache (lokal, in lessons-learned):** Die lokale Dev-DB hing auf altem Alembic-Stand (`notifications`-Tabelle fehlte) → **500 auf allen eingeloggten Seiten** (Login-Seite lud sauber). `flask db upgrade` brachte sie auf head. **Prod unberührt** (Auto-Migration via entrypoint.sh). Merke: bei lokalem 500 nach Login zuerst `flask db upgrade`.
 
-**Deploy-Stand:** Live ≈ **v1.4.1** auf `stonbgsport01`. **v1.5.0–1.7.7 ausstehend.** Deploy: `git pull && docker compose pull && docker compose up -d`. Enthält **eine** Migration (`notifications.actor_id`, v1.7.2) → läuft **automatisch** beim Container-Start (entrypoint.sh). **Hinweis HEIC (v1.7.7):** neue Dependency `pillow-heif` → braucht ein **frisches Image** (CI-Build nach Push). Kein Dockerfile-Eingriff nötig: das cp313/`manylinux_2_28`-Wheel bündelt `libheif`.
+**Bestehende Konvention (Wache #19):** **Keine inline-Event-Handler** (`onchange`/`onclick`/…) in Templates – CSP blockiert sie. Stattdessen nonce-signiertes `<script>` mit `addEventListener`. CSP **nie** mit `unsafe-inline` aufweichen.
+
+**Deploy-Stand:** Live ≈ **v1.4.1** auf `stonbgsport01`. **v1.5.0–1.7.9 ausstehend.** Deploy: `git pull && docker compose pull && docker compose up -d`. Enthält **eine** Migration (`notifications.actor_id`, v1.7.2) → läuft **automatisch** beim Container-Start (entrypoint.sh). **Hinweis HEIC (ab v1.7.7):** Dependency `pillow-heif` → braucht ein **frisches Image** (CI-Build nach Push). Kein Dockerfile-Eingriff nötig: das cp313/`manylinux_2_28`-Wheel bündelt `libheif`.
 
 **Optimierungs-Backlog (neu angelegt, für die geplante große Runde):**
 - **Tests/Quality:** `r96z` (Route-Smoke ≠ 500) · `w7e1` (Playwright-E2E in CI) · `fzku` (`scalar_one_or_none`-Audit) · `wkvn` (Migrations-Drift) · `w5os` (vulture+mypy+coverage) · `iofv` (Security-Header-Test)
@@ -84,7 +82,7 @@ bd close <id>         # Complete work
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories "wachwechsel-18"          # Pointer für diesen Wachwechsel (#18)
+bd memories "wachwechsel-20"          # Pointer für diesen Wachwechsel (#20)
 bd ready                              # nächste Issues
 ```
 

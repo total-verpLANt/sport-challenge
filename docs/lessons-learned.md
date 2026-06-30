@@ -36,6 +36,20 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 
 ---
 
+### 2026-06-30: Lokale Dev-DB hängt hinter Migrationen → 500 nur auf eingeloggten Seiten
+
+**Erkenntnis:** Die lokale `instance/sport-challenge.db` kann auf einem alten Alembic-Stand stehen, während der Code neue Tabellen erwartet. Konkret fehlte die `notifications`-Tabelle (DB auf `aab58a149773`), während der Context-Processor `inject_notifications` in `app/__init__.py` sie bei **jedem** authentifizierten Render abfragt → `OperationalError` → HTTP 500.
+
+**Warum relevant:** Das Symptom ist irreführend: Die **Login-Seite lädt sauber** (unauthenticated, kein Context-Processor-Zugriff), aber **jede eingeloggte Seite** wirft 500. Man sucht den Fehler leicht im falschen Feature, statt im DB-Stand. Kostete in einer Playwright-Testrunde einen kompletten Subagenten-Durchlauf.
+
+**Wie vermeiden:** Wenn lokal eingeloggte Seiten 500 werfen, **zuerst** `FLASK_APP=run.py .venv/bin/flask db upgrade` ausführen, bevor man im Feature-Code sucht. `flask db current` zeigt den Ist-Stand, `(head)` markiert den Soll-Stand.
+
+**Wo sichtbar:** Nur lokal – **Prod ist nicht betroffen**, dort laufen Migrationen automatisch beim Container-Start via `entrypoint.sh`.
+
+**Quelle:** Wachwechsel #20 (Fix `sysk`), 2026-06-30 – Diagnose durch Playwright-Subagent.
+
+---
+
 ## Tooling: Claude Sub-Agents
 
 ### 2026-04-24: Sub-Agents haben keine Bash-Berechtigung ohne explizite Freigabe
