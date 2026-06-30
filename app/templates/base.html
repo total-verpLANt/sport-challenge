@@ -14,6 +14,25 @@
         rel="stylesheet"
         integrity="sha384-GPAzSuZc0kFvdIev6wm9zg8gnafE8tLso7rsAYQfc9hAdWCpOcpcNI5W9lWkYcsd"
         crossorigin="anonymous">
+  <style>
+    /* Notif-Dropdown auf Smartphones (<576px) vom Glockenbutton loesen
+       und als fixiertes Panel ueber volle Breite spannen, statt am Button
+       zu haengen (sonst ragt es links aus dem Viewport). */
+    @media (max-width: 575.98px) {
+      #notif-menu.dropdown-menu {
+        position: fixed !important;
+        top: 3.5rem !important;
+        left: .5rem !important;
+        right: .5rem !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        transform: none !important;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+    }
+  </style>
 </head>
 <body>
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">

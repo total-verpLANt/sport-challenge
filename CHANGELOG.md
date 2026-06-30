@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.7.9] – 2026-06-30
+
+### Behoben
+- Auf dem Smartphone ragte die Liste der Benachrichtigungen seitlich über den Bildrand hinaus und war teilweise abgeschnitten. Sie wird jetzt mittig in voller Breite angezeigt und ist bei vielen Einträgen scrollbar.
+
 ## [1.7.8] – 2026-06-24
 
 ### Behoben
