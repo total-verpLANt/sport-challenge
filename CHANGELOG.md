@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.8.1] – 2026-07-13
+
+### Sicherheit
+- Wenn du dein Passwort änderst, werden jetzt automatisch alle anderen Geräte abgemeldet, auf denen du noch angemeldet warst. So bleibt niemand mit einem alten Passwort-Stand eingeloggt.
+
 ## [1.8.0] – 2026-07-13
 
 ### Neu

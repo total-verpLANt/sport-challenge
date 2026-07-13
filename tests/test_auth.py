@@ -438,3 +438,57 @@ def test_first_user_registration_creates_no_notification(client, db):
 
     notifications = db.session.scalars(db.select(Notification)).all()
     assert notifications == []
+
+
+# ---------------------------------------------------------------------------
+# uat2 – Session-/Remember-Token an das Passwort binden (Django-Muster).
+# get_id() liefert "<id>|<auth_hash>"; aendert sich das Passwort, wird der
+# auth_hash ungueltig und der user_loader weist den Token ab -> Auto-Logout.
+# ---------------------------------------------------------------------------
+
+def test_get_id_has_auth_hash_format(client, db):
+    user = User(email="fmt@example.com", is_approved=True, nickname="Fmt")
+    user.set_password("passwort_eins1")
+    _db.session.add(user)
+    _db.session.commit()
+
+    token = user.get_id()
+    raw_id, sep, auth_hash = token.partition("|")
+    assert sep == "|"
+    assert raw_id == str(user.id)
+    assert len(auth_hash) == 64  # SHA-256 hex
+
+
+def test_password_change_invalidates_old_token(client, db):
+    from flask import current_app
+
+    user = User(email="rotate@example.com", is_approved=True, nickname="Rot")
+    user.set_password("altes_passwort1")
+    _db.session.add(user)
+    _db.session.commit()
+
+    loader = current_app.login_manager._user_callback
+    old_token = user.get_id()
+    assert loader(old_token) is not None  # vor dem Wechsel gueltig
+
+    user.set_password("neues_passwort2")
+    _db.session.commit()
+
+    assert loader(old_token) is None          # alter Token ungueltig
+    assert loader(user.get_id()) is not None  # frischer Token laedt wieder
+
+
+def test_user_loader_rejects_legacy_and_malformed_tokens(client, db):
+    from flask import current_app
+
+    user = User(email="legacy@example.com", is_approved=True, nickname="Leg")
+    user.set_password("passwort_drei3")
+    _db.session.add(user)
+    _db.session.commit()
+
+    loader = current_app.login_manager._user_callback
+    # Alt-Format (nur die ID, kein "|") -> abgelehnt (einmaliger Sammel-Logout beim Deploy)
+    assert loader(str(user.id)) is None
+    # Muell / nicht-numerische ID -> kein Crash, sondern None
+    assert loader("abc|deadbeef") is None
+    assert loader("|") is None

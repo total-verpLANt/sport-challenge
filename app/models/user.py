@@ -1,5 +1,8 @@
+import hmac
 from datetime import datetime, timezone
+from hashlib import sha256
 
+from flask import current_app
 from flask_login import UserMixin
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -32,6 +35,29 @@ class User(UserMixin, db.Model):
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
+
+    def auth_hash(self) -> str:
+        """Session-/Remember-Token-Bindung an das aktuelle Passwort (siehe uat2).
+
+        HMAC-SHA256 über den password_hash mit dem SECRET_KEY als Schlüssel
+        (Django-`get_session_auth_hash`-Muster). Ändert sich das Passwort, ändert
+        sich der password_hash und damit dieser Wert – bestehende Session- und
+        Remember-Cookies (die ihn via get_id transportieren) werden dadurch beim
+        nächsten Laden ungültig. So überlebt ein gestohlenes Cookie keinen
+        Passwort-Reset des Opfers.
+        """
+        secret = current_app.config["SECRET_KEY"]
+        if isinstance(secret, str):
+            secret = secret.encode()
+        return hmac.new(secret, self.password_hash.encode(), sha256).hexdigest()
+
+    def get_id(self) -> str:
+        """Flask-Login-Identität: '<id>|<auth_hash>' statt nur der User-ID.
+
+        Der user_loader (app/__init__.py) prüft den auth_hash-Teil konstant-zeitig
+        gegen den aktuellen Wert und weist abweichende (= veraltete) Tokens ab.
+        """
+        return f"{self.id}|{self.auth_hash()}"
 
     @property
     def display_name(self) -> str:

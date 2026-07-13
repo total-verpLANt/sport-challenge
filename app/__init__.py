@@ -116,7 +116,23 @@ def create_app(config_class=Config):
 
     @login_manager.user_loader
     def load_user(user_id: str):
-        return db.session.get(User, int(user_id))
+        # Token-Format (siehe uat2): "<id>|<auth_hash>". Der auth_hash bindet die
+        # Session/das Remember-Cookie ans aktuelle Passwort. Alt-Sessions ohne "|"
+        # (vor v1.8.1) sowie Tokens mit veraltetem Hash (nach Passwort-Wechsel)
+        # werden als ungültig behandelt -> Nutzer wird ausgeloggt (einmaliger
+        # Sammel-Logout beim Deploy, danach greift der 30-Tage-Komfort).
+        import hmac
+
+        raw_id, sep, token = user_id.partition("|")
+        if not sep:
+            return None
+        try:
+            user = db.session.get(User, int(raw_id))
+        except (TypeError, ValueError):
+            return None
+        if user is None or not hmac.compare_digest(user.auth_hash(), token):
+            return None
+        return user
 
     from app.routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix="/auth")
