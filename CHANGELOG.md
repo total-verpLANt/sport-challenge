@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.8.0] – 2026-07-13
+
+### Neu
+- Beim Login gibt es jetzt die Option **„Angemeldet bleiben"** (standardmäßig aktiv). Damit musst du dich nicht mehr bei jedem Besuch neu anmelden – die App merkt sich dich bis zu 30 Tage. An einem geteilten Gerät kannst du den Haken einfach entfernen.
+
 ## [1.7.9] – 2026-06-30
 
 ### Behoben

@@ -54,7 +54,8 @@ def login():
                     if not user.is_approved:
                         error = "Konto wartet auf Admin-Freigabe."
                     else:
-                        login_user(user)
+                        remember = request.form.get("remember") == "on"
+                        login_user(user, remember=remember)
                         if user.nickname is None:
                             flash("Willkommen! Gib dir einen Spitznamen – er wird überall angezeigt.")
                             return redirect(url_for("settings.profile"))

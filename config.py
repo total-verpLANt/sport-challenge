@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 
 class Config:
@@ -57,3 +58,7 @@ class Config:
     REMEMBER_COOKIE_HTTPONLY: bool = True
     SESSION_COOKIE_SAMESITE: str = "Lax"
     REMEMBER_COOKIE_SAMESITE: str = "Lax"
+    # Long-Life-Login (siehe uat2): "Angemeldet bleiben" setzt ein Remember-Me-Cookie.
+    # 30 Tage statt Flask-Login-Default (365) – Kompromiss aus Komfort und Angriffsfenster
+    # eines gestohlenen Cookies. Greift nur, wenn login_user(remember=True) aufgerufen wird.
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)
