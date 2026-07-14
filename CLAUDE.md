@@ -52,7 +52,7 @@ bd close <id>         # Complete work
 
 ## Aktueller Stand (2026-07-14, Wachwechsel #21)
 
-**Aktive Arbeit:** Keine. **v1.9.0**, gepusht auf `origin/main`. **338 Tests grün.**
+**Aktive Arbeit:** Keine. **v1.9.1**, gepusht auf `origin/main`. **338 Tests grün.**
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
@@ -65,7 +65,7 @@ bd close <id>         # Complete work
 - **Einmaliger Sammel-Logout** beim ersten Deploy mit v1.8.1: das `User.get_id`-Format ändert sich → alle bestehenden Sessions werden **einmalig** ungültig (danach 30-Tage-Remember). Keine Datengefahr.
 - Kein Env-/Dependency-/Dockerfile-Eingriff diese Wache.
 
-**⚠️ Offenes loses Ende (bd-Sync):** `bd dolt push` hing und **sperrte die bd-DB** – die Issue-Closes `8kr1.3`–`.7` **und** der Epic-Close `8kr1` sowie ein `bd remember`-Pointer für Wache #21 konnten **nicht** bestätigt durchlaufen. Git ist vollständig gepusht (Wahrheit). **Nachfolger:** `bd list --parent sport-challenge-8kr1` prüfen, offene Issues schließen, `bd dolt push` erneut versuchen, sobald der Lock frei ist. Siehe lessons-learned (dolt-Lock).
+**✅ dolt-Lock gelöst (2026-07-15):** Ursache waren Zombie-`git-remote-http`-Prozesse eines aus der **Claude-Sandbox** gestarteten `bd dolt push` – der Sandbox-Netzwerk-Proxy lässt die Verbindung sterben (TCP CLOSED), der Prozess hängt ewig und hält `noms/LOCK`. Alle Closes (`8kr1.3`–`.7`, Epic `8kr1`, Bugfix `yyo3`) sind nachgeholt; bd-Schema-Migration v49→v53 als einziger Clone durchgeführt. **Regel: `bd dolt push` NUR im externen Terminal ausführen, nie aus der Claude-Session.** Hängt es doch: Zombies via `lsof .beads/embeddeddolt/sport_challenge/.dolt/noms/LOCK` finden und extern killen.
 
 **Bestehende Konvention:** **Keine inline-Event-Handler** (`onchange`/`onclick`/…) in Templates – CSP blockiert sie. Stattdessen nonce-signiertes `<script>` mit `addEventListener`. CSP **nie** mit `unsafe-inline` aufweichen. (Erneut bestätigt in `8kr1.5`.)
 
