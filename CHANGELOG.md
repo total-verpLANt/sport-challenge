@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.9.1] – 2026-07-14
+
+### Behoben
+- Der Kommentar-Button unter Beiträgen im Feed reagierte nicht auf Klicks – das Kommentarfeld öffnete sich nicht. Jetzt klappen die Kommentare wie vorgesehen auf und zu.
+
 ## [1.9.0] – 2026-07-14
 
 ### Neu

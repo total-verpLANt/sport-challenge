@@ -310,6 +310,7 @@
 {% else %}
 <p class="text-muted">Noch keine Einträge im Feed.</p>
 {% endif %}
+{% endblock %}
 
 {% block scripts %}
 <script nonce="{{ csp_nonce() }}">
@@ -636,5 +637,4 @@
   }
 })();
 </script>
-{% endblock %}
 {% endblock %}
