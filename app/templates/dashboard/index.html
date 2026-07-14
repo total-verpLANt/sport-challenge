@@ -24,6 +24,27 @@
   {% endif %}
 {% endmacro %}
 
+{% macro comment_section(item) %}
+  <div class="comment-section mt-2">
+    <button type="button" class="btn btn-sm btn-outline-secondary comment-toggle-btn"
+            data-comments-url="{{ item.comments_url }}"
+            data-post-id="{{ item.id }}"
+            data-csrf="{{ csrf_token() }}">
+      💬 <span class="comment-count">{{ item.comment_count }}</span> Kommentare
+    </button>
+    <div class="comment-body mt-2" hidden>
+      <div class="comment-list mb-2"></div>
+      <form class="comment-form" data-post-url="{{ item.comments_url }}" data-csrf="{{ csrf_token() }}">
+        <div class="input-group input-group-sm">
+          <textarea name="body" class="form-control" rows="1" maxlength="1000" required
+                    placeholder="Kommentar schreiben…"></textarea>
+          <button type="submit" class="btn btn-outline-primary">Senden</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endmacro %}
+
 {% block content %}
 
 {% if pending_invitations %}
@@ -252,6 +273,7 @@
         {% endif %}
 
         {{ like_button(item) }}
+        {{ comment_section(item) }}
       </div>
     </div>
     {% else %}
@@ -271,6 +293,7 @@
         {% endif %}
 
         {{ like_button(item) }}
+        {{ comment_section(item) }}
       </div>
     </div>
     {% endif %}
@@ -365,6 +388,130 @@
       namesHtml;
   }
 
+  function commentSectionHtml(item, csrf) {
+    return '<div class="comment-section mt-2">' +
+      '<button type="button" class="btn btn-sm btn-outline-secondary comment-toggle-btn" ' +
+      'data-comments-url="' + esc(item.comments_url) + '" ' +
+      'data-post-id="' + esc(item.id) + '" ' +
+      'data-csrf="' + esc(csrf) + '">💬 <span class="comment-count">' + esc(item.comment_count) + '</span> Kommentare</button>' +
+      '<div class="comment-body mt-2" hidden>' +
+        '<div class="comment-list mb-2"></div>' +
+        '<form class="comment-form" data-post-url="' + esc(item.comments_url) + '" data-csrf="' + esc(csrf) + '">' +
+          '<div class="input-group input-group-sm">' +
+            '<textarea name="body" class="form-control" rows="1" maxlength="1000" required ' +
+            'placeholder="Kommentar schreiben…"></textarea>' +
+            '<button type="submit" class="btn btn-outline-primary">Senden</button>' +
+          '</div>' +
+        '</form>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderComment(c) {
+    const deleteHtml = c.can_delete
+      ? ' <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2 comment-delete-btn" ' +
+        'data-delete-url="' + esc(c.delete_url) + '">Löschen</button>'
+      : '';
+    return '<div class="comment-item small mb-1 pb-1 border-bottom" data-comment-id="' + esc(c.id) + '">' +
+      '<strong>' + esc(c.user_display_name) + '</strong> ' +
+      '<span class="text-muted">' + esc(c.time) + '</span>' + deleteHtml +
+      '<div>' + esc(c.body) + '</div>' +
+    '</div>';
+  }
+
+  function attachCommentDelegation() {
+    document.addEventListener('click', function(e) {
+      const toggleBtn = e.target.closest('.comment-toggle-btn');
+      if (toggleBtn) {
+        const body = toggleBtn.nextElementSibling;
+        if (!body || !body.classList.contains('comment-body')) return;
+        const wasHidden = body.hidden;
+        body.hidden = !wasHidden;
+        if (wasHidden && body.dataset.loaded !== '1') {
+          const list = body.querySelector('.comment-list');
+          const commentsUrl = toggleBtn.dataset.commentsUrl;
+          list.textContent = 'Lädt…';
+          fetch(commentsUrl, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+              list.innerHTML = '';
+              (data.comments || []).forEach(function(c) {
+                list.insertAdjacentHTML('beforeend', renderComment(c));
+              });
+              body.dataset.loaded = '1';
+            })
+            .catch(function(err) {
+              list.textContent = 'Fehler beim Laden der Kommentare.';
+              console.error(err);
+            });
+        }
+        return;
+      }
+
+      const deleteBtn = e.target.closest('.comment-delete-btn');
+      if (deleteBtn) {
+        if (deleteBtn.disabled) return;
+        deleteBtn.disabled = true;
+        const deleteUrl = deleteBtn.dataset.deleteUrl;
+        const section = deleteBtn.closest('.comment-section');
+        const toggle = section ? section.querySelector('.comment-toggle-btn') : null;
+        const csrf = toggle ? toggle.dataset.csrf : '';
+        const commentItem = deleteBtn.closest('.comment-item');
+        fetch(deleteUrl, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrf },
+          credentials: 'same-origin',
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (commentItem) commentItem.remove();
+          if (section) {
+            const countEl = section.querySelector('.comment-count');
+            if (countEl) countEl.textContent = data.count;
+          }
+        })
+        .catch(console.error)
+        .finally(() => { deleteBtn.disabled = false; });
+      }
+    });
+
+    document.addEventListener('submit', function(e) {
+      const form = e.target.closest('.comment-form');
+      if (!form) return;
+      e.preventDefault();
+
+      const textarea = form.querySelector('textarea[name="body"]');
+      if (!textarea || !textarea.value.trim()) return;
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const postUrl = form.dataset.postUrl;
+      const csrf = form.dataset.csrf;
+      const fd = new FormData(form);
+
+      if (submitBtn) submitBtn.disabled = true;
+      fetch(postUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf },
+        body: fd,
+        credentials: 'same-origin',
+      })
+      .then(r => r.json())
+      .then(data => {
+        const body = form.closest('.comment-body');
+        const list = body ? body.querySelector('.comment-list') : null;
+        if (list && data.comment) list.insertAdjacentHTML('beforeend', renderComment(data.comment));
+        const section = form.closest('.comment-section');
+        if (section) {
+          const countEl = section.querySelector('.comment-count');
+          if (countEl) countEl.textContent = data.count;
+        }
+        textarea.value = '';
+      })
+      .catch(console.error)
+      .finally(() => { if (submitBtn) submitBtn.disabled = false; });
+    });
+  }
+
   function buildCard(item, csrf) {
     const card = document.createElement('div');
     card.className = 'card mb-3' + (item.type === 'absence' ? ' border-secondary-subtle' : '');
@@ -385,6 +532,7 @@
           '<strong>' + esc(item.start_date) + '</strong> bis <strong>' + esc(item.end_date) + '</strong> abwesend.</p>' +
           reasonHtml +
           likeBlockHtml(item, csrf) +
+          commentSectionHtml(item, csrf) +
         '</div>';
       attachLikeHandler(card.querySelector('.like-btn'));
       return card;
@@ -405,6 +553,7 @@
         '<div class="js-media-slot"></div>' +
         notesHtml +
         likeBlockHtml(item, csrf) +
+        commentSectionHtml(item, csrf) +
       '</div>';
 
     if (item.media && item.media.length > 0) {
@@ -445,6 +594,7 @@
 
   // Initial
   document.querySelectorAll('.like-btn').forEach(attachLikeHandler);
+  attachCommentDelegation();
 
   // Mehr laden
   const loadMoreBtn = document.getElementById('load-more-btn');
