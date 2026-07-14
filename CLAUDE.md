@@ -50,25 +50,26 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-06-30, Wachwechsel #20)
+## Aktueller Stand (2026-07-14, Wachwechsel #21)
 
-**Aktive Arbeit:** Keine. **v1.7.9**, gepusht auf `origin/main`. **315 Tests grün.**
-**Keine** Migration, **keine** neue Dependency, **kein** Env-Eingriff diese Wache (reiner Template-/CSS-Fix).
+**Aktive Arbeit:** Keine. **v1.9.0**, gepusht auf `origin/main`. **338 Tests grün.**
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
 **Abgeschlossen diese Wache:**
-- `sysk` → **Notif-Dropdown ragte auf Smartphones links aus dem Bild.** Fix: Media-Query (`<576px`) in `base.html` löst `#notif-menu` vom Glockenbutton → `position:fixed` über volle Breite (.5rem Rand, scrollbar). CSP unberührt (`style-src` erlaubt `'unsafe-inline'`). **v1.7.9**
-- Seit Wache #19 zusätzlich gepusht: `kbja` → HEIC-Upload serverseitig in web-kompatibles JPEG konvertieren. **v1.7.8**
-- Neues Ticket `qggk` (P3): Custom-CSS aus Inline-`<style>` in eigene `static/css/app.css` auslagern (erst sinnvoll bei mehr Custom-CSS).
+- `uat2` → **Long-Life-Login.** Checkbox „Angemeldet bleiben" (Remember-Cookie 30 Tage) **v1.8.0**; Session/Remember-Token ans Passwort gebunden (Django-`get_session_auth_hash`-Muster in `User.get_id`/`auth_hash` + `user_loader`), invalidiert Cookies bei Passwort-Wechsel – **ohne** Migration. **v1.8.1**
+- `8kr1` (Epic, 7 Issues) → **Kommentarfunktion im Social-Feed.** Nutzer kommentieren Aktivitäten **und** Abwesenheiten; gebündelte Notification beim Autor. Neu: `SickPeriodComment`-Modell + Migration, `ActivityComment` war bereits als ungenutzter Rumpf vorhanden. Notif-Typ `ACTIVITY_COMMENTED` + `upsert_comment_notification`. 6 Routen in `dashboard.py` (create/list/delete je Activity+SickPeriod, IDOR-403, Body ≤1000, Lazy-Load). Kommentar-UI in `dashboard/index.html` (nonce-Script, `esc()`, kein inline-Handler; Playwright-CSP/XSS-Test PASS). **v1.9.0**
 
-**Stolperstein diese Wache (lokal, in lessons-learned):** Die lokale Dev-DB hing auf altem Alembic-Stand (`notifications`-Tabelle fehlte) → **500 auf allen eingeloggten Seiten** (Login-Seite lud sauber). `flask db upgrade` brachte sie auf head. **Prod unberührt** (Auto-Migration via entrypoint.sh). Merke: bei lokalem 500 nach Login zuerst `flask db upgrade`.
+**⚠️ Prod-Eingriffe bei den ausstehenden Deploys (explizit):**
+- **Eine additive Migration** `sick_period_comments` (v1.9.0) → läuft **automatisch** beim Container-Start (entrypoint.sh). Non-destruktiv.
+- **Einmaliger Sammel-Logout** beim ersten Deploy mit v1.8.1: das `User.get_id`-Format ändert sich → alle bestehenden Sessions werden **einmalig** ungültig (danach 30-Tage-Remember). Keine Datengefahr.
+- Kein Env-/Dependency-/Dockerfile-Eingriff diese Wache.
 
-**Bestehende Konvention (Wache #19):** **Keine inline-Event-Handler** (`onchange`/`onclick`/…) in Templates – CSP blockiert sie. Stattdessen nonce-signiertes `<script>` mit `addEventListener`. CSP **nie** mit `unsafe-inline` aufweichen.
+**⚠️ Offenes loses Ende (bd-Sync):** `bd dolt push` hing und **sperrte die bd-DB** – die Issue-Closes `8kr1.3`–`.7` **und** der Epic-Close `8kr1` sowie ein `bd remember`-Pointer für Wache #21 konnten **nicht** bestätigt durchlaufen. Git ist vollständig gepusht (Wahrheit). **Nachfolger:** `bd list --parent sport-challenge-8kr1` prüfen, offene Issues schließen, `bd dolt push` erneut versuchen, sobald der Lock frei ist. Siehe lessons-learned (dolt-Lock).
 
-**Deploy-Stand:** Live ≈ **v1.4.1** auf `stonbgsport01`. **v1.5.0–1.7.9 ausstehend.** Deploy: `git pull && docker compose pull && docker compose up -d`. Enthält **eine** Migration (`notifications.actor_id`, v1.7.2) → läuft **automatisch** beim Container-Start (entrypoint.sh). **Hinweis HEIC (ab v1.7.7):** Dependency `pillow-heif` → braucht ein **frisches Image** (CI-Build nach Push). Kein Dockerfile-Eingriff nötig: das cp313/`manylinux_2_28`-Wheel bündelt `libheif`.
+**Bestehende Konvention:** **Keine inline-Event-Handler** (`onchange`/`onclick`/…) in Templates – CSP blockiert sie. Stattdessen nonce-signiertes `<script>` mit `addEventListener`. CSP **nie** mit `unsafe-inline` aufweichen. (Erneut bestätigt in `8kr1.5`.)
 
-**Optimierungs-Backlog (neu angelegt, für die geplante große Runde):**
+**Optimierungs-Backlog (für die geplante große Runde):**
 - **Tests/Quality:** `r96z` (Route-Smoke ≠ 500) · `w7e1` (Playwright-E2E in CI) · `fzku` (`scalar_one_or_none`-Audit) · `wkvn` (Migrations-Drift) · `w5os` (vulture+mypy+coverage) · `iofv` (Security-Header-Test)
 - **Performance:** `379m` (Slow-Endpoints, N+1, Profiling) · `qt72` (DB-Index-Audit)
 - **Security:** `izas` (IDOR/Autorisierung) · `b2u0` (CSP-Audit) · `j0b5` (Upload-Härtung) · `ytum` (Dependency/Secret-Hygiene)
@@ -82,7 +83,7 @@ bd close <id>         # Complete work
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd memories "wachwechsel-20"          # Pointer für diesen Wachwechsel (#20)
+bd list --parent sport-challenge-8kr1 # Epic-Reste checken (bd-Closes ggf. offen, s. dolt-Lock)
 bd ready                              # nächste Issues
 ```
 

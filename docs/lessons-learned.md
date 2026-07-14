@@ -481,3 +481,43 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wo sichtbar:** `app/routes/challenges.py` (index). Ticket `co52`, Audit-Folge `fzku`. Verwandt: Route-Smoke-Test `r96z` hätte den 500er sofort gefangen.
 
 **Quelle:** Wachwechsel #18, Session 2026-06-22
+
+---
+
+## Tooling: Beads (bd) / Dolt
+
+### 2026-07-14: `bd dolt push` hängt und sperrt die bd-DB
+
+**Erkenntnis:** Ein `bd dolt push` kann sehr lange laufen/hängen und hält dabei einen Lock auf die bd-Datenbank. Solange er läuft, **stauen sich alle nachfolgenden bd-Befehle** (`bd close`, `bd list`, `bd ready`) und laufen in den 2-Minuten-Timeout bzw. in den Hintergrund. Beim Epic `8kr1` blockierte das die Issue-Closes über den gesamten Rest der Session.
+
+**Warum relevant:** Der Fortschritt der eigentlichen Arbeit hängt **nicht** an bd – **Git ist die Wahrheit**. Wer beim hängenden bd stehenbleibt, verliert Zeit. Die bd-Statusupdates (Closes, `bd remember`) sind Tracking-Overhead und können nachgezogen werden, sobald der Lock frei ist.
+
+**Wie umgehen:** (1) Nicht mehrere `bd dolt push` schnell hintereinander absetzen. (2) Bei hängendem bd: git committen/pushen (Wahrheit sichern), bd-Closes als losen Punkt in die Übergabe schreiben. (3) `timeout` gibt es auf macOS **nicht** (nur `gtimeout`) – man kann bd-Befehle nicht einfach hart begrenzen.
+
+**Wo sichtbar:** Session 2026-07-14, Epic `8kr1`. Offene Closes `8kr1.3`–`.7` + Epic beim Wachwechsel #21.
+
+---
+
+## Architektur: Rumpf-Code vor Feature-Start prüfen
+
+### 2026-07-14: `ActivityComment` existierte bereits als ungenutzter Rumpf
+
+**Erkenntnis:** Beim Start der Kommentarfunktion (`8kr1`) stellte sich heraus, dass `ActivityComment` (Modell **und** Migration `b0fe5687f411`) bereits seit 2026-04-29 im Code lag – als bewusster „Kommentar-Rumpf – KEIN UI"-Platzhalter, nirgends genutzt. Die Tabelle lag also schon produktiv in der DB. Für Aktivitäts-Kommentare war **keine** Migration nötig; nur das SickPeriod-Pendant (`SickPeriodComment`) musste neu angelegt werden.
+
+**Warum relevant:** Vor einem neuen Feature lohnt ein `grep` nach Rumpf-Modellen/-Migrationen. Hätte man das übersehen, wäre eine doppelte Tabelle/Migration entstanden.
+
+**Wo sichtbar:** `app/models/activity.py` (`ActivityComment`), Migration `b0fe5687f411`. Research-Report `.schrammns_workflow/research/2026-07-14-kommentierfunktion-social-feed.md`.
+
+---
+
+## Tooling: Tests / In-Memory-SQLite
+
+### 2026-07-14: `:memory:`-Fixture täuscht bei Cross-Request-Session-Tests
+
+**Erkenntnis:** Beim Testen von Session-/Cookie-Invalidierung über **mehrere** Requests (Auto-Logout nach Passwort-Wechsel, `uat2`) täuscht die `:memory:`-SQLite-Fixture: der langlebige `app_context` teilt **eine** scoped `db.session`, deren Identity-Map stale bleibt → der `user_loader` sieht das geänderte Passwort **nicht**, der Request bleibt fälschlich eingeloggt (200 statt 302).
+
+**Warum relevant:** Ein korrekt implementierter Sicherheitsmechanismus wirkt im `:memory:`-Test wie kaputt – man jagt einen Phantom-Bug im Produktivcode, obwohl die Fixture schuld ist.
+
+**Wie umgehen:** Für Cross-Request-Invalidierung eine **Datei-SQLite** (`tempfile`) nutzen, DB-Setup in eigenem `app_context` schließen, dann Client-Requests → jeder Request bekommt eine frische Session (wie Prod). Für reine Loader-Logik reicht ein Unit-Aufruf `login_manager._user_callback(token)` im selben Kontext.
+
+**Wo sichtbar:** `uat2` (v1.8.1), `tests/test_auth.py`. Session 2026-07-14.
