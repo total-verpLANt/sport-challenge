@@ -21,6 +21,7 @@ class NotificationType:
     CHALLENGE_INVITE = "challenge_invite"      # User: zu Challenge eingeladen
     CHALLENGE_LIFECYCLE = "challenge_lifecycle"  # Teilnehmer: Start/Ende
     ACTIVITY_LIKED = "activity_liked"          # Urheber: Beitrag geliked
+    ACTIVITY_COMMENTED = "activity_commented"  # Urheber: Beitrag kommentiert
 
 
 def create_notification(
@@ -109,6 +110,79 @@ def upsert_like_notification(
         notification = Notification(
             user_id=user_id,
             type=NotificationType.ACTIVITY_LIKED,
+            message=message,
+            link_url=link_url,
+            actor_id=latest_actor_id,
+        )
+        db.session.add(notification)
+
+    if commit:
+        db.session.commit()
+    return notification
+
+
+def render_comment_message(commenter_names: list[str]) -> str:
+    """Baut den gebündelten Kommentar-Text. `commenter_names`: neueste zuerst.
+
+    1 → „A hat …", 2 → „A und B haben …", >2 → „A und N weitere haben …".
+    """
+    n = len(commenter_names)
+    if n == 1:
+        return f"{commenter_names[0]} hat deinen Beitrag kommentiert"
+    if n == 2:
+        return f"{commenter_names[0]} und {commenter_names[1]} haben deinen Beitrag kommentiert"
+    return f"{commenter_names[0]} und {n - 1} weitere haben deinen Beitrag kommentiert"
+
+
+def upsert_comment_notification(
+    user_id: int,
+    link_url: str,
+    commenter_names: list[str],
+    latest_actor_id: int | None = None,
+    commit: bool = False,
+) -> Notification | None:
+    """Pflegt die EINE gebündelte, ungelesene Kommentar-Notification je Beitrag.
+
+    `commenter_names` = aktuelle fremde Kommentatoren (ohne Autor, distinct
+    user_id), neueste zuerst – bereits vom Aufrufer dedupliziert/gefiltert.
+    - Leere Liste → vorhandene UNGELESENE Bündel-Notif entfernen (letzter
+      Kommentar gelöscht), Rückgabe None.
+    - Sonst: existierende ungelesene Bündel-Notif aktualisieren (Text,
+      Actor, created_at → wieder nach oben) oder neu anlegen.
+    Bereits GELESENE Notifications bleiben unberührt (historisch); ein neuer
+    Kommentar nach dem Lesen erzeugt so eine frische ungelesene Bündel-Notif.
+    Notif-Identität: (Empfänger, Typ activity_commented, Beitrag, read_at
+    NULL) – stets auf `user_id` gefiltert (kein IDOR).
+
+    SICHERHEIT: `message` enthält NIE Kommentar-Freitext, nur die generischen
+    Namens-Templates aus `render_comment_message` (XSS-Invariante).
+    """
+    existing = db.session.scalar(
+        db.select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.type == NotificationType.ACTIVITY_COMMENTED,
+            Notification.link_url == link_url,
+            Notification.read_at.is_(None),
+        )
+    )
+
+    if not commenter_names:
+        if existing is not None:
+            db.session.delete(existing)
+        if commit:
+            db.session.commit()
+        return None
+
+    message = render_comment_message(commenter_names)
+    if existing is not None:
+        existing.message = message
+        existing.actor_id = latest_actor_id
+        existing.created_at = datetime.now(timezone.utc)
+        notification = existing
+    else:
+        notification = Notification(
+            user_id=user_id,
+            type=NotificationType.ACTIVITY_COMMENTED,
             message=message,
             link_url=link_url,
             actor_id=latest_actor_id,
