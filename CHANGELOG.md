@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.9.0] – 2026-07-14
+
+### Neu
+- Du kannst jetzt unter Beiträgen und Abwesenheiten im Feed **Kommentare** schreiben. Über das Kommentar-Symbol klappst du die Kommentare auf, schreibst deinen eigenen und kannst deine eigenen Kommentare auch wieder löschen. Wer einen Beitrag verfasst hat, bekommt eine Benachrichtigung, sobald jemand darunter kommentiert.
+
 ## [1.8.1] – 2026-07-13
 
 ### Sicherheit
