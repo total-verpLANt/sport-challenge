@@ -468,6 +468,20 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 
 ---
 
+## Frontend / Jinja2-Templates
+
+### 2026-07-14: Verschachtelter `{% block %}` wird doppelt gerendert – Script lief zweimal
+
+**Erkenntnis:** Ein `{% block scripts %}`, der im Child-Template **innerhalb** von `{% block content %}` definiert ist, rendert Jinja2 **zweimal**: einmal inline im content und einmal am `scripts`-Anker der `base.html`. In `dashboard/index.html` lief dadurch das komplette Feed-Script doppelt – zwei identische `document`-Click-Listener togglten den Kommentarbereich pro Klick zweimal (auf→zu), der Kommentar-Button wirkte tot (`yyo3`, v1.9.1).
+
+**Warum relevant:** Der Bug ist heimtückisch selektiv: Der Like-Button überlebte nur wegen seines `disabled`-Guards, „Mehr laden" und Kommentar-Submit hätten doppelt gefeuert. Ein Playwright-Test, der nur „Element vorhanden" prüft, sieht nichts – erst ein echter Klick-Test deckt es auf.
+
+**Wie umgehen:** Blöcke im Child-Template immer auf oberster Ebene definieren (`{% endblock %}` von content **vor** `{% block scripts %}`). Diagnose-Trick: gerendertes HTML auf doppelte Marker greppen (`html.count("function xyz") > 1`). Minimal-Repro: Child mit verschachteltem Block → Parent rendert den Inhalt an beiden Stellen.
+
+**Wo sichtbar:** `app/templates/dashboard/index.html`, Fix-Commit `5a5cea3` (v1.9.1). Verwandt: E2E-Ticket `w7e1` hätte es gefangen.
+
+---
+
 ## Datenbank / Queries
 
 ### 2026-06-22: scalar_one_or_none() crasht bei mehreren Treffern (Multi-Challenge)
@@ -495,6 +509,16 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 **Wie umgehen:** (1) Nicht mehrere `bd dolt push` schnell hintereinander absetzen. (2) Bei hängendem bd: git committen/pushen (Wahrheit sichern), bd-Closes als losen Punkt in die Übergabe schreiben. (3) `timeout` gibt es auf macOS **nicht** (nur `gtimeout`) – man kann bd-Befehle nicht einfach hart begrenzen.
 
 **Wo sichtbar:** Session 2026-07-14, Epic `8kr1`. Offene Closes `8kr1.3`–`.7` + Epic beim Wachwechsel #21.
+
+### 2026-07-15: Wurzelursache – `bd dolt push` aus der Claude-Sandbox hängt am Netzwerk-Proxy
+
+**Erkenntnis:** Der Hänger von 2026-07-14 war kein bd-Bug, sondern die Claude-Code-Sandbox: `bd dolt push` spawnt `git-remote-http`, dessen Verbindung über den Sandbox-Proxy (`view-localhost`) stirbt (TCP-Status CLOSED). Der Helper wartet endlos, erbt den flock auf `.beads/embeddeddolt/sport_challenge/.dolt/noms/LOCK` und überlebt als Zombie sogar das Sitzungsende – danach blockiert jede bd-Operation. `kill` ist in der Sandbox verboten; die Zombies mussten im externen Terminal beendet werden.
+
+**Warum relevant:** Reproduzierbar – zweiter Push-Versuch aus der Sandbox zeigte am 2026-07-15 exakt dasselbe Bild. Lokale bd-Writes (`create`/`close`/`remember`) sind dagegen unkritisch.
+
+**Wie umgehen:** (1) **Regel: `bd dolt push` nur im externen Terminal ausführen, nie aus der Claude-Session.** (2) Diagnose bei Hänger: `lsof .beads/embeddeddolt/sport_challenge/.dolt/noms/LOCK` zeigt die Lock-Halter; extern killen. (3) Ein per TaskStop abgebrochener Push räumt seine Kinder sauber ab. (4) bd-Remote ist **kein** eigenes Repo, sondern versteckte Refs (`refs/dolt/data`) im normalen GitHub-Repo – von bd beim Setup auto-konfiguriert (`sync.remote` in `.beads/config.yaml`).
+
+**Wo sichtbar:** Session 2026-07-15 (Wachwechsel #22). Schema-Migration v49→v53 dabei als einziger Clone durchgeführt.
 
 ---
 

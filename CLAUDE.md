@@ -50,22 +50,24 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-07-14, Wachwechsel #21)
+## Aktueller Stand (2026-07-15, Wachwechsel #22)
 
 **Aktive Arbeit:** Keine. **v1.9.1**, gepusht auf `origin/main`. **338 Tests grün.**
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abgeschlossen diese Wache:**
-- `uat2` → **Long-Life-Login.** Checkbox „Angemeldet bleiben" (Remember-Cookie 30 Tage) **v1.8.0**; Session/Remember-Token ans Passwort gebunden (Django-`get_session_auth_hash`-Muster in `User.get_id`/`auth_hash` + `user_loader`), invalidiert Cookies bei Passwort-Wechsel – **ohne** Migration. **v1.8.1**
-- `8kr1` (Epic, 7 Issues) → **Kommentarfunktion im Social-Feed.** Nutzer kommentieren Aktivitäten **und** Abwesenheiten; gebündelte Notification beim Autor. Neu: `SickPeriodComment`-Modell + Migration, `ActivityComment` war bereits als ungenutzter Rumpf vorhanden. Notif-Typ `ACTIVITY_COMMENTED` + `upsert_comment_notification`. 6 Routen in `dashboard.py` (create/list/delete je Activity+SickPeriod, IDOR-403, Body ≤1000, Lazy-Load). Kommentar-UI in `dashboard/index.html` (nonce-Script, `esc()`, kein inline-Handler; Playwright-CSP/XSS-Test PASS). **v1.9.0**
+**Abgeschlossen diese Wache (#22):**
+- `yyo3` → **Bugfix v1.9.1:** Kommentar-Button im Feed reagierte nicht. Ursache: `{% block scripts %}` war in `dashboard/index.html` **innerhalb** von `{% block content %}` verschachtelt → Jinja2 renderte das Feed-Script **doppelt**, doppelte Click-Delegation togglete den Kommentarbereich auf+zu. Fix: ein `endblock` verschoben (Commit `5a5cea3`). Verifiziert: 338 pytest + Playwright-E2E (Toggle, Senden, Lazy-Load, kein Doppel-Submit). Siehe lessons-learned (Jinja2-Templates).
+- **dolt-Lock gelöst + bd-Buchungen nachgeholt:** Alle Closes aus Wache #21 gebucht (`8kr1.3`–`.7`, Epic `8kr1`, `yyo3`), bd-Schema-Migration v49→v53 als einziger Clone durchgeführt, `bd remember`-Pointer gesetzt.
+
+**Vorherige Wache (#21, kompakt):** `uat2` → Long-Life-Login („Angemeldet bleiben", 30 Tage) **v1.8.0**; Session/Remember-Token ans Passwort gebunden **v1.8.1** (ohne Migration). `8kr1` (Epic) → Kommentarfunktion im Social-Feed (Aktivitäten + Abwesenheiten, gebündelte Notification, 6 Routen, IDOR-403, Lazy-Load, nonce-Script) **v1.9.0** – neue Migration `sick_period_comments`.
 
 **⚠️ Prod-Eingriffe bei den ausstehenden Deploys (explizit):**
 - **Eine additive Migration** `sick_period_comments` (v1.9.0) → läuft **automatisch** beim Container-Start (entrypoint.sh). Non-destruktiv.
 - **Einmaliger Sammel-Logout** beim ersten Deploy mit v1.8.1: das `User.get_id`-Format ändert sich → alle bestehenden Sessions werden **einmalig** ungültig (danach 30-Tage-Remember). Keine Datengefahr.
 - Kein Env-/Dependency-/Dockerfile-Eingriff diese Wache.
 
-**✅ dolt-Lock gelöst (2026-07-15):** Ursache waren Zombie-`git-remote-http`-Prozesse eines aus der **Claude-Sandbox** gestarteten `bd dolt push` – der Sandbox-Netzwerk-Proxy lässt die Verbindung sterben (TCP CLOSED), der Prozess hängt ewig und hält `noms/LOCK`. Alle Closes (`8kr1.3`–`.7`, Epic `8kr1`, Bugfix `yyo3`) sind nachgeholt; bd-Schema-Migration v49→v53 als einziger Clone durchgeführt. **Regel: `bd dolt push` NUR im externen Terminal ausführen, nie aus der Claude-Session.** Hängt es doch: Zombies via `lsof .beads/embeddeddolt/sport_challenge/.dolt/noms/LOCK` finden und extern killen.
+**⚠️ Einziger offener Punkt (bd-Sync):** `bd dolt push` muss noch **im externen Terminal** ausgeführt werden (synchronisiert Closes + Schema-Migration nach `refs/dolt/data` im GitHub-Repo). **Regel: `bd dolt push` NIE aus der Claude-Session** – der Sandbox-Proxy lässt `git-remote-http` sterben (TCP CLOSED), der Zombie hält `noms/LOCK` und blockiert danach jede bd-Operation. Diagnose bei Hänger: `lsof .beads/embeddeddolt/sport_challenge/.dolt/noms/LOCK`, Zombies extern killen. Lokale bd-Writes (create/close/remember) sind unkritisch. Details: lessons-learned (Beads/Dolt).
 
 **Bestehende Konvention:** **Keine inline-Event-Handler** (`onchange`/`onclick`/…) in Templates – CSP blockiert sie. Stattdessen nonce-signiertes `<script>` mit `addEventListener`. CSP **nie** mit `unsafe-inline` aufweichen. (Erneut bestätigt in `8kr1.5`.)
 
@@ -83,8 +85,7 @@ bd close <id>         # Complete work
 ```bash
 ./scripts/verify-handover.sh          # Schnell-Check: Umgebung ok?
 bd prime                              # Workflow-Kontext
-bd list --parent sport-challenge-8kr1 # Epic-Reste checken (bd-Closes ggf. offen, s. dolt-Lock)
-bd ready                              # nächste Issues
+bd ready                              # nächste Issues (Optimierungs-Backlog, kein aktiver Epic)
 ```
 
 ## Build & Test
