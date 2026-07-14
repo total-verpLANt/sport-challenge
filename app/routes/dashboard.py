@@ -7,9 +7,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db, limiter
-from app.models.activity import Activity, ActivityLike
+from app.models.activity import Activity, ActivityComment, ActivityLike
 from app.models.challenge import Challenge, ChallengeParticipation
-from app.models.sick_period import SickPeriod, SickPeriodLike
+from app.models.sick_period import SickPeriod, SickPeriodComment, SickPeriodLike
 from app.models.user import User
 from app.services import notifications as notif_service
 from app.services.statistics import get_challenge_statistics
@@ -62,6 +62,17 @@ def _challenge_label(challenges: dict, challenge_id: int) -> dict:
     }
 
 
+def _comment_to_dict(c, delete_endpoint: str, current_user_id: int, is_admin: bool) -> dict:
+    return {
+        "id": c.id,
+        "body": c.body,
+        "user_display_name": c.user.display_name if c.user else "Unbekannt",
+        "time": c.created_at.strftime("%d.%m.%Y %H:%M"),
+        "delete_url": url_for(delete_endpoint, comment_id=c.id),
+        "can_delete": c.user_id == current_user_id or is_admin,
+    }
+
+
 def _activity_to_dict(a: Activity, users: dict, challenges: dict, current_user_id: int) -> dict:
     u = users.get(a.user_id)
     return {
@@ -78,6 +89,8 @@ def _activity_to_dict(a: Activity, users: dict, challenges: dict, current_user_i
         "liked_by_me": current_user_id in {like.user_id for like in a.likes},
         "like_count": len(a.likes),
         "liked_by": [like.user.display_name for like in a.likes if like.user],
+        "comment_count": len(a.comments),
+        "comments_url": url_for("dashboard.list_activity_comments", activity_id=a.id),
         "media": [
             {
                 "url": url_for("media.activity_media", media_id=m.id),
@@ -103,6 +116,8 @@ def _absence_to_dict(p: SickPeriod, users: dict, challenges: dict, current_user_
         "liked_by_me": current_user_id in {like.user_id for like in p.likes},
         "like_count": len(p.likes),
         "liked_by": [like.user.display_name for like in p.likes if like.user],
+        "comment_count": len(p.comments),
+        "comments_url": url_for("dashboard.list_sick_period_comments", sick_period_id=p.id),
         **_challenge_label(challenges, p.challenge_id),
     }
 
@@ -124,6 +139,7 @@ def _build_feed_items(current_user_id: int, page: int):
         .options(
             selectinload(Activity.media),
             selectinload(Activity.likes).selectinload(ActivityLike.user),
+            selectinload(Activity.comments),
         )
     ).all()
 
@@ -131,7 +147,10 @@ def _build_feed_items(current_user_id: int, page: int):
         db.select(SickPeriod)
         .order_by(SickPeriod.created_at.desc())
         .limit(fetch_n)
-        .options(selectinload(SickPeriod.likes).selectinload(SickPeriodLike.user))
+        .options(
+            selectinload(SickPeriod.likes).selectinload(SickPeriodLike.user),
+            selectinload(SickPeriod.comments),
+        )
     ).all()
 
     uid_set = {a.user_id for a in activities} | {p.user_id for p in periods}
@@ -391,3 +410,221 @@ def like_sick_period(sick_period_id: int):
 
     liked_by = [like.user.display_name for like in likes]
     return jsonify({"liked": liked, "count": len(likes), "liked_by": liked_by})
+
+
+@dashboard_bp.route("/activities/<int:activity_id>/comments", methods=["POST"])
+@login_required
+@limiter.limit("10/minute")
+def create_activity_comment(activity_id: int):
+    """Kommentar an einer Aktivität anlegen (AJAX)."""
+    activity = db.session.get(Activity, activity_id)
+    if not activity:
+        return jsonify({"error": "nicht gefunden"}), 404
+    body = (request.form.get("body") or "").strip()
+    if not body:
+        return jsonify({"error": "Kommentar darf nicht leer sein"}), 400
+    if len(body) > 1000:
+        return jsonify({"error": "Kommentar zu lang (max. 1000 Zeichen)"}), 400
+
+    comment = ActivityComment(activity_id=activity_id, user_id=current_user.id, body=body)
+    db.session.add(comment)
+    db.session.flush()
+
+    feed_link = url_for("dashboard.index") + f"#feed-post-activity-{activity.id}"
+    all_comments = db.session.scalars(
+        db.select(ActivityComment)
+        .where(ActivityComment.activity_id == activity_id)
+        .options(selectinload(ActivityComment.user))
+        .order_by(ActivityComment.id.desc())
+    ).all()
+
+    # Gebündelte Kommentar-Notification: fremde Kommentatoren (ohne Autor), neueste zuerst.
+    seen, foreign_names, latest_actor = set(), [], None
+    for c in all_comments:
+        if c.user_id == activity.user_id:
+            continue
+        if latest_actor is None:
+            latest_actor = c.user_id
+        if c.user_id not in seen:
+            seen.add(c.user_id)
+            foreign_names.append(c.user.display_name)
+    notif_service.upsert_comment_notification(activity.user_id, feed_link, foreign_names, latest_actor)
+    db.session.commit()
+
+    return jsonify({
+        "count": len(all_comments),
+        "comment": _comment_to_dict(
+            comment, "dashboard.delete_activity_comment", current_user.id, current_user.is_admin
+        ),
+    })
+
+
+@dashboard_bp.route("/activities/<int:activity_id>/comments", methods=["GET"])
+@login_required
+def list_activity_comments(activity_id: int):
+    """Kommentare einer Aktivität nachladen (AJAX, Lazy-Load)."""
+    activity = db.session.get(Activity, activity_id)
+    if not activity:
+        return jsonify({"error": "nicht gefunden"}), 404
+
+    comments = db.session.scalars(
+        db.select(ActivityComment)
+        .where(ActivityComment.activity_id == activity_id)
+        .options(selectinload(ActivityComment.user))
+        .order_by(ActivityComment.id.asc())
+    ).all()
+    return jsonify({
+        "comments": [
+            _comment_to_dict(
+                c, "dashboard.delete_activity_comment", current_user.id, current_user.is_admin
+            )
+            for c in comments
+        ]
+    })
+
+
+@dashboard_bp.route("/activity-comments/<int:comment_id>/delete", methods=["POST"])
+@login_required
+def delete_activity_comment(comment_id: int):
+    """Eigenen Kommentar (oder als Admin fremden) an einer Aktivität löschen."""
+    comment = db.session.get(ActivityComment, comment_id)
+    if not comment:
+        return jsonify({"error": "nicht gefunden"}), 404
+    if comment.user_id != current_user.id and not current_user.is_admin:
+        return jsonify({"error": "nicht erlaubt"}), 403
+
+    activity = db.session.get(Activity, comment.activity_id)
+    db.session.delete(comment)
+    db.session.flush()
+
+    remaining = db.session.scalars(
+        db.select(ActivityComment)
+        .where(ActivityComment.activity_id == comment.activity_id)
+        .options(selectinload(ActivityComment.user))
+        .order_by(ActivityComment.id.desc())
+    ).all()
+
+    if activity is not None:
+        feed_link = url_for("dashboard.index") + f"#feed-post-activity-{activity.id}"
+        seen, foreign_names, latest_actor = set(), [], None
+        for c in remaining:
+            if c.user_id == activity.user_id:
+                continue
+            if latest_actor is None:
+                latest_actor = c.user_id
+            if c.user_id not in seen:
+                seen.add(c.user_id)
+                foreign_names.append(c.user.display_name)
+        notif_service.upsert_comment_notification(activity.user_id, feed_link, foreign_names, latest_actor)
+
+    db.session.commit()
+    return jsonify({"count": len(remaining)})
+
+
+@dashboard_bp.route("/sick-periods/<int:sick_period_id>/comments", methods=["POST"])
+@login_required
+@limiter.limit("10/minute")
+def create_sick_period_comment(sick_period_id: int):
+    """Kommentar an einer Abwesenheit anlegen (AJAX)."""
+    period = db.session.get(SickPeriod, sick_period_id)
+    if not period:
+        return jsonify({"error": "nicht gefunden"}), 404
+    body = (request.form.get("body") or "").strip()
+    if not body:
+        return jsonify({"error": "Kommentar darf nicht leer sein"}), 400
+    if len(body) > 1000:
+        return jsonify({"error": "Kommentar zu lang (max. 1000 Zeichen)"}), 400
+
+    comment = SickPeriodComment(sick_period_id=sick_period_id, user_id=current_user.id, body=body)
+    db.session.add(comment)
+    db.session.flush()
+
+    feed_link = url_for("dashboard.index") + f"#feed-post-absence-{period.id}"
+    all_comments = db.session.scalars(
+        db.select(SickPeriodComment)
+        .where(SickPeriodComment.sick_period_id == sick_period_id)
+        .options(selectinload(SickPeriodComment.user))
+        .order_by(SickPeriodComment.id.desc())
+    ).all()
+
+    # Gebündelte Kommentar-Notification: fremde Kommentatoren (ohne Autor), neueste zuerst.
+    seen, foreign_names, latest_actor = set(), [], None
+    for c in all_comments:
+        if c.user_id == period.user_id:
+            continue
+        if latest_actor is None:
+            latest_actor = c.user_id
+        if c.user_id not in seen:
+            seen.add(c.user_id)
+            foreign_names.append(c.user.display_name)
+    notif_service.upsert_comment_notification(period.user_id, feed_link, foreign_names, latest_actor)
+    db.session.commit()
+
+    return jsonify({
+        "count": len(all_comments),
+        "comment": _comment_to_dict(
+            comment, "dashboard.delete_sick_period_comment", current_user.id, current_user.is_admin
+        ),
+    })
+
+
+@dashboard_bp.route("/sick-periods/<int:sick_period_id>/comments", methods=["GET"])
+@login_required
+def list_sick_period_comments(sick_period_id: int):
+    """Kommentare einer Abwesenheit nachladen (AJAX, Lazy-Load)."""
+    period = db.session.get(SickPeriod, sick_period_id)
+    if not period:
+        return jsonify({"error": "nicht gefunden"}), 404
+
+    comments = db.session.scalars(
+        db.select(SickPeriodComment)
+        .where(SickPeriodComment.sick_period_id == sick_period_id)
+        .options(selectinload(SickPeriodComment.user))
+        .order_by(SickPeriodComment.id.asc())
+    ).all()
+    return jsonify({
+        "comments": [
+            _comment_to_dict(
+                c, "dashboard.delete_sick_period_comment", current_user.id, current_user.is_admin
+            )
+            for c in comments
+        ]
+    })
+
+
+@dashboard_bp.route("/sick-period-comments/<int:comment_id>/delete", methods=["POST"])
+@login_required
+def delete_sick_period_comment(comment_id: int):
+    """Eigenen Kommentar (oder als Admin fremden) an einer Abwesenheit löschen."""
+    comment = db.session.get(SickPeriodComment, comment_id)
+    if not comment:
+        return jsonify({"error": "nicht gefunden"}), 404
+    if comment.user_id != current_user.id and not current_user.is_admin:
+        return jsonify({"error": "nicht erlaubt"}), 403
+
+    period = db.session.get(SickPeriod, comment.sick_period_id)
+    db.session.delete(comment)
+    db.session.flush()
+
+    remaining = db.session.scalars(
+        db.select(SickPeriodComment)
+        .where(SickPeriodComment.sick_period_id == comment.sick_period_id)
+        .options(selectinload(SickPeriodComment.user))
+        .order_by(SickPeriodComment.id.desc())
+    ).all()
+
+    if period is not None:
+        feed_link = url_for("dashboard.index") + f"#feed-post-absence-{period.id}"
+        seen, foreign_names, latest_actor = set(), [], None
+        for c in remaining:
+            if c.user_id == period.user_id:
+                continue
+            if latest_actor is None:
+                latest_actor = c.user_id
+            if c.user_id not in seen:
+                seen.add(c.user_id)
+                foreign_names.append(c.user.display_name)
+        notif_service.upsert_comment_notification(period.user_id, feed_link, foreign_names, latest_actor)
+
+    db.session.commit()
+    return jsonify({"count": len(remaining)})
