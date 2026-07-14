@@ -8,7 +8,9 @@ from app.services.notifications import (
     delete_notification,
     list_for_user,
     mark_read,
+    render_comment_message,
     unread_count,
+    upsert_comment_notification,
 )
 
 
@@ -129,3 +131,66 @@ def test_delete_all_only_own(db):
     assert deleted == 2
     assert unread_count(a.id) == 0
     assert unread_count(b.id) == 1
+
+
+# --- 8kr1.6: render_comment_message / upsert_comment_notification ---------
+
+def test_render_comment_message_variants():
+    """1/2/3 Namen -> korrekte Bündel-Texte (analog render_like_message)."""
+    assert render_comment_message(["Anna"]) == "Anna hat deinen Beitrag kommentiert"
+    assert (
+        render_comment_message(["Anna", "Bert"])
+        == "Anna und Bert haben deinen Beitrag kommentiert"
+    )
+    assert (
+        render_comment_message(["Anna", "Bert", "Carla"])
+        == "Anna und 2 weitere haben deinen Beitrag kommentiert"
+    )
+
+
+def test_upsert_comment_notification_bundles(db):
+    """Zwei Namen -> eine Notification mit gebündeltem Text 'A und B ...'."""
+    owner = _make_user(db, "owner_bundle@test.com")
+    n = upsert_comment_notification(
+        owner.id,
+        "/dashboard/#feed-post-activity-1",
+        ["Anna", "Bert"],
+        latest_actor_id=None,
+        commit=True,
+    )
+    assert n is not None
+    assert n.type == NotificationType.ACTIVITY_COMMENTED
+    assert n.message == "Anna und Bert haben deinen Beitrag kommentiert"
+
+    count = db.session.scalar(
+        db.select(db.func.count())
+        .select_from(Notification)
+        .where(
+            Notification.user_id == owner.id,
+            Notification.type == NotificationType.ACTIVITY_COMMENTED,
+        )
+    )
+    assert count == 1
+
+
+def test_upsert_comment_notification_empty_removes(db):
+    """Leere Liste entfernt eine vorhandene UNGELESENE Bündel-Notif."""
+    owner = _make_user(db, "owner_empty@test.com")
+    upsert_comment_notification(
+        owner.id,
+        "/dashboard/#feed-post-activity-2",
+        ["Anna"],
+        latest_actor_id=None,
+        commit=True,
+    )
+    assert unread_count(owner.id) == 1
+
+    result = upsert_comment_notification(
+        owner.id,
+        "/dashboard/#feed-post-activity-2",
+        [],
+        latest_actor_id=None,
+        commit=True,
+    )
+    assert result is None
+    assert unread_count(owner.id) == 0
