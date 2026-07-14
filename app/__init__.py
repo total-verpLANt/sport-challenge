@@ -111,7 +111,11 @@ def create_app(config_class=Config):
     from app.models.connector import ConnectorCredential  # noqa: F401
     from app.models.notification import Notification  # noqa: F401
     from app.models.penalty import PenaltyOverride  # noqa: F401
-    from app.models.sick_period import SickPeriod, SickPeriodLike  # noqa: F401
+    from app.models.sick_period import (  # noqa: F401
+        SickPeriod,
+        SickPeriodComment,
+        SickPeriodLike,
+    )
     from app.models.user import User
 
     @login_manager.user_loader
