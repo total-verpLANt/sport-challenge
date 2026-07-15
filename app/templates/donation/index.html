@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2>Spendenziele – {{ challenge.name }}</h2>
+  <a href="{{ url_for('challenges.detail', public_id=challenge.public_id) }}" class="btn btn-outline-secondary btn-sm">
+    Zurück zur Challenge
+  </a>
+</div>
+
+{% if poll %}
+  {% if poll.status == "open" %}
+  <div class="alert alert-warning">
+    🗳️ Die Abstimmung über das Spendenziel läuft – neue Vorschläge sind nicht mehr möglich.
+  </div>
+  {% else %}
+  <div class="alert alert-success">
+    ✅ Die Abstimmung über das Spendenziel ist beendet.
+  </div>
+  {% endif %}
+{% endif %}
+
+{% if not proposals %}
+<div class="alert alert-info">
+  Noch keine Spendenziel-Vorschläge vorhanden.
+</div>
+{% endif %}
+
+{% for proposal in proposals %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <h5 class="card-title fw-bold mb-1">{{ proposal.name }}</h5>
+        {% if proposal.description %}
+        <p class="text-muted small mb-1">{{ proposal.description }}</p>
+        {% endif %}
+        {% if proposal.url %}
+        <a href="{{ proposal.url }}" rel="noopener noreferrer" target="_blank" class="small">
+          {{ proposal.url }}
+        </a>
+        {% endif %}
+      </div>
+      {% if current_user.is_admin or (proposal.created_by_id == current_user.id and poll is none) %}
+      <form method="post"
+            action="{{ url_for('donation.delete_proposal', proposal_id=proposal.id) }}"
+            data-confirm="Vorschlag '{{ proposal.name[:40] }}' wirklich löschen?"
+            class="d-inline ms-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger btn-sm">Löschen</button>
+      </form>
+      {% endif %}
+    </div>
+    <div class="text-muted small mt-2">
+      Eingereicht von {{ authors.get(proposal.created_by_id, "Unbekannt") }}
+      am {{ proposal.created_at.strftime('%d.%m.%Y') }}
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% if is_participant and poll is none %}
+<div class="card shadow-sm mt-4">
+  <div class="card-header"><strong>Neues Spendenziel vorschlagen</strong></div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('donation.create_proposal', public_id=challenge.public_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label for="proposal_name" class="form-label">Name <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" id="proposal_name" name="name"
+               required maxlength="255"
+               value="{{ form_data.get('name', '') if form_data else '' }}">
+      </div>
+      <div class="mb-3">
+        <label for="proposal_description" class="form-label">Beschreibung (optional)</label>
+        <textarea class="form-control" id="proposal_description" name="description"
+                  rows="3" maxlength="2000">{{ form_data.get('description', '') if form_data else '' }}</textarea>
+      </div>
+      <div class="mb-3">
+        <label for="proposal_url" class="form-label">Link (optional)</label>
+        <input type="url" class="form-control" id="proposal_url" name="url"
+               placeholder="https://…" maxlength="500"
+               value="{{ form_data.get('url', '') if form_data else '' }}">
+      </div>
+      <button type="submit" class="btn btn-primary">Vorschlag einreichen</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
