@@ -109,6 +109,11 @@ def create_app(config_class=Config):
     from app.models.bonus import BonusChallenge, BonusChallengeEntry  # noqa: F401
     from app.models.challenge import Challenge, ChallengeParticipation  # noqa: F401
     from app.models.connector import ConnectorCredential  # noqa: F401
+    from app.models.donation import (  # noqa: F401
+        DonationPoll,
+        DonationProposal,
+        DonationVote,
+    )
     from app.models.notification import Notification  # noqa: F401
     from app.models.penalty import PenaltyOverride  # noqa: F401
     from app.models.sick_period import (  # noqa: F401
