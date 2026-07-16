@@ -2,6 +2,11 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.10.1] – 2026-07-16
+
+### Sicherheit
+- Eine Sicherheitslücke in einer von der App verwendeten Komponente (Garmin-Anbindung) wurde durch ein Update geschlossen.
+
 ## [1.10.0] – 2026-07-16
 
 ### Neu
