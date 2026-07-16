@@ -325,6 +325,43 @@ def test_open_poll_twice_rejected(client, db):
     assert poll_count == 1
 
 
+def test_open_poll_notifies_participants(client, db):
+    from app.models.notification import Notification
+    from app.services.notifications import NotificationType
+
+    admin = _create_and_login(client, db, email="admin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id, days_until_end=-1)
+    _add_participation(db, admin.id, challenge.id, status="accepted")
+
+    accepted = _create_user(db, "accepted@test.com")
+    _add_participation(db, accepted.id, challenge.id, status="accepted")
+    bailed = _create_user(db, "bailed@test.com")
+    _add_participation(db, bailed.id, challenge.id, status="bailed_out")
+    outsider = _create_user(db, "outsider@test.com")  # keine Participation
+
+    _create_proposal(db, challenge.id, admin.id)
+
+    response = client.post(
+        f"/donation/{challenge.public_id}/poll/open",
+        data={"max_votes_per_user": "1"},
+    )
+    assert response.status_code == 302
+
+    notifications = db.session.scalars(
+        db.select(Notification).where(
+            Notification.type == NotificationType.DONATION_POLL_OPENED
+        )
+    ).all()
+    assert len(notifications) == 2
+    recipient_ids = {n.user_id for n in notifications}
+    assert recipient_ids == {accepted.id, bailed.id}
+    assert admin.id not in recipient_ids
+    assert outsider.id not in recipient_ids
+    for notification in notifications:
+        assert "/donation/" in notification.link_url
+        assert notification.actor_id == admin.id
+
+
 # --- Abstimmen ---------------------------------------------------------------
 
 def test_vote_within_limit(client, db):

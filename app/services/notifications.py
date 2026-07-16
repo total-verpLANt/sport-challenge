@@ -22,6 +22,7 @@ class NotificationType:
     CHALLENGE_LIFECYCLE = "challenge_lifecycle"  # Teilnehmer: Start/Ende
     ACTIVITY_LIKED = "activity_liked"          # Urheber: Beitrag geliked
     ACTIVITY_COMMENTED = "activity_commented"  # Urheber: Beitrag kommentiert
+    DONATION_POLL_OPENED = "donation_poll_opened"  # Teilnehmer: Spendenziel-Abstimmung eröffnet
 
 
 def create_notification(

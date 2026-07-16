@@ -16,6 +16,8 @@ from app.extensions import db, limiter
 from app.models.challenge import Challenge, ChallengeParticipation
 from app.models.donation import DonationPoll, DonationProposal, DonationVote
 from app.models.user import User
+from app.services import notifications as notif_service
+from app.services.notifications import NotificationType
 from app.utils.decorators import admin_required
 from app.utils.urls import is_safe_external_url
 
@@ -262,6 +264,28 @@ def open_poll(public_id):
         db.session.rollback()
         flash("Abstimmung existiert bereits.")
         return index_redirect
+
+    # Teilnehmer benachrichtigen (accepted + bailed_out, ohne den Öffner).
+    # Message enthält nur den admin-kontrollierten Challenge-Namen –
+    # NIE Vorschlags-Freitext (XSS-Invariante, siehe notifications.py).
+    participant_ids = db.session.scalars(
+        db.select(ChallengeParticipation.user_id).where(
+            ChallengeParticipation.challenge_id == challenge.id,
+            ChallengeParticipation.status.in_(["accepted", "bailed_out"]),
+            ChallengeParticipation.user_id != current_user.id,
+        )
+    ).all()
+    for user_id in participant_ids:
+        notif_service.create_notification(
+            user_id,
+            NotificationType.DONATION_POLL_OPENED,
+            f"Die Abstimmung über das Spendenziel der Challenge „{challenge.name}“ "
+            f"ist eröffnet – stimme jetzt ab!",
+            link_url=url_for("donation.index", public_id=str(challenge.public_id)),
+            actor_id=current_user.id,
+        )
+    if participant_ids:
+        db.session.commit()
 
     flash("Die Abstimmung über das Spendenziel wurde gestartet.", "success")
     return index_redirect
