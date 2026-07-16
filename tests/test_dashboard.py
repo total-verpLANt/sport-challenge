@@ -960,6 +960,117 @@ def test_unlike_one_of_two_shrinks_message(client, db):
     assert _latest_like_message(db, owner.id) == f"{stay_name} hat deinen Beitrag geliked"
 
 
+# ---------------------------------------------------------------------------
+# 1t8s.5: Spenden-Voting auf dem Dashboard (Banner, Gewinner, Detail-Link)
+# ---------------------------------------------------------------------------
+
+def _create_finished_challenge_with_participation(db, user_id, status="accepted"):
+    """Kürzlich beendete Challenge (innerhalb RECENT_FINISHED_DAYS) + Teilnahme."""
+    today = date.today()
+    challenge = Challenge(
+        name="Voting Finished Challenge",
+        start_date=today - timedelta(days=30),
+        end_date=today - timedelta(days=3),
+        penalty_per_miss=5.0,
+        bailout_fee=25.0,
+        created_by_id=user_id,
+    )
+    db.session.add(challenge)
+    db.session.commit()
+    db.session.add(
+        ChallengeParticipation(
+            user_id=user_id, challenge_id=challenge.id, status=status, weekly_goal=3
+        )
+    )
+    db.session.commit()
+    return challenge
+
+
+def _create_poll(db, challenge_id, created_by_id, status="open", winner_proposal_id=None):
+    from app.models.donation import DonationPoll
+
+    poll = DonationPoll(
+        challenge_id=challenge_id,
+        status=status,
+        max_votes_per_user=1,
+        created_by_id=created_by_id,
+        winner_proposal_id=winner_proposal_id,
+    )
+    db.session.add(poll)
+    db.session.commit()
+    return poll
+
+
+def test_dashboard_shows_voting_banner_for_participant(client, db):
+    """Beendete Challenge + offener Poll + Teilnehmer → Voting-Banner sichtbar."""
+    user = _create_and_login(client, db, email="votebanner@test.com")
+    challenge = _create_finished_challenge_with_participation(db, user.id)
+    _create_poll(db, challenge.id, user.id, status="open")
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Abstimmung" in body
+    assert f"/donation/{challenge.public_id}" in body
+
+
+def test_dashboard_hides_voting_banner_for_non_participant(client, db):
+    """Offener Poll, aber User ohne Teilnahme → kein Voting-Banner."""
+    owner = _create_and_login(client, db, email="voteowner@test.com")
+    challenge = _create_finished_challenge_with_participation(db, owner.id)
+    _create_poll(db, challenge.id, owner.id, status="open")
+
+    client.post("/auth/logout")
+    outsider = User(email="voteoutsider@test.com", is_approved=True)
+    outsider.set_password("testpass123")
+    db.session.add(outsider)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "voteoutsider@test.com", "password": "testpass123"})
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Abstimmung über das Spendenziel läuft" not in body
+
+
+def test_dashboard_shows_winner_on_finished_card(client, db):
+    """Poll closed + Gewinner → Gewinner-Name auf der Abschluss-Karte."""
+    from app.models.donation import DonationProposal
+
+    user = _create_and_login(client, db, email="votewinner@test.com")
+    challenge = _create_finished_challenge_with_participation(db, user.id)
+    proposal = DonationProposal(
+        challenge_id=challenge.id,
+        created_by_id=user.id,
+        name="Seenotretter e.V.",
+    )
+    db.session.add(proposal)
+    db.session.commit()
+    _create_poll(
+        db, challenge.id, user.id, status="closed", winner_proposal_id=proposal.id
+    )
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Seenotretter e.V." in body
+    assert "Spendenziel:" in body
+    # Offener-Poll-Banner darf bei geschlossenem Poll nicht erscheinen
+    assert "Abstimmung über das Spendenziel läuft" not in body
+
+
+def test_challenge_detail_has_donation_link(client, db):
+    """Challenge-Detailseite verlinkt auf die Spendenziel-Seite."""
+    user = _create_and_login(client, db, email="detaillink@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    resp = client.get(f"/challenges/{challenge.public_id}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert f"/donation/{challenge.public_id}" in body
+    assert "Spendenziele" in body
+
+
 def test_unlike_keeps_already_read_notification(client, db):
     """Eine bereits GELESENE Like-Notification bleibt beim Un-Like erhalten (historisch)."""
     from app.services import notifications as notif_service

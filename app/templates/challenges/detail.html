@@ -37,6 +37,11 @@
   </div>
 </div>
 
+<div class="mb-4">
+  <a href="{{ url_for('donation.index', public_id=challenge.public_id) }}"
+     class="btn btn-outline-primary">💶 Spendenziele &amp; Abstimmung</a>
+</div>
+
 {# User actions section #}
 {% if my_participation %}
   {% if my_participation.status == "invited" %}

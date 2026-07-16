@@ -91,6 +91,25 @@
 {% endfor %}
 {% endif %}
 
+{% for board in boards %}
+{% if board.poll and board.poll.status == 'open' and board.is_participant %}
+{% set poll_challenge = board.summary.challenge %}
+<div class="card border-warning mb-4">
+  <div class="card-header bg-warning text-dark">
+    <strong>🗳️ Abstimmung über das Spendenziel läuft</strong>
+  </div>
+  <div class="card-body">
+    <p class="card-text">
+      Für die Challenge <strong>{{ poll_challenge.name }}</strong> läuft gerade
+      die Abstimmung über das Spendenziel. Gib deine Stimme ab!
+    </p>
+    <a href="{{ url_for('donation.index', public_id=poll_challenge.public_id) }}"
+       class="btn btn-warning">Zur Abstimmung</a>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
 {% if not boards %}
 <div class="alert alert-info">
   <strong>Keine aktive Challenge</strong> – aktuell gibt es keine Challenge, die angezeigt werden kann.
@@ -121,6 +140,16 @@
         <span class="fs-4 fw-bold text-danger">
           {{ "%.2f"|format(total_pot)|replace(".", ",") }} €
         </span>
+        {% if board.poll and board.poll.status == 'closed' and board.winner_proposal %}
+        <div class="small mt-1">
+          Spendenziel: 🏆 <strong>{{ board.winner_proposal.name }}</strong>
+        </div>
+        {% elif board.poll and board.poll.status == 'open' %}
+        <div class="small mt-1">
+          <a href="{{ url_for('donation.index', public_id=challenge.public_id) }}"
+             class="text-decoration-none">Zur Abstimmung →</a>
+        </div>
+        {% endif %}
       </div>
     </div>
     <a href="{{ leaderboard_url }}" class="btn btn-outline-secondary btn-sm mt-3">

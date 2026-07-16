@@ -9,8 +9,10 @@ from sqlalchemy.orm import selectinload
 from app.extensions import db, limiter
 from app.models.activity import Activity, ActivityComment, ActivityLike
 from app.models.challenge import Challenge, ChallengeParticipation
+from app.models.donation import DonationProposal
 from app.models.sick_period import SickPeriod, SickPeriodComment, SickPeriodLike
 from app.models.user import User
+from app.routes.donation import _get_poll, _user_is_participant
 from app.services import notifications as notif_service
 from app.services.statistics import get_challenge_statistics
 from app.services.weekly_summary import get_challenge_summary
@@ -188,6 +190,24 @@ def _build_feed_items(current_user_id: int, page: int):
     return [d for _, d in items[start:end]], has_more
 
 
+def _poll_info(challenge: Challenge) -> dict:
+    """Poll-Anreicherung eines Boards (Epic 1t8s.5).
+
+    Liefert den DonationPoll der Challenge (oder None), den Gewinner-Vorschlag
+    (nur wenn gesetzt) und ob current_user Teilnehmer ist (accepted/bailed_out).
+    Einzel-Queries pro Board sind ok – es gibt max. eine Handvoll Boards.
+    """
+    poll = _get_poll(challenge.id)
+    winner_proposal = None
+    if poll is not None and poll.winner_proposal_id is not None:
+        winner_proposal = db.session.get(DonationProposal, poll.winner_proposal_id)
+    return {
+        "poll": poll,
+        "winner_proposal": winner_proposal,
+        "is_participant": _user_is_participant(challenge.id),
+    }
+
+
 def _build_dashboard_boards(today: date) -> list[dict]:
     """Baut die Liste der Dashboard-Boards (Top-Bereich).
 
@@ -207,7 +227,8 @@ def _build_dashboard_boards(today: date) -> list[dict]:
 
     if active:
         return [
-            {"kind": "active", "summary": get_challenge_summary(c)} for c in active
+            {"kind": "active", "summary": get_challenge_summary(c), **_poll_info(c)}
+            for c in active
         ]
 
     # Keine aktive Challenge → kürzlich beendete als Abschluss-Karten
@@ -226,7 +247,8 @@ def _build_dashboard_boards(today: date) -> list[dict]:
         finished = [newest] if newest else []
 
     return [
-        {"kind": "finished", "summary": get_challenge_summary(c)} for c in finished
+        {"kind": "finished", "summary": get_challenge_summary(c), **_poll_info(c)}
+        for c in finished
     ]
 
 
