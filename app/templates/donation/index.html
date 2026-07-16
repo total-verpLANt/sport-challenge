@@ -9,12 +9,25 @@
 
 {% if poll %}
   {% if poll.status == "open" %}
-  <div class="alert alert-warning">
-    🗳️ Die Abstimmung über das Spendenziel läuft – neue Vorschläge sind nicht mehr möglich.
+  <div class="alert alert-info">
+    🗳️ Abstimmung läuft – {{ poll.max_votes_per_user }} Stimme{{ 'n' if poll.max_votes_per_user != 1 }} pro Person.
+    Neue Vorschläge sind nicht mehr möglich.
   </div>
   {% else %}
-  <div class="alert alert-success">
-    ✅ Die Abstimmung über das Spendenziel ist beendet.
+  <div class="card border-success shadow-sm mb-4">
+    <div class="card-body">
+      {% if winner_proposal %}
+      <h5 class="card-title fw-bold mb-1">🏆 Gewinner: {{ winner_proposal.name }}</h5>
+      <p class="text-muted small mb-0">
+        Die Abstimmung über das Spendenziel ist beendet – der Spendentopf geht an dieses Ziel.
+      </p>
+      {% else %}
+      <h5 class="card-title fw-bold mb-1">Abstimmung beendet</h5>
+      <p class="text-muted small mb-0">
+        Die Abstimmung wurde ohne Stimmen beendet – es gibt keinen Gewinner.
+      </p>
+      {% endif %}
+    </div>
   </div>
   {% endif %}
 {% endif %}
@@ -50,6 +63,32 @@
       </form>
       {% endif %}
     </div>
+    {% if poll %}
+    {% set count = vote_counts.get(proposal.id, 0) %}
+    <div class="mt-3">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="badge bg-primary">{{ count }} Stimme{{ 'n' if count != 1 }}</span>
+        {% if poll.status == "open" and is_participant %}
+          {% if proposal.id in my_vote_ids %}
+          <form method="post" action="{{ url_for('donation.unvote', proposal_id=proposal.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Stimme zurückziehen</button>
+          </form>
+          {% else %}
+          <form method="post" action="{{ url_for('donation.vote', proposal_id=proposal.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-primary">Abstimmen</button>
+          </form>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div class="progress" style="height: 6px;">
+        <div class="progress-bar" role="progressbar"
+             style="width: {% if total_votes %}{{ (count * 100 / total_votes)|int }}{% else %}0{% endif %}%"
+             aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="{{ total_votes }}"></div>
+      </div>
+    </div>
+    {% endif %}
     <div class="text-muted small mt-2">
       Eingereicht von {{ authors.get(proposal.created_by_id, "Unbekannt") }}
       am {{ proposal.created_at.strftime('%d.%m.%Y') }}
@@ -82,6 +121,52 @@
                value="{{ form_data.get('url', '') if form_data else '' }}">
       </div>
       <button type="submit" class="btn btn-primary">Vorschlag einreichen</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if current_user.is_admin and poll is none and challenge.end_date < today and proposals %}
+<div class="card shadow-sm mt-4">
+  <div class="card-header"><strong>Abstimmung starten</strong></div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('donation.open_poll', public_id=challenge.public_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label for="max_votes_per_user" class="form-label">Stimmen pro Person</label>
+        <input type="number" class="form-control" id="max_votes_per_user" name="max_votes_per_user"
+               min="1" max="{{ proposals|length }}" value="1" required>
+        <div class="form-text">
+          Wie viele verschiedene Ziele darf jede Person wählen? (höchstens {{ proposals|length }})
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Abstimmung starten</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if current_user.is_admin and poll and poll.status == "open" %}
+<div class="card shadow-sm mt-4">
+  <div class="card-header"><strong>Abstimmung schließen</strong></div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('donation.close_poll', public_id=challenge.public_id) }}"
+          {% if not tie_proposal_ids %}data-confirm="Abstimmung wirklich schließen? Der Gewinner wird endgültig fixiert."{% endif %}>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if tie_proposal_ids %}
+      <p class="small mb-2">
+        ⚖️ Gleichstand an der Spitze – bitte den Gewinner unter den punktgleichen
+        Erstplatzierten auswählen:
+      </p>
+      {% for proposal in proposals if proposal.id in tie_proposal_ids %}
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="winner_proposal_id"
+               id="winner_{{ proposal.id }}" value="{{ proposal.id }}" required>
+        <label class="form-check-label" for="winner_{{ proposal.id }}">{{ proposal.name }}</label>
+      </div>
+      {% endfor %}
+      {% endif %}
+      <button type="submit" class="btn btn-danger mt-2">Abstimmung schließen</button>
     </form>
   </div>
 </div>
