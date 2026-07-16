@@ -362,6 +362,66 @@ def test_open_poll_notifies_participants(client, db):
         assert notification.actor_id == admin.id
 
 
+# --- qe46: Admin-Notification bei neuem Vorschlag ----------------------------
+
+def test_create_proposal_notifies_admins(client, db):
+    from app.models.notification import Notification
+    from app.services.notifications import NotificationType
+
+    user = _create_and_login(client, db, email="proposer@test.com")
+    challenge = _create_challenge(db, user.id)
+    _add_participation(db, user.id, challenge.id, status="accepted")
+
+    admin1 = _create_user(db, "notifadmin1@test.com")
+    admin1.role = "admin"
+    admin2 = _create_user(db, "notifadmin2@test.com")
+    admin2.role = "admin"
+    db.session.commit()
+
+    response = client.post(
+        f"/donation/{challenge.public_id}/proposals",
+        data={"name": "Tierheim Musterstadt"},
+    )
+    assert response.status_code == 302
+
+    notifications = db.session.scalars(
+        db.select(Notification).where(
+            Notification.type == NotificationType.DONATION_PROPOSAL_CREATED
+        )
+    ).all()
+    assert {n.user_id for n in notifications} == {admin1.id, admin2.id}
+    for notification in notifications:
+        # Vorschlags-Name ist User-Freitext und darf NIE in der Message landen
+        assert "Tierheim Musterstadt" not in notification.message
+        assert "/donation/" in notification.link_url
+        assert notification.actor_id == user.id
+
+
+def test_create_proposal_does_not_notify_proposing_admin(client, db):
+    from app.models.notification import Notification
+    from app.services.notifications import NotificationType
+
+    admin = _create_and_login(client, db, email="selfadmin@test.com", is_admin=True)
+    challenge = _create_challenge(db, admin.id)
+    _add_participation(db, admin.id, challenge.id, status="accepted")
+    other_admin = _create_user(db, "otheradmin@test.com")
+    other_admin.role = "admin"
+    db.session.commit()
+
+    response = client.post(
+        f"/donation/{challenge.public_id}/proposals",
+        data={"name": "Hospiz"},
+    )
+    assert response.status_code == 302
+
+    notifications = db.session.scalars(
+        db.select(Notification).where(
+            Notification.type == NotificationType.DONATION_PROPOSAL_CREATED
+        )
+    ).all()
+    assert {n.user_id for n in notifications} == {other_admin.id}
+
+
 # --- Abstimmen ---------------------------------------------------------------
 
 def test_vote_within_limit(client, db):

@@ -190,6 +190,24 @@ def create_proposal(public_id):
     db.session.add(proposal)
     db.session.commit()
 
+    # Admins über den neuen Vorschlag informieren (ohne den Einreicher).
+    # Message enthält nur display_name + admin-kontrollierten Challenge-Namen –
+    # NIE den Vorschlags-Namen (User-Freitext, XSS-Invariante in notifications.py).
+    admin_ids = db.session.scalars(
+        db.select(User.id).where(User.role == "admin", User.id != current_user.id)
+    ).all()
+    for admin_id in admin_ids:
+        notif_service.create_notification(
+            admin_id,
+            NotificationType.DONATION_PROPOSAL_CREATED,
+            f"{current_user.display_name} hat ein neues Spendenziel für "
+            f"„{challenge.name}“ vorgeschlagen.",
+            link_url=url_for("donation.index", public_id=str(challenge.public_id)),
+            actor_id=current_user.id,
+        )
+    if admin_ids:
+        db.session.commit()
+
     flash("Spendenziel-Vorschlag wurde angelegt.", "success")
     return redirect(url_for("donation.index", public_id=str(challenge.public_id)))
 

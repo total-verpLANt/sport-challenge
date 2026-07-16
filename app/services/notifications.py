@@ -23,6 +23,7 @@ class NotificationType:
     ACTIVITY_LIKED = "activity_liked"          # Urheber: Beitrag geliked
     ACTIVITY_COMMENTED = "activity_commented"  # Urheber: Beitrag kommentiert
     DONATION_POLL_OPENED = "donation_poll_opened"  # Teilnehmer: Spendenziel-Abstimmung eröffnet
+    DONATION_PROPOSAL_CREATED = "donation_proposal_created"  # Admins: neuer Spendenziel-Vorschlag
 
 
 def create_notification(
