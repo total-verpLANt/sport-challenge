@@ -498,7 +498,31 @@ Aktualisiert bei jedem Wachwechsel (Skill `/wachwechsel`). Alte Einträge nicht 
 
 ---
 
+## CI / GitHub Actions
+
+### 2026-07-16: Rote CI heißt nicht zwingend eigener Code – pip-audit schlägt bei neuen CVEs commit-unabhängig fehl
+
+**Erkenntnis:** Drei „Docker Publish"-Läufe wurden rot, obwohl der gepushte Feature-Code fehlerfrei war. Ursache: Der `pip-audit -r requirements.txt`-Step prüft bei **jedem** Lauf gegen die aktuelle Vulnerability-Datenbank. Die frisch veröffentlichte CVE-2026-54447 in `garminconnect 0.3.3` ließ den Step fehlschlagen – der letzte grüne Lauf am Vortag lief mit **identischer** requirements.txt.
+
+**Warum relevant:** Die naheliegende Diagnose „mein letzter Commit hat die CI gebrochen" ist hier falsch und kostet Zeit in der falschen Richtung. Signatur des Musters: Lauf bricht **früh** ab (~30 s statt ~5–6 min) und der letzte grüne Lauf liegt zeitlich vor der CVE-Veröffentlichung.
+
+**Wie umgehen:** (1) Bei roter CI zuerst `gh run view <id> --log-failed` lesen, bevor man den eigenen Diff verdächtigt. (2) Fix: Dependency auf die im pip-audit-Output genannte Fix-Version heben (hier 0.3.5), Import-Kompatibilität + volle Suite lokal prüfen, `pip-audit` lokal gegenlaufen lassen („No known vulnerabilities found"), dann pushen. (3) In der Claude-Sandbox: `XDG_CACHE_HOME=$TMPDIR gh run view …` und `uv pip install --cache-dir "$TMPDIR/uv-cache" …`, da die Standard-Cache-Pfade außerhalb der Schreib-Allowlist liegen.
+
+**Wo sichtbar:** Commits `a78d7ce` (fix, v1.10.1); fehlgeschlagene Läufe 29479498123/29480936529/29481302950, grüner Fix-Lauf 29491432629 (2026-07-16).
+
+---
+
 ## Tooling: Beads (bd) / Dolt
+
+### 2026-07-16: `bd dep add A B` bedeutet „A hängt von B ab" – Richtung immer mit `bd ready` verifizieren
+
+**Erkenntnis:** `bd dep add <X> <Y>` legt die Abhängigkeit **X depends on Y** an (Y blockiert X). Das Beispiel in der set-course-Skill-Doku suggeriert die umgekehrte Richtung („issue-2 is blocked by issue-1" bei `bd dep add issue-1 issue-2`) – beim Epic `1t8s` wurden dadurch alle 7 Kanten zunächst invertiert verdrahtet: `bd ready` zeigte das **letzte** Issue (Doku/Version) als startbereit statt der Wave-1-Issues.
+
+**Warum relevant:** Ein invertierter Dependency-Graph fällt ohne Gegenprobe erst mitten in der Ausführung auf (falsches Issue wird zuerst bearbeitet). Zusätzliche Stolperfalle beim Anlegen: Kind-Issues unter einem Epic bekommen Punkt-Suffixe (`1t8s.1`), ein Regex wie `sport-challenge-[a-z0-9]+` matcht nur den Epic-Teil vor dem Punkt.
+
+**Wie umgehen:** (1) Merkregel: erst das **abhängige** Issue, dann sein **Blocker** (`bd dep add <blocked> <blocker>`). (2) Nach dem Verdrahten immer `bd ready` gegenprüfen: Es müssen exakt die Wave-1-Issues erscheinen. (3) Die bd-Ausgabe bestätigt die Richtung im Klartext („X depends on Y (blocks)") – lesen, nicht überfliegen.
+
+**Wo sichtbar:** Session 2026-07-15 (Epic `1t8s`, Spenden-Voting), Korrektur direkt nach `bd ready`-Gegenprobe.
 
 ### 2026-07-14: `bd dolt push` hängt und sperrt die bd-DB
 

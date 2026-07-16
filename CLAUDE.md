@@ -50,35 +50,35 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Aktueller Stand (2026-07-15, Wachwechsel #22)
+## Aktueller Stand (2026-07-16, Wachwechsel #23)
 
-**Aktive Arbeit:** Keine. **v1.9.1**, gepusht auf `origin/main`. **338 Tests grün.**
+**Aktive Arbeit:** Keine. **v1.10.2**, gepusht auf `origin/main`, **deployed & vom Kapitän bestätigt**. **376 Tests grün**, CI (Docker Publish) grün. Git-Tag `v1.10.2` auf `134e233`.
 
 **Oberstes Prinzip:** Änderungen dürfen die laufende Prod-Instanz **nie** gefährden (nur additiv/non-destruktiv). Erfordert eine Änderung einen Eingriff in Prod (z. B. neue `.env`-Var, Image-Rebuild, Migration), muss das im Abschluss-Report **explizit hervorgehoben** werden.
 
-**Abgeschlossen diese Wache (#22):**
-- `yyo3` → **Bugfix v1.9.1:** Kommentar-Button im Feed reagierte nicht. Ursache: `{% block scripts %}` war in `dashboard/index.html` **innerhalb** von `{% block content %}` verschachtelt → Jinja2 renderte das Feed-Script **doppelt**, doppelte Click-Delegation togglete den Kommentarbereich auf+zu. Fix: ein `endblock` verschoben (Commit `5a5cea3`). Verifiziert: 338 pytest + Playwright-E2E (Toggle, Senden, Lazy-Load, kein Doppel-Submit). Siehe lessons-learned (Jinja2-Templates).
-- **dolt-Lock gelöst + bd-Buchungen nachgeholt:** Alle Closes aus Wache #21 gebucht (`8kr1.3`–`.7`, Epic `8kr1`, `yyo3`), bd-Schema-Migration v49→v53 als einziger Clone durchgeführt, `bd remember`-Pointer gesetzt.
+**Abgeschlossen diese Wache (#23):**
+- **Epic `1t8s` → Spenden-Voting v1.10.0** (7 Issues, 5 Waves via make-it-so): Teilnehmer (accepted **und** bailed_out) schlagen Spendenziele vor (Name Pflicht, Beschreibung/Link optional); Admin öffnet nach `end_date` die Abstimmung mit einstellbarem `max_votes_per_user`, Live-Zwischenstand ohne Voter-Namen, Admin schließt manuell (Gleichstand → Radio-Auswahl unter Punktgleichen, serverseitig validiert). Neu: `app/models/donation.py` (3 Tabellen, Migration `1e5248e475d7` — **in Prod ausgerollt**), `app/routes/donation.py` (7 Routen), `app/utils/urls.py::is_safe_external_url` (http/https-Whitelist), `donation/index.html` (rein Form-basiert, kein JS), Dashboard-Banner/Gewinner-Anzeige, Notification `donation_poll_opened`. Security-Audit: PASS_WITH_NOTES. Plan/Research archiviert unter `.schrammns_workflow/plans_archive/` bzw. `research/2026-07-15-spenden-voting-feature.md`.
+- **`fix(security)` → v1.10.1:** garminconnect 0.3.3→0.3.5 (CVE-2026-54447). CI-pip-audit hatte 3 Läufe rot gefärbt — Ursache war die frisch veröffentlichte CVE, nicht der Feature-Code. Siehe lessons-learned (CI/pip-audit).
+- **`vnjb` + `qe46` → v1.10.2:** Dashboard-Link „Spendenziel vorschlagen" in der Vorschlagsphase (aktive + Abschluss-Karte, nur Teilnehmer, nur solange kein Poll) und Admin-Notification `donation_proposal_created` bei neuem Vorschlag (Vorschlags-Name als User-Freitext bewusst NICHT in der Message — XSS-Invariante).
 
-**Vorherige Wache (#21, kompakt):** `uat2` → Long-Life-Login („Angemeldet bleiben", 30 Tage) **v1.8.0**; Session/Remember-Token ans Passwort gebunden **v1.8.1** (ohne Migration). `8kr1` (Epic) → Kommentarfunktion im Social-Feed (Aktivitäten + Abwesenheiten, gebündelte Notification, 6 Routen, IDOR-403, Lazy-Load, nonce-Script) **v1.9.0** – neue Migration `sick_period_comments`.
+**Prod-Status:** v1.10.2 ist ausgerollt, Migration `1e5248e475d7` gelaufen. **Keine ausstehenden Prod-Eingriffe.**
 
-**⚠️ Prod-Eingriffe bei den ausstehenden Deploys (explizit):**
-- **Eine additive Migration** `sick_period_comments` (v1.9.0) → läuft **automatisch** beim Container-Start (entrypoint.sh). Non-destruktiv.
-- **Einmaliger Sammel-Logout** beim ersten Deploy mit v1.8.1: das `User.get_id`-Format ändert sich → alle bestehenden Sessions werden **einmalig** ungültig (danach 30-Tage-Remember). Keine Datengefahr.
-- Kein Env-/Dependency-/Dockerfile-Eingriff diese Wache.
+**⚠️ Einziger offener Punkt (bd-Sync):** `bd dolt push` **im externen Terminal** ausführen (Closes dieser Wache: Epic `1t8s` + `.1`–`.7`, `vnjb`, `qe46`; neue Tickets `m70u`, plus `bd remember`). **Regel: `bd dolt push` NIE aus der Claude-Session** (Sandbox-Proxy killt `git-remote-http`, Zombie hält `noms/LOCK`). Details: lessons-learned (Beads/Dolt).
 
-**⚠️ Einziger offener Punkt (bd-Sync):** `bd dolt push` muss noch **im externen Terminal** ausgeführt werden (synchronisiert Closes + Schema-Migration nach `refs/dolt/data` im GitHub-Repo). **Regel: `bd dolt push` NIE aus der Claude-Session** – der Sandbox-Proxy lässt `git-remote-http` sterben (TCP CLOSED), der Zombie hält `noms/LOCK` und blockiert danach jede bd-Operation. Diagnose bei Hänger: `lsof .beads/embeddeddolt/sport_challenge/.dolt/noms/LOCK`, Zombies extern killen. Lokale bd-Writes (create/close/remember) sind unkritisch. Details: lessons-learned (Beads/Dolt).
-
-**Bestehende Konvention:** **Keine inline-Event-Handler** (`onchange`/`onclick`/…) in Templates – CSP blockiert sie. Stattdessen nonce-signiertes `<script>` mit `addEventListener`. CSP **nie** mit `unsafe-inline` aufweichen. (Erneut bestätigt in `8kr1.5`.)
+**Bestehende Konventionen (bestätigt):** Keine inline-Event-Handler (CSP, nonce-Scripts); `{% block scripts %}` nie in `{% block content %}` verschachteln; Subagenten committen/pushen NIE (Lead reviewt, testet, committet atomar pro Issue).
 
 **Optimierungs-Backlog (für die geplante große Runde):**
 - **Tests/Quality:** `r96z` (Route-Smoke ≠ 500) · `w7e1` (Playwright-E2E in CI) · `fzku` (`scalar_one_or_none`-Audit) · `wkvn` (Migrations-Drift) · `w5os` (vulture+mypy+coverage) · `iofv` (Security-Header-Test)
 - **Performance:** `379m` (Slow-Endpoints, N+1, Profiling) · `qt72` (DB-Index-Audit)
-- **Security:** `izas` (IDOR/Autorisierung) · `b2u0` (CSP-Audit) · `j0b5` (Upload-Härtung) · `ytum` (Dependency/Secret-Hygiene)
+- **Security:** `izas` (IDOR/Autorisierung) · `b2u0` (CSP-Audit) · `j0b5` (Upload-Härtung) · `ytum` (Dependency/Secret-Hygiene) · **neu:** `m70u` (Spenden-Voting Härtung: Vote-Limit-TOCTOU + Waisen-Votes bei Admin-Löschung, 2× LOW aus Audit, P3)
 
-**Restliche offene Queue:** `kfzb` (Notif Challenge start/ende – **ZEITbasiert, kein Scheduler** → Mechanik offen) · `2ar3` (PayPal-Spendenlink – **braucht Migration** `donation_url`) · `g6lz` (/challenges alle Einladungen, Plural) · `na54` (Menü-Link `/challenges` fehlt) · `tjs` (Rest: 404/500-Seiten, Limiter-Backend, robots.txt) · `4t4`/`18t` (KI-Screenshot).
+**Restliche offene Queue:** `kfzb` (Notif Challenge start/ende – **ZEITbasiert, kein Scheduler** → Mechanik offen) · `2ar3` (PayPal-Spendenlink – **braucht Migration** `donation_url`; Hinweis: Voting-Gewinner aus `1t8s` kann den Link künftig speisen) · `g6lz` (/challenges alle Einladungen, Plural) · `na54` (Menü-Link `/challenges` fehlt) · `tjs` (Rest: 404/500-Seiten, Limiter-Backend, robots.txt) · `4t4`/`18t` (KI-Screenshot).
 
 **Bestehender Grenzfall (unverändert):** Aktivität exakt um 00:00 Uhr fällt im `_ranking`-Filter (`if v`) beim Frühaufsteher raus – bewusst nicht gefixt (siehe `docs/lessons-learned.md`).
+
+### Nachricht vom scheidenden Wachoffizier (2026-07-16)
+
+> Zwei Dinge, die diese Wache gelehrt hat: Erstens, wenn die CI plötzlich rot wird, prüfe zuerst den pip-audit-Step, bevor du deinen eigenen Code verdächtigst — bei uns war es eine über Nacht veröffentlichte CVE in `garminconnect`, drei Läufe sahen nach Feature-Bruch aus und waren keiner. Zweitens: `bd dep add A B` heißt „A hängt von B ab", genau andersherum als das Beispiel in der set-course-Skill-Doku — ich habe die Kanten des Epics einmal komplett falsch herum verdrahtet und erst `bd ready` hat es verraten; verifiziere Dependency-Verdrahtung immer damit. Das Spenden-Voting ist bewusst komplett Form-basiert ohne JavaScript gebaut — wer dort UI nachrüstet, sollte das nicht ohne Not aufgeben, es hat uns die ganze CSP-/Doppel-Script-Problematik von yyo3 erspart.
 
 ### Einstieg für neue Sessions
 
