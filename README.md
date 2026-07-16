@@ -11,6 +11,7 @@ Flask-Webanwendung für Fitness-Challenges mit Leaderboard, Strafberechnung und 
 - **Bonus-Challenges:** Admin-definierte Termine (z.B. 50 Squat Jumps), Zeiterfassung mit Ranking und Video-Beweis
 - **Benachrichtigungen:** Glocke in der Navbar mit Ungelesen-Zähler und Dropdown (Einladungen, neue Registrierungen für Admins u. a.); einzeln oder alle löschbar
 - **Bailout-Option:** Teilnehmer können aussteigen (+25 € Gebühr), werden im Leaderboard ausgegraut
+- **Spenden-Voting:** Teilnehmer schlagen Spendenziele vor (Name Pflicht, Beschreibung/Link optional). Nach Challenge-Ende öffnet ein Admin die Abstimmung mit konfigurierbarer Stimmenzahl pro Person; der Zwischenstand ist live sichtbar (ohne Namen, geheime Stimmabgabe). Der Admin schließt die Abstimmung manuell – bei Gleichstand wählt er den Gewinner – und das Ergebnis erscheint auf dem Dashboard
 - **Connector-Architektur:** Garmin (Credentials-Form) und Strava (OAuth2) integriert; weitere Provider erweiterbar
 - Credentials werden Fernet-verschlüsselt in der DB gespeichert; Passwörter mit scrypt N=2^17 gehasht
 

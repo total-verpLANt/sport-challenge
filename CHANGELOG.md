@@ -2,6 +2,14 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.10.0] – 2026-07-16
+
+### Neu
+- Ihr könnt jetzt **gemeinsam entscheiden, wohin der Spendentopf geht**: Jeder Teilnehmer kann Spendenziele vorschlagen – mit Name, kurzer Beschreibung und Link.
+- Nach dem Ende der Challenge startet ein Admin die **Abstimmung** und legt fest, wie viele Stimmen jede und jeder hat.
+- Während der Abstimmung siehst du den **Zwischenstand live** – wer wofür gestimmt hat, bleibt geheim.
+- Du bekommst eine **Benachrichtigung** über die Glocke, sobald die Abstimmung startet. Das Gewinner-Ziel erscheint nach der Abstimmung auf der Startseite.
+
 ## [1.9.1] – 2026-07-14
 
 ### Behoben
