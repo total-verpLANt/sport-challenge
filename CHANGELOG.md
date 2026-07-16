@@ -2,6 +2,12 @@
 
 Hier siehst du, was sich in jeder Version der App geändert hat.
 
+## [1.10.2] – 2026-07-16
+
+### Verbessert
+- Auf der Startseite siehst du jetzt direkt den Link **„Spendenziel vorschlagen"**, solange die Vorschlagsrunde läuft – du musst nicht mehr erst die Challenge-Seite öffnen.
+- Admins bekommen eine **Benachrichtigung**, sobald jemand ein neues Spendenziel vorschlägt.
+
 ## [1.10.1] – 2026-07-16
 
 ### Sicherheit
