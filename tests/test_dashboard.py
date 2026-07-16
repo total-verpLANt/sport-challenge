@@ -1089,3 +1089,61 @@ def test_unlike_keeps_already_read_notification(client, db):
     client.post(f"/dashboard/activities/{activity.id}/like")
     assert _count_like_notifications(db, owner.id) == 1
     assert _count_unread_like_notifications(db, owner.id) == 0
+
+
+# ---------------------------------------------------------------------------
+# vnjb: Dashboard-Hinweis "Spendenziel vorschlagen" während der Vorschlagsphase
+# ---------------------------------------------------------------------------
+
+def test_dashboard_shows_propose_hint_on_active_card(client, db):
+    """Aktive Challenge + Teilnehmer + kein Poll → Vorschlags-Hinweis sichtbar."""
+    user = _create_and_login(client, db, email="proposehint@test.com")
+    challenge, _ = _create_challenge_with_participation(db, user.id)
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Spendenziel vorschlagen" in body
+    assert f"/donation/{challenge.public_id}" in body
+
+
+def test_dashboard_shows_propose_hint_on_finished_card(client, db):
+    """Beendete Challenge ohne Poll + Teilnehmer → Vorschlags-Hinweis sichtbar."""
+    user = _create_and_login(client, db, email="proposehintfin@test.com")
+    challenge = _create_finished_challenge_with_participation(db, user.id)
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Spendenziel vorschlagen" in body
+    assert f"/donation/{challenge.public_id}" in body
+
+
+def test_dashboard_hides_propose_hint_when_poll_exists(client, db):
+    """Sobald ein Poll existiert, verschwindet der Vorschlags-Hinweis."""
+    user = _create_and_login(client, db, email="proposehintpoll@test.com")
+    challenge = _create_finished_challenge_with_participation(db, user.id)
+    _create_poll(db, challenge.id, user.id, status="open")
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Spendenziel vorschlagen" not in body
+
+
+def test_dashboard_hides_propose_hint_for_non_participant(client, db):
+    """User ohne Teilnahme sieht den Vorschlags-Hinweis nicht."""
+    owner = _create_and_login(client, db, email="proposehintowner@test.com")
+    _create_challenge_with_participation(db, owner.id)
+
+    client.post("/auth/logout")
+    outsider = User(email="proposehintout@test.com", is_approved=True)
+    outsider.set_password("testpass123")
+    db.session.add(outsider)
+    db.session.commit()
+    client.post("/auth/login", data={"email": "proposehintout@test.com", "password": "testpass123"})
+
+    resp = client.get("/dashboard/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Spendenziel vorschlagen" not in body
